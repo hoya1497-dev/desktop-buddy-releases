@@ -491,7 +491,7 @@
     b.classList.toggle('bite', fishing.state === 'bite');
     b.textContent = { idle: '🎣 던지기', result: '🎣 다시 던지기', casting: '던지는 중…', waiting: '당기기', bite: '❗ 지금 당겨!', reeling: '감는 중…' }[fishing.state];
     b.disabled = fishing.state === 'casting' || fishing.state === 'reeling' || (u && u.castsLeft <= 0 && (fishing.state === 'idle' || fishing.state === 'result'));
-    if (u) $('castInfo').textContent = `오늘 ${u.castsLeft}번 남음`;
+    if (u) $('castInfo').textContent = u.castsLeft >= 9999 ? '횟수 제한 없음 🎣' : `오늘 ${u.castsLeft}번 남음`;
   }
   function onFishCast(m) {
     fishing.state = 'waiting';

@@ -711,6 +711,12 @@
     $('lightBtn').classList.toggle('off', !v.editable);
 
     $('allPetsBox').checked = !!S.view?.showAllPets;
+    // 제작자 후원 링크 (서버에 설정했을 때만 보임)
+    const sup = catalog.support;
+    $('supportBtn').hidden = !(sup && /^https:\/\//.test(sup.url));
+    if (sup) $('supportBtn').onclick = () => {
+      if (confirm(`${sup.text || '만든 사람에게 커피 한 잔 사 주실래요? ☕'}\n\n외부 결제 페이지가 브라우저로 열려요. 게임 안에서는 돈이 오가지 않아요.`)) window.open(sup.url);
+    };
     if (window.HomeGame) HomeGame.renderPanels();
     $('chatHint').textContent = S.room ? '' : '혼자일 땐 말풍선만 떠요. 친구 집에 놀러 가 보세요.';
     if (!$('computer').hidden) renderComputer();
