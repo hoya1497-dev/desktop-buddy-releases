@@ -249,3 +249,10 @@ body.mini .top, body.mini .toolbar, body.mini .selbar, body.mini aside, body.min
 body.mini #updateBar, body.mini #toasts, body.mini .modal, body.mini .knock, body.mini #offlineCover, body.mini .deco-hint { display: none !important; }
 body.mini .stage-wrap { padding: 4px; }
 body.mini #room { border-radius: 8px; cursor: pointer !important; }
+
+/* ---------------- 낚시터 모드 */
+#leaveFishBtn { display: none; }
+body.fishing-mode #leaveFishBtn { display: inline-block; }
+body.fishing-mode #deskBtn, body.fishing-mode #decoBtn, body.fishing-mode #lightBtn { display: none; }
+#castBtn.bite { animation: bitePulse .35s infinite alternate; background: var(--danger); border-color: var(--danger); color: #fff; }
+@keyframes bitePulse { from { transform: scale(1); } to { transform: scale(1.08); } }

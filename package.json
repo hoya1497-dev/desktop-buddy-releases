@@ -9,7 +9,10 @@
     "server": "node server/server.js",
     "dist": "electron-builder --publish never",
     "admin": "node server/admin.js",
-    "release": "electron-builder --publish always"
+    "release": "electron-builder --publish always",
+    "beta": "electron . --profile=1 --server=ws://localhost:8787",
+    "beta2": "electron . --profile=2 --server=ws://localhost:8787",
+    "beta-real": "electron . --profile=real"
   },
   "dependencies": {
     "ws": "^8.18.0",

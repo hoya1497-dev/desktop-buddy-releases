@@ -198,6 +198,7 @@
         <button id="deskBtn" class="ghost">🖥️ 컴퓨터</button>
         <button id="decoBtn" class="ghost">✏️ 꾸미기</button>
         <button id="lightBtn" class="ghost">💡 불 끄기</button>
+        <button id="leaveFishBtn" class="primary">🏠 낚시터에서 나가기</button>
         <button id="panelBtn" class="ghost panel-btn" title="오른쪽 패널 접기/펴기 (Ctrl+B)">패널 닫기 ▶</button>
         <span class="pet-stats">
           <span title="배부름">🍖 <span class="bar"><i id="fullBar"></i></span></span>
@@ -294,7 +295,7 @@
         </div>
       </div>
       <div class="pane" id="pane-fishing">
-        <canvas id="fishScene" class="fish-scene" width="300" height="190"></canvas>
+        <p class="note">🎣 왼쪽 큰 화면이 낚시터예요. 같은 집에 있는 친구가 낚시 탭을 열면 옆자리에 앉아요. 창을 닫아도 낚시터에 있는 걸로 돼서, 미니맵을 켜 두면 낚시터가 작게 보여요.</p>
         <div class="fish-ctl">
           <button id="castBtn" class="primary">🎣 던지기</button>
           <span id="castInfo" class="note-inline"></span>
@@ -367,6 +368,11 @@
         <h3>화면에 띄우기</h3>
         <label class="check"><input id="timerPinBox" type="checkbox"> 📌 타이머를 화면에 고정 <span class="note-inline">(다른 창 위에 작게 떠 있어요)</span></label>
         <label class="check"><input id="miniPinBox" type="checkbox"> 🗺️ 집 창을 닫으면 미니맵으로 작게 보기</label>
+        <h3>소리</h3>
+        <div class="row" style="align-items:center;gap:8px">
+          <label class="check" style="margin:0"><input id="timerSoundBox" type="checkbox"> 🔔 끝나면 삐비빅 소리 내기</label>
+          <button id="timerTestBtn" type="button" class="ghost small">🔊 들어보기</button>
+        </div>
       </div>
       <div class="pane" id="pane-games">
         <p class="note">친구한테 대결을 신청하거나, 🤖 AI랑 연습해 봐요.</p>

@@ -315,11 +315,14 @@
     ctx.drawImage(dc, 0, 0, RW, RH);
   }
 
+  // 낚시터에 있으면 집 그림 자리에 큰 낚시터를 그림 (미니맵도 같음)
+  const fishingMode = () => !!(window.HomeGame && HomeGame.fishingActive());
   function render() {
     ctx.setTransform(K, 0, 0, K, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, RW, RH);
     if (!catalog) return;
+    if (fishingMode()) { HomeGame.drawFishing(ctx, RW, RH, MINI); return; }
     drawHouse();
     const flat = layout.filter((it) => it.item === 'rug');
     flat.forEach(drawItem);
@@ -360,6 +363,7 @@
 
   canvas.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
+    if (fishingMode()) { if (!MINI) HomeGame.fishClick(); return; }
     const p = toRoom(e);
     if (decorating) {
       const it = itemAt(p);
@@ -389,6 +393,7 @@
       }
       return;
     }
+    if (e.target === canvas && fishingMode()) { canvas.style.cursor = 'pointer'; return; }
     if (e.target === canvas) {
       const hov = decorating ? itemAt(p) : (petAt(p) || itemAt(p)?.item === 'computer');
       canvas.style.cursor = hov ? (decorating ? 'move' : 'pointer') : 'default';
@@ -646,8 +651,16 @@
     b.onclick = () => {
       document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('active', x === b));
       document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('active', p.id === 'pane-' + b.dataset.tab));
+      setFishingLook(b.dataset.tab === 'fishing');
     };
   });
+  // 낚시터에 들어가면 집 꾸미기 · 불 · 컴퓨터 버튼 대신 '집으로 돌아가기'
+  function setFishingLook(on) {
+    document.body.classList.toggle('fishing-mode', on);
+    if (on && decorating) $('decoBtn').click();
+    if (on) { closeComputer(); $('friends').hidden = true; }
+  }
+  $('leaveFishBtn').onclick = () => document.querySelector('.tabs button[data-tab=chat]').click();
   function shopRow(icon, name, sub, buttons) {
     const el = document.createElement('li');
     let ico = icon;
@@ -682,7 +695,7 @@
     $('fullBar').style.width = u.pet.full + '%';
     $('moodBar').style.width = u.pet.mood + '%';
     $('homeTitle').textContent = v.editable ? '🏠 내 집' : `🏠 ${v.owner.nickname}님의 집`;
-    $('miniTitle').textContent = $('homeTitle').textContent + (S.room ? ` · ${S.peers.length + 1}명` : '');
+    $('miniTitle').textContent = MINI && S.fishing ? '🎣 낚시터' : $('homeTitle').textContent + (S.room ? ` · ${S.peers.length + 1}명` : '');
     // 남의 집에 놀러 왔으면 그 집 아쿠아리움도 바로 볼 수 있게
     const visiting = S.room && !S.room.isOwner;
     $('friendAquaBtn').hidden = !visiting;
@@ -879,6 +892,7 @@
   function renderTimers() {
     $('timerPinBox').checked = !!timers.pin;
     $('miniPinBox').checked = !!timers.miniPin;
+    $('timerSoundBox').checked = timers.sound !== false;
     const ul = $('timerList'); ul.textContent = '';
     if (!timers.timers.length) { const li = document.createElement('li'); li.className = 'note'; li.textContent = '아직 타이머가 없어요. 위에서 만들어 보세요!'; ul.append(li); return; }
     for (const t of timers.timers) {
@@ -919,6 +933,8 @@
   });
   $('timerPinBox').onchange = (e) => buddy.send('timer-pin', e.target.checked);
   $('miniPinBox').onchange = (e) => buddy.send('mini-pin', e.target.checked);
+  $('timerSoundBox').onchange = (e) => buddy.send('timer-sound', e.target.checked);
+  $('timerTestBtn').onclick = () => buddy.send('timer-test');
 
   // home-game.js(낚시 · 펫 · 상점 등)가 쓰는 도구
   window.HomeCore = {

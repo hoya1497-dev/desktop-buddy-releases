@@ -9,6 +9,17 @@ const fs = require('fs');
 const WebSocket = require('ws');
 const { createUpdater } = require('./updater');
 
+// ---------------------------------------------------------------- 베타 테스트 (npm run beta / beta2)
+// 개발용으로 켤 때만: --profile=2 처럼 주면 저장 폴더를 따로 써서 앱을 여러 개 동시에 켤 수 있고,
+// --server=ws://localhost:8787 처럼 주면 그 서버로 접속해요. 설치한 앱(친구들 앱)에는 영향이 없어요.
+const argOf = (k) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : null; };
+const BETA = app.isPackaged ? {} : { profile: argOf('profile'), server: argOf('server') };
+if (!app.isPackaged) {
+  // 개발용은 설치한 앱과 설정 · 자동 로그인을 섞지 않도록 다른 폴더 사용
+  app.setPath('userData', path.join(app.getPath('appData'), 'Desktop Buddy Dev' + (BETA.profile ? ' ' + BETA.profile : '')));
+}
+const BETA_TAG = BETA.profile ? `[베타 ${BETA.profile}] ` : !app.isPackaged ? '[개발] ' : '';
+
 // ---------------------------------------------------------------- 설정
 // 배포용 기본값: 서버를 인터넷에 올린 뒤 src/defaults.json의 serverUrl만 바꾸고 설치 파일을 만들면
 // 친구들은 아무 설정 없이 바로 접속돼요.
@@ -33,6 +44,7 @@ const DEFAULT_CONFIG = {
   showPetsDesktop: true,   // 꺼내 둔 펫이 바탕화면에서도 캐릭터를 따라다님
   timers: [],              // 세션 타이머 [{ id, name, minutes, repeat, state, endsAt, left, round }]
   timerPin: false,         // 화면에 타이머 고정
+  timerSound: true,        // 타이머가 끝나면 삐비빅 소리
   miniPin: false,          // 집 창을 닫으면 미니맵으로 보이기
   timerBounds: null, miniBounds: null,
   statusRules: [
@@ -47,6 +59,7 @@ let config = { ...DEFAULT_CONFIG };
 
 function loadConfig() {
   try { config = { ...DEFAULT_CONFIG, ...JSON.parse(fs.readFileSync(userFile('config.json'), 'utf8')) }; } catch {}
+  if (BETA.server) config.serverUrl = BETA.server;
   // 설치본인데 개발할 때 쓰던 내 컴퓨터 서버 주소가 남아 있으면 배포용 서버 주소로 바꿈
   if (app.isPackaged && /^wss?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(config.serverUrl || '') && !/localhost|127\.0\.0\.1/.test(DEFAULTS.serverUrl)) {
     config.serverUrl = DEFAULTS.serverUrl;
@@ -123,8 +136,8 @@ function secure(win) {
   });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
 }
-const webPreferences = () => ({
-  preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false,
+const webPreferences = (extra = {}) => ({
+  preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false, ...extra,
 });
 
 function displayInfo() {
@@ -138,7 +151,8 @@ function createOverlay() {
     x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height,
     title: 'DesktopBuddyOverlay', transparent: true, frame: false, resizable: false, movable: false,
     hasShadow: false, skipTaskbar: true, focusable: false, alwaysOnTop: true, backgroundColor: '#00000000',
-    webPreferences: webPreferences(),
+    // 타이머 알람 소리는 오버레이에서 냄 (누르지 않아도 소리가 나게)
+    webPreferences: webPreferences({ autoplayPolicy: 'no-user-gesture-required', backgroundThrottling: false }),
   });
   secure(overlay);
   overlay.setAlwaysOnTop(true, 'screen-saver');
@@ -169,7 +183,7 @@ function showControl() {
 function showHome(focusChat = false) {
   if (!session) { showLogin(); return; }
   if (!home || home.isDestroyed()) {
-    home = makeWindow('home.html', { width: 1220, height: 720, minWidth: 720, minHeight: 560, title: '🏠 Desktop Buddy 집' });
+    home = makeWindow('home.html', { width: 1220, height: 720, minWidth: 720, minHeight: 560, title: `${BETA_TAG}🏠 Desktop Buddy 집` });
     for (const ev of ['show', 'hide', 'minimize', 'restore']) home.on(ev, () => setTimeout(updateWidgets, 50));
   }
   const go = () => { showWin(home); pushHome(); pushTimers(); if (focusChat) home.webContents.send('focus-chat'); updateWidgets(); };
@@ -192,7 +206,7 @@ function createTray() {
 function updateTray() {
   if (!tray) return;
   const coins = session ? ` · 🪙 ${session.user.coins.toLocaleString()}` : '';
-  tray.setToolTip(`Desktop Buddy${coins}${room ? ` · ${room.owner.nickname}님의 방` : ''}`);
+  tray.setToolTip(`${BETA_TAG}Desktop Buddy${coins}${room ? ` · ${room.owner.nickname}님의 방` : ''}`);
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '🏠 집 열기', enabled: !!session, click: () => showHome() },
     { label: '🚪 방 나가기 (혼자 놀기)', enabled: !!room, click: () => leaveRoom() },
@@ -304,6 +318,7 @@ let myPeerId = null;
 let peers = new Map();
 let retry = 0, retryTimer = null;
 let netState = 'offline';
+let fishingView = false;   // 집 창에서 낚시터에 있는지 (미니맵에 낚시터를 보여 줌)
 const chatLog = [];
 let friends = { friends: [], incoming: [], outgoing: [] };
 let knocks = [];             // 내 방 문을 두드린 친구들
@@ -486,11 +501,13 @@ function handleServer(m, sock) {
       });
       for (const w of homes()) w.webContents.send('emote', { from: m.id, kind: m.kind, target: m.target ? (m.target === myPeerId ? 'me' : m.target) : null });
       break;
+    case 'fish-peer':   // 미니맵에도 같이 낚시하는 친구가 보이게
+      for (const w of homes()) w.webContents.send('srv', m);
+      break;
     case 'fish-cast':
     case 'fish-result':
     case 'fish-view':
     case 'aqua':
-    case 'fish-peer':
     case 'mg-state':
     case 'mg-end':
       home?.webContents.send('srv', m);
@@ -600,7 +617,7 @@ function pushPeers() {
 }
 function homeState() {
   return {
-    net: netState, session, room, myPeerId, peers: peerList(), self: selfProfile(), friends, knocks,
+    net: netState, session, room, myPeerId, peers: peerList(), self: selfProfile(), friends, knocks, fishing: fishingView,
   };
 }
 // 집 창 + 미니맵 (미니맵은 같은 집 화면을 작게 보여 줌)
@@ -705,7 +722,7 @@ function petMenu({ id }, win = overlay) {
 // 시간 계산은 여기(메인)에서 해서, 창을 닫아도 계속 흘러가요.
 const tid = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 function timerView() {
-  return { timers: config.timers.map((t) => ({ ...t })), pin: !!config.timerPin, miniPin: !!config.miniPin, now: Date.now() };
+  return { timers: config.timers.map((t) => ({ ...t })), pin: !!config.timerPin, miniPin: !!config.miniPin, sound: config.timerSound !== false, now: Date.now() };
 }
 function pushTimers() {
   const v = timerView();
@@ -750,6 +767,7 @@ function timerCmd(d) {
   }
   saveConfig(); pushTimers(); updateWidgets();
 }
+function alarm(kind) { if (config.timerSound !== false) overlay?.webContents.send('alarm', { kind }); }
 function tickTimers() {
   const nowT = Date.now();
   let changed = false;
@@ -760,10 +778,12 @@ function tickTimers() {
       t.round = (t.round || 1) + 1;
       t.endsAt = nowT + Math.round(t.minutes * 60_000);
       notify(`⏰ ${t.name}`, `${t.round - 1}번째가 끝났어요! 바로 ${t.round}번째를 시작해요.`);
+      alarm('round');
       overlay?.webContents.send('chat', { id: 'me', text: `⏰ ${t.name} ${t.round - 1}번째 끝! 계속 가 보자!` });
     } else {
       t.state = 'done'; t.left = 0;
       notify(`⏰ ${t.name}`, '시간이 다 됐어요! 수고했어요 🎉');
+      alarm('done');
       overlay?.webContents.send('chat', { id: 'me', text: `⏰ ${t.name} 끝! 수고했어요 🎉` });
       overlay?.webContents.send('emote', { from: 'me', kind: 'cheer' });
     }
@@ -824,11 +844,14 @@ function registerIpc() {
   ipcMain.on('pet-menu', (_e, d) => petMenu(d || { id: 'me' }));
   ipcMain.on('char-menu', (_e, d) => { if (d && typeof d.id === 'string' && d.id !== 'me') petMenu({ id: d.id }, home); });
   ipcMain.on('open-home', () => showHome());
+  ipcMain.on('fishing-view', (_e, on) => { if (fishingView !== !!on) { fishingView = !!on; pushHome(); } });
   // 타이머 · 미니맵
   ipcMain.handle('get-timers', () => timerView());
   ipcMain.on('timer-cmd', (_e, d) => timerCmd(d));
   ipcMain.on('timer-pin', (_e, on) => setPin('timer', !!on));
   ipcMain.on('mini-pin', (_e, on) => setPin('mini', !!on));
+  ipcMain.on('timer-sound', (_e, on) => { config.timerSound = !!on; saveConfig(); pushTimers(); });
+  ipcMain.on('timer-test', () => overlay?.webContents.send('alarm', { kind: 'done' }));
   ipcMain.on('widget-size', (e, d) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (win !== timerWin || !d) return;

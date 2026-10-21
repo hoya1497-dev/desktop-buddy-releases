@@ -655,6 +655,31 @@
     if (kind === 'cheer' || kind === 'wave') pet.hop(380);
   });
 
+  // ------------------------------------------------------------ 타이머 알람: 삐비빅 (전자시계 소리)
+  let audio = null;
+  function beep(at, freq, len) {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = 'square'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(0.12, at + 0.005);
+    g.gain.setValueAtTime(0.12, at + len - 0.01);
+    g.gain.linearRampToValueAtTime(0, at + len);
+    o.connect(g).connect(audio.destination);
+    o.start(at); o.stop(at + len + 0.02);
+  }
+  buddy.on('alarm', ({ kind }) => {
+    try {
+      audio = audio || new AudioContext();
+      if (audio.state === 'suspended') audio.resume();
+      const t0 = audio.currentTime + 0.05;
+      // 끝: 삐비빅 × 4번, 반복 회차 넘어갈 때: 삐비빅 × 2번
+      const sets = kind === 'round' ? 2 : 4;
+      for (let k = 0; k < sets; k++) for (let i = 0; i < 3; i++) beep(t0 + k * 0.55 + i * 0.1, 2700, 0.06);
+    } catch (e) { console.error('알람 소리 실패', e); }
+    const me = pets.get('me');
+    if (me) { me.emote('⏰'); me.hop(420); }
+  });
+
   // ------------------------------------------------------------ 루프
   let last = performance.now();
   function loop(now) {
