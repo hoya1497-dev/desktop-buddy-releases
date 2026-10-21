@@ -8,6 +8,12 @@
   <link rel="stylesheet" href="home.css">
 </head>
 <body>
+  <!-- 미니맵 모드일 때만 보이는 작은 머리띠 (끌어서 옮기기) -->
+  <div id="miniBar" class="mini-bar" hidden>
+    <span id="miniTitle">🏠 우리 집</span>
+    <button id="miniOpen" title="집 크게 열기">⤢</button>
+    <button id="miniClose" title="미니맵 끄기">✕</button>
+  </div>
   <header class="top">
     <div class="where">
       <span id="homeTitle">🏠 내 집</span>
@@ -17,10 +23,11 @@
       <span class="coins">🪙 <b id="coins">0</b></span>
       <span class="lv">Lv.<b id="level">1</b> <span class="bar"><i id="expBar"></i></span></span>
       <button id="attendBtn" class="ghost small" title="출석 체크">📅 출석 <span id="attendDot" class="dot-badge" hidden></span></button>
-      <button id="aquaBtn" class="ghost small" title="내 아쿠아리움">🐋</button>
+      <button id="aquaBtn" class="ghost small" title="내 아쿠아리움 보기">🐋 내 아쿠아리움</button>
+      <button id="friendAquaBtn" class="ghost small" hidden>🐋 친구 아쿠아리움</button>
       <button id="friendsBtn" class="ghost small">👥 친구 <span id="friendDot" class="dot-badge" hidden></span></button>
-      <button id="themeBtn" class="ghost small" title="화면 모드">🖥️</button>
-      <button id="settingsBtn" class="ghost small" title="설정">⚙️</button>
+      <button id="themeBtn" class="ghost small" title="화면 모드">🖥️ 화면</button>
+      <button id="settingsBtn" class="ghost small" title="설정">⚙️ 설정</button>
     </div>
   </header>
 
@@ -112,6 +119,29 @@
             </div>
           </div>
 
+          <!-- 미니게임 대결 신청 받음 -->
+          <div id="mgInviteBox" class="knock" hidden>
+            <div><b>🎮 대결 신청!</b> <span id="mgInviteText"></span></div>
+            <div class="row">
+              <button id="mgInviteYes" class="primary small">좋아, 하자!</button>
+              <button id="mgInviteNo" class="ghost small">다음에</button>
+            </div>
+          </div>
+
+          <!-- 미니게임 -->
+          <div id="mgModal" class="modal" hidden>
+            <div class="modal-card mg-card">
+              <div class="row between"><h2 id="mgTitle">🎮 미니게임</h2><button id="mgClose" class="link">그만하기</button></div>
+              <div id="mgVs" class="mg-vs"></div>
+              <div id="mgArea" class="mg-area"></div>
+              <canvas id="mgCanvas" class="mg-canvas" width="480" height="340" hidden></canvas>
+              <p id="mgStatus" class="mg-status"></p>
+              <div class="row mg-actions">
+                <button id="mgAgain" class="primary" hidden>한 판 더</button>
+              </div>
+            </div>
+          </div>
+
           <!-- 컴퓨터 -->
           <div id="computer" class="modal" hidden>
             <div class="modal-card">
@@ -188,12 +218,14 @@
     <div id="asideResizer" class="aside-resizer" title="끌어서 패널 넓이 조절 · 두 번 누르면 접기"></div>
     <aside id="aside">
       <nav class="tabs">
-        <button data-tab="chat" class="active">💬</button>
+        <button data-tab="chat" class="active">💬 채팅</button>
         <button data-tab="shop">🛒 상점</button>
         <button data-tab="bag">🎒 가방</button>
         <button data-tab="fishing">🎣 낚시</button>
         <button data-tab="dex">📖 도감</button>
         <button data-tab="pets">🐾 펫</button>
+        <button data-tab="timer">⏱️ 타이머</button>
+        <button data-tab="games">🎮 미니게임</button>
       </nav>
       <div class="pane active" id="pane-chat">
         <div id="chatLog"></div>
@@ -315,6 +347,39 @@
         <p class="note" id="petNote"></p>
         <ul id="petList" class="petlist"></ul>
       </div>
+      <div class="pane" id="pane-timer">
+        <p class="note">공부할 때 켜 두는 타이머예요. 이름을 붙여 여러 개 만들 수 있고, 반복을 켜면 끝나자마자 다음 회차가 시작돼요.</p>
+        <form id="timerForm" class="timer-form">
+          <input id="timerName" maxlength="20" placeholder="이름 (예: 수학 공부)" autocomplete="off">
+          <div class="row">
+            <input id="timerMin" type="number" min="1" max="600" value="25"> <span class="note-inline">분</span>
+            <label class="check inline"><input id="timerRepeat" type="checkbox"> 🔁 반복</label>
+            <button class="primary small">추가</button>
+          </div>
+          <div class="row timer-quick">
+            <button type="button" class="ghost small" data-q="25|집중|1">25분 집중 🔁</button>
+            <button type="button" class="ghost small" data-q="50|공부|0">50분 공부</button>
+            <button type="button" class="ghost small" data-q="10|쉬는 시간|0">10분 휴식</button>
+          </div>
+        </form>
+        <h3>내 타이머</h3>
+        <ul id="timerList" class="shop timer-list"></ul>
+        <h3>화면에 띄우기</h3>
+        <label class="check"><input id="timerPinBox" type="checkbox"> 📌 타이머를 화면에 고정 <span class="note-inline">(다른 창 위에 작게 떠 있어요)</span></label>
+        <label class="check"><input id="miniPinBox" type="checkbox"> 🗺️ 집 창을 닫으면 미니맵으로 작게 보기</label>
+      </div>
+      <div class="pane" id="pane-games">
+        <p class="note">친구한테 대결을 신청하거나, 🤖 AI랑 연습해 봐요.</p>
+        <div class="subtabs" id="gameTabs">
+          <button data-game="ttt" class="active">⭕ 틱택토</button>
+          <button data-game="rps">✊ 가위바위보</button>
+          <button data-game="basket">🧺 바구니 받기</button>
+        </div>
+        <p class="note game-rule" id="gameRule"></p>
+        <button id="mgAiBtn" class="primary wide">🤖 AI랑 하기</button>
+        <h3>친구랑 대결 <span class="note-inline">같은 집에 있는 사람 · 접속한 친구</span></h3>
+        <ul id="mgPeople" class="people"></ul>
+      </div>
     </aside>
   </main>
 
@@ -330,5 +395,6 @@
   <script src="petart.js"></script>
   <script src="home.js"></script>
   <script src="home-game.js"></script>
+  <script src="minigame.js"></script>
 </body>
 </html>

@@ -450,6 +450,26 @@
   // ------------------------------------------------------------ 낚시
   const scene = $('fishScene'), sg = scene.getContext('2d');
   const fishing = { state: 'idle', t: 0, biteAt: 0, end: 0, msg: '', msgT: 0, splash: 0 };
+  // 같이 낚시: 같은 집에 있는 사람 중 낚시 탭을 연 사람들이 물가에 같이 앉아 있음
+  const fishPeers = new Map(); // peerId -> { here, state, kind, code, size, t }
+  let fishHereSent = null;
+  function syncFishHere() {
+    if (H.isMini) return;   // 미니맵 창은 같은 연결을 쓰니까 알리지 않음
+    const on = !H.isMini && $('pane-fishing').classList.contains('active') && document.visibilityState === 'visible' && H.S?.net === 'online';
+    if (on !== fishHereSent && H.S?.session) { fishHereSent = on; srv({ type: 'fish-here', on }); }
+  }
+  document.addEventListener('visibilitychange', syncFishHere);
+  function fishersHere() {
+    return (H.S?.peers || []).filter((p) => { const f = fishPeers.get(p.id); return f ? f.here : p.fishing; }).slice(0, 5);
+  }
+  function onFishPeer(m) {
+    const prev = fishPeers.get(m.id) || {};
+    fishPeers.set(m.id, { ...prev, here: m.here !== false, state: m.state || 'idle', kind: m.kind, code: m.code, size: m.size, t: performance.now() });
+    if (m.state === 'result' && m.kind === 'catch') {
+      const p = (H.S?.peers || []).find((x) => x.id === m.id), f = FISH()[m.code];
+      if (p && f && $('pane-fishing').classList.contains('active')) H.toast(`🎣 ${p.nickname}님이 ${f.name}${m.size ? `(${m.size}cm)` : ''}을(를) 낚았어요!`);
+    }
+  }
   const recent = [];
   $('castBtn').onclick = () => {
     if (fishing.state === 'idle' || fishing.state === 'result') {
@@ -550,6 +570,8 @@
     // 부두
     g.fillStyle = '#8a5a3c'; g.fillRect(0, 96, 90, 10);
     g.fillStyle = '#5c3a26'; g.fillRect(0, 106, 90, 3); g.fillRect(12, 109, 6, 60); g.fillRect(64, 109, 6, 60);
+    // 같이 낚시하는 친구들 (뒤쪽 물가에 앉아 있음)
+    drawFishers(g, t);
     // 캐릭터
     const u = U();
     Sprites.drawPet(g, 30, 64, { species: u?.species || 'cat', scale: 2, color: u?.color || '#f2a65a', legs: 'sit', eyes: fishing.state === 'bite' ? 'open' : (fishing.state === 'result' && fishing.msgT > 0 ? 'happy' : 'open'), acc: u?.acc?.eq || {}, flip: true });
@@ -584,6 +606,52 @@
       const w = g.measureText(fishing.msg).width + 20;
       g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillRect(W / 2 - w / 2, 150, w, 24);
       g.fillStyle = '#fff'; g.fillText(fishing.msg, W / 2, 167);
+    }
+  }
+
+  function drawFishers(g, t) {
+    const list = fishersHere();
+    list.forEach((p, i) => {
+      const x = 118 + i * 37, y = 90;
+      const st = fishPeers.get(p.id) || { state: 'idle' };
+      const age = (performance.now() - (st.t || 0)) / 1000;
+      // 낚싯줄 + 찌
+      const tip = { x: x + 14, y: y - 22 };
+      g.strokeStyle = '#6e452c'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + 6, y - 6); g.lineTo(tip.x, tip.y); g.stroke();
+      if (st.state === 'waiting' && age < 15) {
+        const bx = x + 16, by = 124 + (i % 2) * 14 + Math.sin(t * 3 + i) * 1.5;
+        g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 1; g.beginPath(); g.moveTo(tip.x, tip.y); g.lineTo(bx, by); g.stroke();
+        g.fillStyle = '#e04a3a'; g.fillRect(bx - 2, by - 3, 4, 3); g.fillStyle = '#fff'; g.fillRect(bx - 2, by, 4, 2);
+      }
+      // 캐릭터 (작게)
+      const skin = window.Skins && Skins.get(p.username, p.skin);
+      let drawn = 0;
+      if (skin) drawn = Skins.draw(g, skin, 'sit', x, y, 30, 1, 0);
+      if (!drawn) Sprites.drawPet(g, x - 12, y - 24, { species: p.species || 'cat', scale: 1.5, palette: Sprites.palette(p.color || '#f2a65a'), legs: 'sit', eyes: st.state === 'result' && st.kind === 'catch' && age < 3 ? 'happy' : 'open', acc: p.acc || {}, flip: true });
+      // 이름
+      g.font = `9px ${FONT}`; g.textAlign = 'center';
+      const nm = p.nickname.length > 5 ? p.nickname.slice(0, 5) + '…' : p.nickname;
+      const w = g.measureText(nm).width + 6;
+      g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(x - w / 2, y - 38, w, 11);
+      g.fillStyle = '#fff'; g.fillText(nm, x, y - 29);
+      // 결과 말풍선
+      if (st.state === 'result' && age < 3.5) {
+        const f = st.kind === 'catch' ? FISH()[st.code] : null;
+        const txt = f ? f.name : { early: '빨랐다!', late: '놓침…', nothing: '꽝' }[st.kind] || '';
+        if (txt) {
+          g.font = `bold 9px ${FONT}`;
+          const tw = g.measureText(txt).width + 8;
+          g.fillStyle = f ? (rar(f).color || '#fff') : 'rgba(255,255,255,0.9)';
+          g.fillRect(x - tw / 2, y - 52 - age * 3, tw, 12);
+          g.fillStyle = f ? '#fff' : '#333'; g.fillText(txt, x, y - 43 - age * 3);
+        }
+      }
+    });
+    if (list.length) {
+      g.font = `bold 10px ${FONT}`; g.textAlign = 'left';
+      const label = `🎣 같이 낚시 중 ${list.length + 1}명`, lw = g.measureText(label).width + 10;
+      g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(4, 4, lw, 15);
+      g.fillStyle = '#fff'; g.fillText(label, 9, 15);
     }
   }
 
@@ -647,11 +715,20 @@
 
   // ------------------------------------------------------------ 방 안에서 돌아다니는 펫
   const roomPets = new Map(); // id -> { x, y, tx, dir, t, hop, heart }
+  // 집주인 펫은 집 안을 돌아다니고, 놀러 온 사람의 펫은 자기 주인을 졸졸 따라다님
   function visiblePets() {
     const v = H.viewing();
     if (!v) return [];
-    if (v.editable) return (U()?.pets || []).filter((p) => p.out);
-    return (H.S.room?.home?.pets || []);
+    const S = H.S;
+    const list = (v.editable ? (U()?.pets || []).filter((p) => p.out) : (S.room?.home?.pets || [])).map((p) => ({ ...p, follow: null }));
+    if (S.room) {
+      if (!S.room.isOwner) (U()?.pets || []).filter((p) => p.out).slice(0, 4).forEach((p, i) => list.push({ ...p, follow: 'me', idx: i }));
+      for (const peer of S.peers || []) {
+        if (peer.owner) continue;
+        (peer.pets || []).slice(0, 4).forEach((p, i) => list.push({ ...p, follow: peer.id, idx: i }));
+      }
+    }
+    return list;
   }
   function syncRoomPets() {
     const list = visiblePets();
@@ -659,17 +736,42 @@
     for (const id of [...roomPets.keys()]) if (!ids.has(id)) roomPets.delete(id);
     for (const p of list) {
       let r = roomPets.get(p.id);
-      const b = H.band(p.floor || 1);
-      if (!r || r.floor !== p.floor) {
-        r = { x: rand(60, H.LADDER_X - 60), y: rand(b.min, b.max), tx: null, ty: null, dir: 1, t: rand(1, 3), hop: 0, heart: 0, floor: p.floor };
-        roomPets.set(p.id, r);
+      if (p.follow) {
+        if (!r || r.follow !== p.follow) {
+          const ch = H.charOf(p.follow);
+          r = { x: ch ? ch.x - 30 : rand(60, H.LADDER_X - 60), y: ch ? ch.y : H.band(1).max, tx: null, ty: null, dir: 1, t: 0, hop: 0, heart: 0, follow: p.follow };
+          roomPets.set(p.id, r);
+        }
+        r.idx = p.idx || 0;
+      } else {
+        const b = H.band(p.floor || 1);
+        if (!r || r.follow || r.floor !== p.floor) {
+          r = { x: rand(60, H.LADDER_X - 60), y: rand(b.min, b.max), tx: null, ty: null, dir: 1, t: rand(1, 3), hop: 0, heart: 0, floor: p.floor };
+          roomPets.set(p.id, r);
+        }
       }
       r.p = p;
     }
   }
+  function followOwner(r, dt) {
+    const ch = H.charOf(r.follow);
+    if (!ch) return;
+    r.t += dt;
+    const behind = ch.dir > 0 ? -1 : 1;
+    const tx = clamp(ch.x + behind * (32 + r.idx * 26), 20, H.RW - 20), ty = ch.y + (r.idx % 2) * 3;
+    const dx = tx - r.x, dy = ty - r.y, d = Math.hypot(dx, dy);
+    if (d > 260) { r.x = tx; r.y = ty; return; }
+    if (d > 2) {
+      const sp = Math.max(55, d * 3) * dt;
+      r.x += dx / d * Math.min(sp, d); r.y += dy / d * Math.min(sp, d);
+      if (Math.abs(dx) > 0.5) r.dir = dx > 0 ? 1 : -1;
+      r.hop = Math.abs(Math.sin(r.t * 9)) * 3;
+    } else { r.hop = 0; r.dir = ch.dir > 0 ? 1 : -1; }
+  }
   function updateRoomPets(dt) {
     for (const r of roomPets.values()) {
       r.heart = Math.max(0, r.heart - dt);
+      if (r.follow) { followOwner(r, dt); continue; }
       const b = H.band(r.floor || 1);
       if (r.tx != null) {
         const dx = r.tx - r.x, dy = r.ty - r.y, d = Math.hypot(dx, dy);
@@ -706,7 +808,7 @@
     for (const [id, r] of roomPets) {
       if (Math.abs(p.x - r.x) < 22 && p.y < r.y + 4 && p.y > r.y - 46) {
         r.heart = 1.2; r.hop = 8;
-        if (H.viewing()?.editable) srv({ type: 'pet-pat', id });
+        if ((U()?.pets || []).some((x) => x.id === id)) srv({ type: 'pet-pat', id });
         return true;
       }
     }
@@ -891,8 +993,10 @@
 
   // ------------------------------------------------------------ 루프 · 연결 지점
   let last = performance.now();
+  let presenceT = 0;
   function tick(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if ((presenceT -= dt) <= 0) { presenceT = 0.5; syncFishHere(); }
     if (!$('pane-fishing').classList.contains('active') && fishing.state !== 'waiting' && fishing.state !== 'bite') { /* 낚시 탭이 안 보이면 그리기 생략 */ }
     else drawScene(dt);
     if (viewer.kind === 'tank' && !$('tankModal').hidden) drawWater(waterCanvas('tankCanvas'), 'tank');
@@ -902,7 +1006,8 @@
   requestAnimationFrame(tick);
 
   buddy.on('srv', (m) => {
-    if (m.type === 'fish-cast') onFishCast(m);
+    if (m.type === 'fish-peer') onFishPeer(m);
+    else if (m.type === 'fish-cast') onFishCast(m);
     else if (m.type === 'fish-result') onFishResult(m);
     else if (m.type === 'fish-view') showTradePick(m);
     else if (m.type === 'aqua') renderAqua(m);
@@ -929,7 +1034,11 @@
     else if (r.reason === 'fish-gift' || r.reason === 'admin') { /* 알림은 따로 떠요 */ }
   });
 
-  function onState() {
+  let lastRoom = null;
+  function onState(st) {
+    if (st && st.net !== 'online') fishHereSent = null;   // 다시 연결되면 다시 알림
+    const code = st?.room?.code || null;
+    if (code !== lastRoom) { lastRoom = code; fishPeers.clear(); }
     syncRoomPets();
     if (!$('fishModal').hidden) renderFishModal();
     renderTank();

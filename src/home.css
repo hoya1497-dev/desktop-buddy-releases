@@ -197,3 +197,55 @@ body.resizing { cursor: col-resize; user-select: none; }
 aside .pane { min-width: 300px; }
 .panel-btn { margin-left: auto; }
 .pet-stats { margin-left: 8px; }
+
+/* ---------------- 패널 탭: 글자까지 보이게 두 줄 */
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); }
+.tabs button { padding: 8px 2px; font-size: 12px; white-space: nowrap; }
+.stats { flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.stats button { white-space: nowrap; }
+
+/* ---------------- 타이머 탭 */
+.timer-form { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--input); }
+.timer-form .row { gap: 6px; align-items: center; flex-wrap: wrap; }
+.timer-form .row input[type=number] { width: 80px; flex: none; }
+.check.inline { margin: 0; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.timer-quick button { font-size: 11px; }
+.timer-list .tm { font: 700 17px ui-monospace, Consolas, monospace; min-width: 64px; text-align: right; }
+.timer-list li.running .tm { color: var(--accent); }
+.timer-list li.done .tm { color: var(--ok); }
+.timer-list .btns button { min-width: 0; width: 30px; padding: 4px 0; }
+.timer-list .ico { font-size: 20px; }
+
+/* ---------------- 미니게임 */
+.game-rule { min-height: 34px; }
+.mg-card { width: min(540px, 96%); text-align: center; }
+.mg-vs { display: flex; justify-content: center; align-items: center; gap: 10px; font-size: 13px; margin: 4px 0 8px; }
+.mg-vs .who { padding: 4px 10px; border-radius: 99px; background: var(--input); border: 1px solid var(--line); }
+.mg-vs .who.turn { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.mg-area { display: flex; justify-content: center; }
+.ttt { display: grid; grid-template-columns: repeat(3, 84px); gap: 6px; }
+.ttt button { width: 84px; height: 84px; font-size: 40px; font-weight: 800; border-radius: 12px; border: 2px solid var(--line); background: var(--input); color: var(--ink); cursor: pointer; padding: 0; }
+.ttt button:hover:not(:disabled) { border-color: var(--accent); }
+.ttt button.o { color: #e8894a; } .ttt button.x { color: #4a8ae0; }
+.ttt button.win { background: color-mix(in srgb, var(--ok) 25%, var(--input)); }
+.rps { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.rps .picks { display: flex; gap: 10px; }
+.rps .picks button { width: 92px; height: 92px; font-size: 44px; border-radius: 16px; border: 2px solid var(--line); background: var(--input); cursor: pointer; }
+.rps .picks button.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--input)); }
+.rps .picks button:disabled { opacity: .5; cursor: default; }
+.rps .reveal { font-size: 46px; min-height: 60px; display: flex; gap: 24px; align-items: center; }
+.rps .reveal small { font-size: 13px; display: block; color: var(--muted); }
+.rps .score { font-size: 15px; font-weight: 700; }
+.mg-canvas { display: block; width: 100%; max-width: 480px; margin: 0 auto; border-radius: 12px; border: 1px solid var(--line); cursor: none; }
+.mg-status { font-size: 14px; font-weight: 600; min-height: 20px; margin: 10px 0 4px; }
+.mg-actions { justify-content: center; }
+
+/* ---------------- 미니맵 모드 (작은 창) */
+.mini-bar { display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 10px; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--card); border-bottom: 1px solid var(--line); -webkit-app-region: drag; cursor: move; }
+.mini-bar span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini-bar button { -webkit-app-region: no-drag; border: 0; background: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 0 4px; }
+.mini-bar button:hover { color: var(--ink); }
+body.mini .top, body.mini .toolbar, body.mini .selbar, body.mini aside, body.mini #asideResizer,
+body.mini #updateBar, body.mini #toasts, body.mini .modal, body.mini .knock, body.mini #offlineCover, body.mini .deco-hint { display: none !important; }
+body.mini .stage-wrap { padding: 4px; }
+body.mini #room { border-radius: 8px; cursor: pointer !important; }

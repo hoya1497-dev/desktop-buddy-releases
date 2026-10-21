@@ -9,7 +9,7 @@
   const FONT = '"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif';
 
   let floorY = H - 40;
-  let cfg = { petScale: 3, occlusion: true, hideOthers: false };
+  let cfg = { petScale: 3, occlusion: true, hideOthers: false, showPetsDesktop: true };
   let rawWindows = [];
   let platforms = [];
   const pets = new Map();
@@ -363,6 +363,46 @@
     }
   }
 
+  // ------------------------------------------------------------ 따라다니는 펫 (집에 꺼내 둔 펫)
+  const followers = new Map(); // `${주인}:${펫}` -> { x, y, dir, hop, kind, owner }
+  function updateFollowers(dt) {
+    const alive = new Set();
+    if (cfg.showPetsDesktop) {
+      for (const owner of visiblePets()) {
+        (owner.profile.pets || []).slice(0, 4).forEach((p, i) => {
+          const key = owner.id + ':' + p.id;
+          alive.add(key);
+          let f = followers.get(key);
+          if (!f) { f = { x: owner.x - owner.dir * 30, y: owner.y, dir: owner.dir, hop: 0, t: Math.random() * 6 }; followers.set(key, f); }
+          f.kind = p.kind; f.owner = owner;
+          f.t += dt;
+          // 주인 뒤쪽에 줄 서서 따라감
+          const gap = owner.w * 0.55 + (i + 1) * Math.max(18, cfg.petScale * 9);
+          const tx = clamp(owner.x - owner.dir * gap, 10, W - 10);
+          const ty = owner.y;
+          const dx = tx - f.x, dy = ty - f.y, d = Math.hypot(dx, dy);
+          if (d > 600) { f.x = tx; f.y = ty; }   // 너무 멀어지면(던졌을 때 등) 바로 옆으로
+          else if (d > 3) {
+            const sp = Math.max(70, d * 3.2) * dt;
+            f.x += dx / d * Math.min(sp, d); f.y += dy / d * Math.min(sp, d);
+            if (Math.abs(dx) > 1) f.dir = dx > 0 ? 1 : -1;
+            f.hop = Math.abs(Math.sin(f.t * 10)) * cfg.petScale * 1.2;
+          } else { f.hop = 0; f.dir = owner.dir; }
+        });
+      }
+    }
+    for (const k of [...followers.keys()]) if (!alive.has(k)) followers.delete(k);
+  }
+  function drawFollowers(ofOwner) {
+    const sc = Math.max(1, Math.round(cfg.petScale * 0.75));
+    for (const f of followers.values()) {
+      if (f.owner !== ofOwner) continue;
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fillRect(Math.round(f.x - 5 * sc), Math.round(f.y - 1), 10 * sc, Math.max(2, sc));
+      PetArt.draw(ctx, f.kind, f.x, f.y, sc, f.dir < 0, f.hop);
+    }
+  }
+
   // ------------------------------------------------------------ 말풍선 / 라벨
   function drawPill(text, cx, bottom, mine, sub) {
     ctx.font = `600 12px ${FONT}`;
@@ -580,6 +620,12 @@
     }
   });
   buddy.on('chat', ({ id, text }) => { pets.get(id)?.say(text); });
+  // 간식 나눠먹기
+  buddy.on('snack', ({ from, to, icon, name }) => {
+    const a = pets.get(from), b = pets.get(to);
+    if (a) { a.emote(icon); a.happyT = 1.2; a.hop(300); if (from === 'me') a.say(`${name} 나눠 먹자! ${icon}`); }
+    if (b) { setTimeout(() => { b.emote(icon); b.emote('😋'); b.happyT = 1.5; b.hop(360); if (to === 'me') b.say(`${a ? a.profile.nickname + '님이 ' : ''}${name}을(를) 나눠줬어요! 냠냠`); }, 500); }
+  });
   buddy.on('skins', (obj) => Skins.update(obj));
   buddy.invoke('get-skins').then((obj) => Skins.update(obj)).catch(() => {});
   buddy.on('summon', () => {
@@ -615,15 +661,16 @@
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     for (const p of pets.values()) p.update(dt);
+    updateFollowers(dt);
     refreshHover();
     placeChat();
 
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.clearRect(0, 0, W, H);
     ctx.imageSmoothingEnabled = false;
-    for (const p of visiblePets()) if (!p.isMe) p.draw(p === hovered);
+    for (const p of visiblePets()) if (!p.isMe) { drawFollowers(p); p.draw(p === hovered); }
     const me = pets.get('me');
-    if (me) me.draw(me === hovered); // 내 캐릭터는 항상 맨 앞
+    if (me) { drawFollowers(me); me.draw(me === hovered); } // 내 캐릭터는 항상 맨 앞
     requestAnimationFrame(loop);
   }
   resize();

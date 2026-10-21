@@ -30,6 +30,11 @@ const DEFAULT_CONFIG = {
   species: 'cat',
   theme: 'system',   // 'system' | 'light' | 'dark'
   autoStart: true,
+  showPetsDesktop: true,   // 꺼내 둔 펫이 바탕화면에서도 캐릭터를 따라다님
+  timers: [],              // 세션 타이머 [{ id, name, minutes, repeat, state, endsAt, left, round }]
+  timerPin: false,         // 화면에 타이머 고정
+  miniPin: false,          // 집 창을 닫으면 미니맵으로 보이기
+  timerBounds: null, miniBounds: null,
   statusRules: [
     'steam = 🎮 게임중', 'league = 🎮 게임중', 'valorant = 🎮 게임중', 'minecraft = 🎮 게임중',
     'code = 💻 코딩중', 'notion = 📚 공부중', 'hwp = 📚 공부중', 'word = 📚 공부중',
@@ -107,6 +112,7 @@ function serverSafety(url) {
 
 // ---------------------------------------------------------------- 창
 let overlay = null, control = null, home = null, login = null, tray = null;
+let mini = null, timerWin = null;   // 미니맵 · 화면 고정 타이머
 let quitting = false;
 
 function secure(win) {
@@ -162,8 +168,11 @@ function showControl() {
 }
 function showHome(focusChat = false) {
   if (!session) { showLogin(); return; }
-  if (!home || home.isDestroyed()) home = makeWindow('home.html', { width: 1220, height: 720, minWidth: 720, minHeight: 560, title: '🏠 Desktop Buddy 집' });
-  const go = () => { showWin(home); pushHome(); if (focusChat) home.webContents.send('focus-chat'); };
+  if (!home || home.isDestroyed()) {
+    home = makeWindow('home.html', { width: 1220, height: 720, minWidth: 720, minHeight: 560, title: '🏠 Desktop Buddy 집' });
+    for (const ev of ['show', 'hide', 'minimize', 'restore']) home.on(ev, () => setTimeout(updateWidgets, 50));
+  }
+  const go = () => { showWin(home); pushHome(); pushTimers(); if (focusChat) home.webContents.send('focus-chat'); updateWidgets(); };
   if (home.webContents.isLoading()) home.webContents.once('did-finish-load', go); else go();
 }
 function showLogin(note = '') {
@@ -189,6 +198,8 @@ function updateTray() {
     { label: '🚪 방 나가기 (혼자 놀기)', enabled: !!room, click: () => leaveRoom() },
     { label: '🏠 내 집으로 돌아가기', enabled: !!session && !(room && room.isOwner), click: () => wsSend({ type: 'join', code: session.user.code }) },
     { label: '캐릭터 불러오기', click: () => overlay?.webContents.send('summon') },
+    { label: '⏱️ 타이머 화면에 고정', type: 'checkbox', checked: !!config.timerPin, click: (i) => setPin('timer', i.checked) },
+    { label: '🗺️ 미니맵 (집 창 닫으면 작게 보기)', type: 'checkbox', checked: !!config.miniPin, click: (i) => setPin('mini', i.checked) },
     { label: '설정', click: () => showControl() },
     { type: 'separator' },
     ...(updateState.state === 'ready'
@@ -265,10 +276,11 @@ function selfProfile() {
     username: session?.user.username || '', hungry: !!pet && pet.full < 30, sad: !!pet && pet.mood < 25,
     skin: session?.user.skin?.v ? session.user.skin : null,
     acc: session?.user.acc?.eq || {},
+    pets: (session?.user.pets || []).filter((x) => x.out).map((x) => ({ id: x.id, kind: x.kind, name: x.name })),
   };
 }
 function publicConfig() {
-  return { petScale: config.petScale, occlusion: config.occlusion, hideOthers: config.hideOthers };
+  return { petScale: config.petScale, occlusion: config.occlusion, hideOthers: config.hideOthers, showPetsDesktop: config.showPetsDesktop !== false };
 }
 let lastSentProfile = '';
 function onSelfChanged() {
@@ -360,6 +372,7 @@ function handleServer(m, sock) {
       wsSend({ type: 'join', code: wantRoom || m.user.code });
       wantRoom = null;
       requestSkin(m.user.username, m.user.skin?.v);
+      updateWidgets();
       break;
     }
     case 'auth-fail':
@@ -471,14 +484,41 @@ function handleServer(m, sock) {
         from: m.id, kind: m.kind, target: m.target ? (m.target === myPeerId ? 'me' : m.target) : null,
         fromName: peers.get(m.id)?.nickname || '',
       });
-      home?.webContents.send('emote', { from: m.id, kind: m.kind, target: m.target ? (m.target === myPeerId ? 'me' : m.target) : null });
+      for (const w of homes()) w.webContents.send('emote', { from: m.id, kind: m.kind, target: m.target ? (m.target === myPeerId ? 'me' : m.target) : null });
       break;
     case 'fish-cast':
     case 'fish-result':
     case 'fish-view':
     case 'aqua':
+    case 'fish-peer':
+    case 'mg-state':
+    case 'mg-end':
       home?.webContents.send('srv', m);
       break;
+    case 'mg-invite': {
+      // 대결 신청: 집 창에 수락/거절 상자 + 알림
+      const name = { ttt: '틱택토', rps: '가위바위보', basket: '바구니 받기' }[m.game] || '미니게임';
+      if (!home || home.isDestroyed()) showHome();
+      const go = () => home.webContents.send('srv', m);
+      if (home.webContents.isLoading()) home.webContents.once('did-finish-load', go); else go();
+      notify('🎮 대결 신청!', `${m.from.nickname}(@${m.from.username})님이 ${name} 대결을 신청했어요. 눌러서 확인해요.`);
+      overlay?.webContents.send('chat', { id: 'me', text: `🎮 ${m.from.nickname}님이 ${name} 대결 신청!` });
+      break;
+    }
+    case 'mg-start': {
+      showHome();
+      const go = () => home.webContents.send('srv', m);
+      if (home.webContents.isLoading()) home.webContents.once('did-finish-load', go); else go();
+      break;
+    }
+    case 'snack': {
+      const idOf = (x) => (x === myPeerId ? 'me' : x);
+      const food = session?.catalog.foods[m.food];
+      const d = { from: idOf(m.from), to: idOf(m.to), icon: food ? food.icon : '🍪', name: food ? food.name : '간식' };
+      overlay?.webContents.send('snack', d);
+      for (const w of homes()) w.webContents.send('snack', d);
+      break;
+    }
     case 'password-result':
       control?.webContents.send('srv', m);
       break;
@@ -549,7 +589,7 @@ function requestSkin(username, v) {
 function pushSkins() {
   const obj = Object.fromEntries(skins);
   overlay?.webContents.send('skins', obj);
-  home?.webContents.send('skins', obj);
+  for (const w of homes()) w.webContents.send('skins', obj);
   control?.webContents.send('skins', obj);
 }
 
@@ -563,11 +603,13 @@ function homeState() {
     net: netState, session, room, myPeerId, peers: peerList(), self: selfProfile(), friends, knocks,
   };
 }
-function pushHome() { if (home && !home.isDestroyed()) home.webContents.send('home-state', homeState()); }
+// 집 창 + 미니맵 (미니맵은 같은 집 화면을 작게 보여 줌)
+function homes() { return [home, mini].filter((w) => w && !w.isDestroyed()); }
+function pushHome() { const st = homeState(); for (const w of homes()) w.webContents.send('home-state', st); }
 function addChat(entry) {
   chatLog.push({ ts: Date.now(), ...entry });
   if (chatLog.length > 200) chatLog.shift();
-  home?.webContents.send('chat', chatLog[chatLog.length - 1]);
+  for (const w of homes()) w.webContents.send('chat', chatLog[chatLog.length - 1]);
 }
 
 function joinRoom(code) {
@@ -590,6 +632,7 @@ function logout() {
   setTimeout(closeSocket, 300);
   pushPeers(); setNet('offline'); onSelfChanged();
   home?.hide();
+  updateWidgets();
   showLogin('로그아웃했어요.');
 }
 function sendChat(text) {
@@ -601,7 +644,7 @@ function sendChat(text) {
 }
 function sendEmote(kind, target = null) {
   overlay?.webContents.send('emote', { from: 'me', kind, target, fromName: config.nickname });
-  home?.webContents.send('emote', { from: 'me', kind, target });
+  for (const w of homes()) w.webContents.send('emote', { from: 'me', kind, target });
   if (room) wsSend({ type: 'emote', kind, target: target || undefined });
 }
 
@@ -613,7 +656,14 @@ function setStatus(s) {
   control?.webContents.send('config', config);
   onSelfChanged();
 }
-function petMenu({ id }) {
+function snackMenu(id) {
+  const foods = session?.user.food || {};
+  const cat = session?.catalog.foods || {};
+  const have = Object.keys(foods).filter((k) => cat[k] && foods[k] > 0);
+  if (!have.length) return [{ label: '가방에 음식이 없어요 (상점 → 음식)', enabled: false }];
+  return have.map((k) => ({ label: `${cat[k].icon} ${cat[k].name} ×${foods[k]}`, click: () => wsSend({ type: 'share-snack', target: id, food: k }) }));
+}
+function petMenu({ id }, win = overlay) {
   let template;
   if (id === 'me') {
     template = [
@@ -639,13 +689,132 @@ function petMenu({ id }) {
     template = [
       { label: p ? `${p.nickname} (@${p.username})${p.status ? ' · ' + p.status : ''}` : '친구', enabled: false },
       { type: 'separator' },
+      { label: '🍪 간식 나눠먹기', enabled: !!(room && p), submenu: snackMenu(id) },
       ...EMOTES.slice(0, 3).map(([k, l]) => ({ label: l + ' 보내기', click: () => sendEmote(k, id) })),
       { label: '💬 채팅하기', click: () => showHome(true) },
+      { label: '🎮 미니게임 대결 신청', enabled: !!p, submenu: [['ttt', '⭕ 틱택토'], ['rps', '✊ 가위바위보'], ['basket', '🧺 바구니 받기']].map(([g, l]) => ({ label: l, click: () => wsSend({ type: 'mg-invite', game: g, to: p.username }) })) },
     ];
     if (room?.isOwner) template.push({ type: 'separator' }, { label: '내 방에서 내보내기', click: () => wsSend({ type: 'kick', id }) });
     if (p) template.push({ type: 'separator' }, { label: '🚫 차단하기', click: () => wsSend({ type: 'block', username: p.username }) });
   }
-  Menu.buildFromTemplate(template).popup({ window: overlay });
+  Menu.buildFromTemplate(template).popup({ window: win && !win.isDestroyed() ? win : overlay });
+}
+
+// ---------------------------------------------------------------- 세션 타이머
+// 이름 붙인 타이머를 여러 개 만들 수 있고, 반복하면 끝날 때마다 다음 회차를 바로 시작해요.
+// 시간 계산은 여기(메인)에서 해서, 창을 닫아도 계속 흘러가요.
+const tid = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+function timerView() {
+  return { timers: config.timers.map((t) => ({ ...t })), pin: !!config.timerPin, miniPin: !!config.miniPin, now: Date.now() };
+}
+function pushTimers() {
+  const v = timerView();
+  for (const w of [home, timerWin]) if (w && !w.isDestroyed()) w.webContents.send('timers', v);
+}
+function timerCmd(d) {
+  if (!d || typeof d !== 'object') return;
+  const t = config.timers.find((x) => x.id === d.id);
+  const ms = (x) => Math.round(x.minutes * 60_000);
+  switch (d.op) {
+    case 'add': {
+      if (config.timers.length >= 12) return;
+      const minutes = Math.min(600, Math.max(1, Math.round(Number(d.minutes) || 25)));
+      const name = String(d.name || '').trim().slice(0, 20) || `${minutes}분 타이머`;
+      config.timers.push({ id: tid(), name, minutes, repeat: !!d.repeat, state: 'idle', endsAt: 0, left: minutes * 60_000, round: 1 });
+      break;
+    }
+    case 'del': config.timers = config.timers.filter((x) => x.id !== d.id); break;
+    case 'start':
+      if (!t || t.state === 'running') return;
+      if (t.state === 'done' || t.state === 'idle') { t.left = ms(t); if (t.state === 'done') t.round = 1; }
+      t.state = 'running'; t.endsAt = Date.now() + t.left;
+      break;
+    case 'pause':
+      if (!t || t.state !== 'running') return;
+      t.left = Math.max(0, t.endsAt - Date.now()); t.state = 'paused';
+      break;
+    case 'reset':
+      if (!t) return;
+      t.state = 'idle'; t.left = ms(t); t.round = 1; t.endsAt = 0;
+      break;
+    case 'update':
+      if (!t) return;
+      if ('name' in d) t.name = String(d.name || '').trim().slice(0, 20) || t.name;
+      if ('repeat' in d) t.repeat = !!d.repeat;
+      if ('minutes' in d) {
+        t.minutes = Math.min(600, Math.max(1, Math.round(Number(d.minutes) || t.minutes)));
+        if (t.state === 'idle' || t.state === 'done') t.left = ms(t);
+      }
+      break;
+    default: return;
+  }
+  saveConfig(); pushTimers(); updateWidgets();
+}
+function tickTimers() {
+  const nowT = Date.now();
+  let changed = false;
+  for (const t of config.timers) {
+    if (t.state !== 'running' || t.endsAt > nowT) continue;
+    changed = true;
+    if (t.repeat) {
+      t.round = (t.round || 1) + 1;
+      t.endsAt = nowT + Math.round(t.minutes * 60_000);
+      notify(`⏰ ${t.name}`, `${t.round - 1}번째가 끝났어요! 바로 ${t.round}번째를 시작해요.`);
+      overlay?.webContents.send('chat', { id: 'me', text: `⏰ ${t.name} ${t.round - 1}번째 끝! 계속 가 보자!` });
+    } else {
+      t.state = 'done'; t.left = 0;
+      notify(`⏰ ${t.name}`, '시간이 다 됐어요! 수고했어요 🎉');
+      overlay?.webContents.send('chat', { id: 'me', text: `⏰ ${t.name} 끝! 수고했어요 🎉` });
+      overlay?.webContents.send('emote', { from: 'me', kind: 'cheer' });
+    }
+  }
+  if (changed) { saveConfig(); pushTimers(); }
+}
+
+// ---------------------------------------------------------------- 화면 위 작은 창 (타이머 · 미니맵)
+function setPin(which, on) {
+  if (which === 'timer') config.timerPin = on; else config.miniPin = on;
+  saveConfig(); updateWidgets(); pushTimers(); updateTray();
+}
+function widgetWindow(file, opts, boundsKey, query) {
+  const def = screen.getPrimaryDisplay().workArea;
+  const b = config[boundsKey];
+  const w = new BrowserWindow({
+    width: opts.width, height: opts.height,
+    x: b ? b.x : def.x + def.width - opts.width - 24, y: b ? b.y : def.y + opts.y,
+    frame: false, resizable: !!opts.resizable, minWidth: opts.minWidth, minHeight: opts.minHeight,
+    alwaysOnTop: true, skipTaskbar: true, maximizable: false, fullscreenable: false, show: false,
+    transparent: !!opts.transparent, backgroundColor: opts.transparent ? '#00000000' : '#f6f1ea', hasShadow: !opts.transparent,
+    title: opts.title, webPreferences: webPreferences(),
+  });
+  secure(w);
+  w.setAlwaysOnTop(true, 'floating');
+  if (process.platform === 'darwin') w.setVisibleOnAllWorkspaces(true);
+  if (b && b.width && opts.resizable) w.setSize(Math.max(opts.minWidth || 100, b.width), Math.max(opts.minHeight || 100, b.height));
+  w.loadFile(path.join(__dirname, file), query ? { query } : undefined);
+  const remember = () => { if (!w.isDestroyed()) { config[boundsKey] = w.getBounds(); saveConfig(); } };
+  w.on('moved', remember); w.on('resized', remember);
+  w.on('close', (e) => { if (!quitting) { e.preventDefault(); w.hide(); } });
+  return w;
+}
+function homeShowing() { return !!(home && !home.isDestroyed() && home.isVisible() && !home.isMinimized()); }
+function updateWidgets() {
+  // 타이머: 고정을 켜면 항상
+  if (config.timerPin) {
+    if (!timerWin || timerWin.isDestroyed()) {
+      timerWin = widgetWindow('timer.html', { width: 270, height: 120, y: 80, transparent: true, title: 'Desktop Buddy 타이머' }, 'timerBounds');
+      timerWin.webContents.on('did-finish-load', () => { pushTimers(); timerWin.showInactive(); });
+    } else if (!timerWin.isVisible() && !timerWin.webContents.isLoading()) timerWin.showInactive();
+  } else if (timerWin && !timerWin.isDestroyed() && timerWin.isVisible()) timerWin.hide();
+
+  // 미니맵: 고정을 켰고, 로그인했고, 집 창이 안 보일 때만
+  const wantMini = !!(config.miniPin && session && !homeShowing());
+  if (wantMini) {
+    if (!mini || mini.isDestroyed()) {
+      mini = widgetWindow('home.html', { width: 250, height: 282, y: 220, resizable: true, minWidth: 170, minHeight: 200, title: 'Desktop Buddy 미니맵' }, 'miniBounds', { mini: '1' });
+      mini.webContents.on('did-finish-load', () => { pushHome(); pushSkins(); if (config.miniPin && !homeShowing()) mini.showInactive(); });
+    } else if (!mini.isVisible() && !mini.webContents.isLoading()) { pushHome(); mini.showInactive(); }
+  } else if (mini && !mini.isDestroyed() && mini.isVisible()) mini.hide();
 }
 
 // ---------------------------------------------------------------- IPC
@@ -653,6 +822,24 @@ function registerIpc() {
   // 오버레이
   ipcMain.on('set-ignore', (_e, v) => overlay?.setIgnoreMouseEvents(!!v, { forward: true }));
   ipcMain.on('pet-menu', (_e, d) => petMenu(d || { id: 'me' }));
+  ipcMain.on('char-menu', (_e, d) => { if (d && typeof d.id === 'string' && d.id !== 'me') petMenu({ id: d.id }, home); });
+  ipcMain.on('open-home', () => showHome());
+  // 타이머 · 미니맵
+  ipcMain.handle('get-timers', () => timerView());
+  ipcMain.on('timer-cmd', (_e, d) => timerCmd(d));
+  ipcMain.on('timer-pin', (_e, on) => setPin('timer', !!on));
+  ipcMain.on('mini-pin', (_e, on) => setPin('mini', !!on));
+  ipcMain.on('widget-size', (e, d) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (win !== timerWin || !d) return;
+    const [w] = win.getSize();
+    win.setSize(w, Math.max(60, Math.min(600, Math.round(Number(d.h) || 100))));
+  });
+  ipcMain.on('widget-close', (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (win === timerWin) setPin('timer', false);
+    if (win === mini) setPin('mini', false);
+  });
   ipcMain.on('open-control', () => showHome());
   ipcMain.on('poke', (_e, { target }) => sendEmote('poke', target));
 
@@ -689,7 +876,7 @@ function registerIpc() {
   });
   ipcMain.on('save-config', (_e, partial) => {
     const allowed = ['nickname', 'color', 'serverUrl', 'status', 'customStatus', 'targets',
-      'occlusion', 'hideOthers', 'petScale', 'statusRules', 'autoStart', 'species'];
+      'occlusion', 'hideOthers', 'petScale', 'statusRules', 'autoStart', 'species', 'showPetsDesktop'];
     for (const k of allowed) if (partial && k in partial) config[k] = partial[k];
     config.nickname = String(config.nickname || '나').slice(0, 16);
     config.petScale = Math.min(8, Math.max(2, Number(config.petScale) || 3));
@@ -725,7 +912,8 @@ function registerIpc() {
   // 게임 기능 요청은 정해진 종류만 서버로 전달
   const SRV_TYPES = new Set(['checkin', 'acc-equip', 'buy', 'feed', 'pet-out', 'pet-rename', 'pet-pat',
     'fish-cast', 'fish-reel', 'fish-sell', 'fish-gift', 'fish-view', 'trade-offer', 'trade-answer', 'trade-cancel',
-    'tank-put', 'tank-take', 'tank-feed', 'aqua-put', 'aqua-take', 'aqua-view', 'block', 'unblock', 'password-change']);
+    'tank-put', 'tank-take', 'tank-feed', 'aqua-put', 'aqua-take', 'aqua-view', 'block', 'unblock', 'password-change',
+    'fish-here', 'share-snack', 'mg-invite', 'mg-answer', 'mg-move', 'mg-quit']);
   ipcMain.on('srv', (_e, m) => {
     if (!m || typeof m !== 'object' || !SRV_TYPES.has(m.type)) return;
     const json = JSON.stringify(m);
@@ -739,7 +927,7 @@ function registerIpc() {
   ipcMain.on('set-theme', (_e, t) => {
     if (!['system', 'light', 'dark'].includes(t)) return;
     config.theme = t; saveConfig();
-    for (const w of [home, control, login]) if (w && !w.isDestroyed()) w.webContents.send('theme', t);
+    for (const w of [home, control, login, mini, timerWin]) if (w && !w.isDestroyed()) w.webContents.send('theme', t);
   });
   ipcMain.on('feed', (_e, food) => wsSend({ type: 'feed', food: String(food) }));
   ipcMain.on('pat', () => wsSend({ type: 'pat' }));
@@ -785,6 +973,8 @@ if (!app.requestSingleInstanceLock()) {
     setInterval(pollWindows, process.platform === 'darwin' ? 700 : 250);
     setInterval(pollActive, 2000);
     pollActive();
+    setInterval(tickTimers, 1000);
+    updateWidgets();
 
     screen.on('display-metrics-changed', () => {
       if (!overlay) return;

@@ -175,6 +175,8 @@
 
   $('hideOthers').checked = config.hideOthers;
   $('hideOthers').onchange = (e) => save({ hideOthers: e.target.checked });
+  $('showPetsDesktop').checked = config.showPetsDesktop !== false;
+  $('showPetsDesktop').onchange = (e) => save({ showPetsDesktop: e.target.checked });
 
   // ---------------------------------------------------- 창 목록
   async function loadWindows() {

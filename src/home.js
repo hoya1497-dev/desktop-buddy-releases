@@ -3,6 +3,17 @@
   const $ = (id) => document.getElementById(id);
   const canvas = $('room');
   const ctx = canvas.getContext('2d');
+  // 미니맵 모드: 같은 집 화면을 작은 창에 보여 주기만 하고, 누르면 큰 집 창을 엶
+  const MINI = new URLSearchParams(location.search).get('mini') === '1';
+  if (MINI) {
+    document.body.classList.add('mini');
+    $('miniBar').hidden = false;
+    const block = (e) => { if (e.target.closest && e.target.closest('#miniBar')) return; e.stopImmediatePropagation(); e.preventDefault(); };
+    for (const ev of ['mouseup', 'contextmenu', 'wheel', 'dblclick']) addEventListener(ev, block, { capture: true, passive: false });
+    addEventListener('mousedown', (e) => { if (e.target.closest && e.target.closest('#miniBar')) return; block(e); buddy.send('open-home'); }, true);
+    $('miniOpen').onclick = () => buddy.send('open-home');
+    $('miniClose').onclick = () => buddy.send('widget-close');
+  }
   const FONT = '"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif';
   const EMOJI_FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
   const PET_H = 56;            // 집 안 캐릭터 키
@@ -413,6 +424,13 @@
       if (me && p.y > FLOORS[f].wall - 10) { me.state = 'idle'; me.goTo(p.x, p.y); }
     }
   });
+  // 친구 캐릭터 우클릭: 간식 나눠먹기 · 이모트 · 대결 신청 메뉴
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (decorating) return;
+    const pet = petAt(toRoom(e));
+    if (pet && !pet.isMe) buddy.send('char-menu', { id: pet.id });
+  });
   canvas.addEventListener('wheel', (e) => {
     if (!decorating) return;
     const it = itemAt(toRoom(e)) || selected;
@@ -619,7 +637,7 @@
   const THEME_ICON = { system: '🖥️', light: '☀️', dark: '🌙' };
   const THEME_NEXT = { system: 'light', light: 'dark', dark: 'system' };
   const THEME_NAME = { system: '컴퓨터 설정 따라가기', light: '화이트 모드', dark: '다크 모드' };
-  const showTheme = () => { const t = window.buddyTheme || 'system'; $('themeBtn').textContent = THEME_ICON[t]; $('themeBtn').title = '화면 모드: ' + THEME_NAME[t]; };
+  const showTheme = () => { const t = window.buddyTheme || 'system'; $('themeBtn').textContent = THEME_ICON[t] + ' 화면'; $('themeBtn').title = '화면 모드: ' + THEME_NAME[t]; };
   document.addEventListener('buddy-theme', showTheme);
   $('themeBtn').onclick = () => { const next = THEME_NEXT[window.buddyTheme || 'system']; buddy.send('set-theme', next); toast(THEME_NAME[next]); };
 
@@ -664,6 +682,14 @@
     $('fullBar').style.width = u.pet.full + '%';
     $('moodBar').style.width = u.pet.mood + '%';
     $('homeTitle').textContent = v.editable ? '🏠 내 집' : `🏠 ${v.owner.nickname}님의 집`;
+    $('miniTitle').textContent = $('homeTitle').textContent + (S.room ? ` · ${S.peers.length + 1}명` : '');
+    // 남의 집에 놀러 왔으면 그 집 아쿠아리움도 바로 볼 수 있게
+    const visiting = S.room && !S.room.isOwner;
+    $('friendAquaBtn').hidden = !visiting;
+    if (visiting) {
+      $('friendAquaBtn').textContent = `🐋 ${S.room.owner.nickname}님 아쿠아리움`;
+      $('friendAquaBtn').onclick = () => window.HomeGame && HomeGame.openAquarium(S.room.owner.username);
+    }
     const badge = $('roomBadge');
     if (S.room) { badge.className = 'badge on'; badge.textContent = `${S.peers.length + 1}명${S.room.locked ? ' · 🔒' : ' · 🚪 열림'}`; }
     else { badge.className = 'badge off'; badge.textContent = '혼자 놀기'; }
@@ -715,6 +741,15 @@
   document.querySelectorAll('[data-emote]').forEach((b) => { b.onclick = () => buddy.send('emote', { kind: b.dataset.emote }); });
   buddy.on('focus-chat', () => { document.querySelector('.tabs button[data-tab=chat]').click(); $('chatInput').focus(); });
 
+  // 간식 나눠먹기: 둘 다 같이 먹는 모습
+  buddy.on('snack', ({ from, to, icon }) => {
+    const a = pets.get(from), b = pets.get(to);
+    if (a && b) {
+      a.emote(icon); a.happyT = 1;
+      a.goTo(b.x + (a.x < b.x ? -34 : 34), b.y, () => { a.state = 'eat'; a.t = 1.6; a.dir = a.x < b.x ? 1 : -1; a.emote('😋'); });
+      b.emote(icon); b.happyT = 1.4; setTimeout(() => b.emote('😋'), 700);
+    } else (a || b)?.emote(icon);
+  });
   const EMOTE_ICON = { wave: '👋', heart: '💖', cheer: '🎉', zzz: '💤', poke: '💥' };
   buddy.on('emote', ({ from, kind, target }) => {
     const pet = pets.get(target || from);
@@ -741,6 +776,8 @@
     else if (r.reason === 'gift-sent') toast(`🎁 ${r.to}님에게 🪙${-r.amount}을 선물했어요`);
     else if (r.reason === 'gift' || r.reason === 'admin') { me?.emote('🎁'); }
     else if (r.reason === 'skin') toast('캐릭터 그림을 바꿨어요!');
+    else if (r.reason === 'snack-sent') toast(`${catalog?.foods[r.food]?.icon || '🍪'} ${r.to}님과 간식을 나눠 먹었어요!`);
+    else if (r.reason === 'snack-got') me?.emote('😋');
     else if (r.reason === 'feed' || r.reason === 'levelup') {
       const food = catalog?.foods[r.food];
       if (me && food) {
@@ -829,12 +866,68 @@
   buddy.on('update', renderUpdate);
   buddy.invoke('get-update').then(renderUpdate).catch(() => {});
 
+  // ------------------------------------------------------------ 타이머 탭
+  let timers = { timers: [], pin: false, miniPin: false, now: Date.now() };
+  let tSkew = 0;
+  const fmtT = (ms) => {
+    const sec = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
+    const two = (n) => String(n).padStart(2, '0');
+    return h ? `${h}:${two(m)}:${two(x)}` : `${two(m)}:${two(x)}`;
+  };
+  const tLeft = (t) => (t.state === 'running' ? t.endsAt - (Date.now() + tSkew) : t.state === 'done' ? 0 : t.left);
+  function renderTimers() {
+    $('timerPinBox').checked = !!timers.pin;
+    $('miniPinBox').checked = !!timers.miniPin;
+    const ul = $('timerList'); ul.textContent = '';
+    if (!timers.timers.length) { const li = document.createElement('li'); li.className = 'note'; li.textContent = '아직 타이머가 없어요. 위에서 만들어 보세요!'; ul.append(li); return; }
+    for (const t of timers.timers) {
+      const cmd = (op, extra) => buddy.send('timer-cmd', { op, id: t.id, ...extra });
+      const sub = `${t.minutes}분${t.repeat ? ` · 🔁 반복 (${t.round}번째)` : ''}${t.state === 'paused' ? ' · 멈춤' : t.state === 'done' ? ' · 끝!' : t.state === 'running' ? ' · 진행 중' : ''}`;
+      const li = shopRow(t.state === 'running' ? '⏳' : t.state === 'done' ? '✅' : '⏱️', t.name, sub, [
+        t.state === 'running' ? ['⏸', false, () => cmd('pause'), 'ghost small'] : ['▶', false, () => cmd('start'), 'primary small'],
+        ['↺', false, () => cmd('reset'), 'ghost small'],
+        ['🔁', false, () => cmd('update', { repeat: !t.repeat }), t.repeat ? 'primary small' : 'ghost small'],
+        ['🗑', false, () => { if (confirm(`'${t.name}' 타이머를 지울까요?`)) cmd('del'); }, 'ghost small'],
+      ]);
+      li.classList.add(t.state); li.dataset.id = t.id;
+      const tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = fmtT(tLeft(t));
+      li.querySelector('.btns').before(tm);
+      li.querySelectorAll('.btns button').forEach((b, i) => { b.title = [t.state === 'running' ? '멈춤' : '시작', '처음으로', '반복 켜기/끄기', '지우기'][i]; });
+      ul.append(li);
+    }
+  }
+  setInterval(() => {
+    for (const li of $('timerList').children) {
+      const t = timers.timers.find((x) => x.id === li.dataset.id);
+      if (t) li.querySelector('.tm').textContent = fmtT(tLeft(t));
+    }
+  }, 500);
+  const gotTimers = (v) => { if (!v) return; timers = v; tSkew = v.now - Date.now(); renderTimers(); };
+  buddy.on('timers', gotTimers);
+  buddy.invoke('get-timers').then(gotTimers).catch(() => {});
+  $('timerForm').onsubmit = (e) => {
+    e.preventDefault();
+    const minutes = Math.round(Number($('timerMin').value));
+    if (!(minutes >= 1 && minutes <= 600)) { toast('1~600분 사이로 정해 주세요'); return; }
+    buddy.send('timer-cmd', { op: 'add', name: $('timerName').value, minutes, repeat: $('timerRepeat').checked });
+    $('timerName').value = '';
+    toast('⏱️ 타이머를 만들었어요. ▶를 누르면 시작해요');
+  };
+  document.querySelectorAll('.timer-quick button').forEach((b) => {
+    b.onclick = () => { const [m, n, r] = b.dataset.q.split('|'); buddy.send('timer-cmd', { op: 'add', name: n, minutes: Number(m), repeat: r === '1' }); };
+  });
+  $('timerPinBox').onchange = (e) => buddy.send('timer-pin', e.target.checked);
+  $('miniPinBox').onchange = (e) => buddy.send('mini-pin', e.target.checked);
+
   // home-game.js(낚시 · 펫 · 상점 등)가 쓰는 도구
   window.HomeCore = {
     get S() { return S; }, get catalog() { return catalog; }, get K() { return K; },
     get FLOORS() { return FLOORS; }, get RW() { return RW; }, get LADDER_X() { return LADDER_X; },
     viewing, toast, band, rand, clamp, shopRow, wallThumb, placeNew, findItem, geom, itemScale,
     me: () => pets.get('me'),
+    charOf: (id) => pets.get(id),
+    isMini: MINI,
     layout: () => layout,
     isDecorating: () => decorating,
   };

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>Desktop Buddy 타이머</title>
+  <link rel="stylesheet" href="control.css">
+  <style>
+    html, body { background: transparent !important; margin: 0; overflow: hidden; user-select: none; }
+    .card { margin: 6px; background: color-mix(in srgb, var(--card) 94%, transparent); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 22px rgba(0,0,0,.22); overflow: hidden; }
+    .head { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 10px; font-size: 12px; font-weight: 700; color: var(--muted); -webkit-app-region: drag; cursor: move; }
+    .head span { flex: 1; }
+    .head button { -webkit-app-region: no-drag; border: 0; background: none; color: var(--muted); font-size: 13px; padding: 0 4px; cursor: pointer; }
+    .head button:hover { color: var(--ink); }
+    ul { list-style: none; margin: 0; padding: 0 8px 8px; }
+    li { display: flex; align-items: center; gap: 6px; padding: 6px 4px; border-top: 1px solid var(--line); }
+    .nm { flex: 1; min-width: 0; }
+    .nm b { display: block; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nm small { color: var(--muted); font-size: 10px; white-space: nowrap; }
+    .tm { font: 700 16px ui-monospace, Consolas, monospace; color: var(--ink); }
+    li.running .tm { color: var(--accent); }
+    li.done .tm { color: var(--ok); }
+    li button { -webkit-app-region: no-drag; border: 1px solid var(--line); background: var(--input); color: var(--ink); border-radius: 8px; width: 26px; height: 26px; padding: 0; font-size: 12px; cursor: pointer; }
+    li button:hover { border-color: var(--accent); }
+    .empty { padding: 4px 12px 10px; font-size: 11px; color: var(--muted); }
+    .bar { height: 3px; background: var(--line); border-radius: 2px; margin-top: 3px; overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="head"><span>⏱️ 타이머</span><button id="openBtn" title="집에서 타이머 관리">⚙</button><button id="closeBtn" title="화면 고정 끄기">✕</button></div>
+    <ul id="list"></ul>
+    <div class="empty" id="empty" hidden>타이머가 없어요. 집 → ⏱️ 타이머 탭에서 만들어요.</div>
+  </div>
+  <script src="theme.js"></script>
+  <script src="timer.js"></script>
+</body>
+</html>

@@ -14,12 +14,15 @@ const SEND = [
   'friend-add', 'friend-accept', 'friend-decline', 'friend-remove', 'visit', 'knock', 'knock-answer',
   'skin-set', 'light', 'gift', 'overlay-focus', 'set-theme',
   'update-install', 'update-open', 'update-check', 'srv',
+  // 캐릭터 메뉴 · 타이머 · 미니맵
+  'char-menu', 'open-home', 'timer-cmd', 'timer-pin', 'mini-pin', 'widget-size', 'widget-close',
 ];
-const INVOKE = ['get-state', 'list-windows', 'get-chat', 'get-skins', 'get-theme', 'get-update'];
+const INVOKE = ['get-state', 'list-windows', 'get-chat', 'get-skins', 'get-theme', 'get-update', 'get-timers'];
 const ON = [
   'init', 'config', 'self', 'windows', 'peers', 'chat', 'emote', 'summon',
   'login-state', 'login-error', 'account',
   'home-state', 'reward', 'toast', 'focus-chat', 'skins', 'skin-saved', 'theme', 'update', 'srv',
+  'timers', 'snack',
 ];
 
 contextBridge.exposeInMainWorld('buddy', {
