@@ -42,7 +42,7 @@ const DEFAULT_CONFIG = {
   theme: 'system',   // 'system' | 'light' | 'dark'
   autoStart: true,
   showPetsDesktop: true,   // 꺼내 둔 펫이 바탕화면에서도 캐릭터를 따라다님
-  timers: [],              // 세션 타이머 [{ id, name, minutes, repeat, state, endsAt, left, round }]
+  timers: [],              // 세션 타이머 [{ id, name, steps: [{ name, minutes }], step, repeat, times, state, endsAt, left, round }]
   timerPin: false,         // 화면에 타이머 고정
   timerSound: true,        // 타이머가 끝나면 삐비빅 소리
   miniPin: true,           // 집 창을 닫으면 미니맵으로 보이기 (기본 켜짐)
@@ -718,11 +718,30 @@ function petMenu({ id }, win = overlay) {
 }
 
 // ---------------------------------------------------------------- 세션 타이머
-// 이름 붙인 타이머를 여러 개 만들 수 있고, 반복하면 끝날 때마다 다음 회차를 바로 시작해요.
+// 타이머 하나에 단계를 여러 개 넣을 수 있어요 (예: 공부 50분 → 휴식 10분).
+// 단계가 끝나면 다음 단계로, 마지막 단계가 끝나면 반복을 켰을 때 처음부터 다시 (times번까지, 0이면 계속).
 // 시간 계산은 여기(메인)에서 해서, 창을 닫아도 계속 흘러가요.
 const tid = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const clampMin = (m, def = 25) => Math.min(600, Math.max(1, Math.round(Number(m) || def)));
+const stepMs = (t) => Math.round(t.steps[t.step || 0].minutes * 60_000);
+function normTimer(t) {
+  // 예전 타이머(단계 없이 minutes만 있던 것)도 단계 1개짜리로
+  if (!Array.isArray(t.steps) || !t.steps.length) t.steps = [{ name: t.name || '타이머', minutes: clampMin(t.minutes) }];
+  t.step = Math.min(t.steps.length - 1, Math.max(0, t.step || 0));
+  t.times = Math.max(0, Math.min(99, Math.round(Number(t.times) || 0)));
+  t.round = t.round || 1;
+  return t;
+}
 function timerView() {
-  return { timers: config.timers.map((t) => ({ ...t })), pin: !!config.timerPin, miniPin: !!config.miniPin, sound: config.timerSound !== false, now: Date.now() };
+  return {
+    timers: config.timers.map((t) => {
+      normTimer(t);
+      const cur = t.steps[t.step];
+      // minutes · stepName: 지금 단계 기준 (화면 고정 타이머가 진행 막대를 그릴 때 씀)
+      return { ...t, steps: t.steps.map((s) => ({ ...s })), minutes: cur.minutes, stepName: cur.name, stepCount: t.steps.length };
+    }),
+    pin: !!config.timerPin, miniPin: !!config.miniPin, sound: config.timerSound !== false, now: Date.now(),
+  };
 }
 function pushTimers() {
   const v = timerView();
@@ -731,19 +750,23 @@ function pushTimers() {
 function timerCmd(d) {
   if (!d || typeof d !== 'object') return;
   const t = config.timers.find((x) => x.id === d.id);
-  const ms = (x) => Math.round(x.minutes * 60_000);
   switch (d.op) {
     case 'add': {
       if (config.timers.length >= 12) return;
-      const minutes = Math.min(600, Math.max(1, Math.round(Number(d.minutes) || 25)));
-      const name = String(d.name || '').trim().slice(0, 20) || `${minutes}분 타이머`;
-      config.timers.push({ id: tid(), name, minutes, repeat: !!d.repeat, state: 'idle', endsAt: 0, left: minutes * 60_000, round: 1 });
+      let steps = Array.isArray(d.steps) ? d.steps : [{ name: d.name, minutes: d.minutes }];
+      steps = steps.slice(0, 8).map((s, i) => ({ name: String(s && s.name || '').trim().slice(0, 12) || `${i + 1}단계`, minutes: clampMin(s && s.minutes) }));
+      if (!steps.length) return;
+      const name = String(d.name || '').trim().slice(0, 20) || (steps.length > 1 ? steps.map((s) => s.name).join(' + ') : `${steps[0].minutes}분 타이머`);
+      if (steps.length === 1 && !String(d.steps?.[0]?.name || '').trim()) steps[0].name = name;
+      config.timers.push({ id: tid(), name, steps, step: 0, repeat: !!d.repeat, times: Math.max(0, Math.min(99, Math.round(Number(d.times) || 0))),
+        state: 'idle', endsAt: 0, left: steps[0].minutes * 60_000, round: 1 });
       break;
     }
     case 'del': config.timers = config.timers.filter((x) => x.id !== d.id); break;
     case 'start':
       if (!t || t.state === 'running') return;
-      if (t.state === 'done' || t.state === 'idle') { t.left = ms(t); if (t.state === 'done') t.round = 1; }
+      normTimer(t);
+      if (t.state === 'done' || t.state === 'idle') { t.step = 0; t.round = 1; t.left = stepMs(t); }
       t.state = 'running'; t.endsAt = Date.now() + t.left;
       break;
     case 'pause':
@@ -752,22 +775,63 @@ function timerCmd(d) {
       break;
     case 'reset':
       if (!t) return;
-      t.state = 'idle'; t.left = ms(t); t.round = 1; t.endsAt = 0;
+      normTimer(t);
+      t.state = 'idle'; t.step = 0; t.round = 1; t.left = stepMs(t); t.endsAt = 0;
       break;
+    case 'skip': {   // 지금 단계 건너뛰기 (다음 단계로)
+      if (!t || (t.state !== 'running' && t.state !== 'paused')) return;
+      advance(normTimer(t), Date.now(), true);
+      break;
+    }
     case 'update':
       if (!t) return;
+      normTimer(t);
       if ('name' in d) t.name = String(d.name || '').trim().slice(0, 20) || t.name;
       if ('repeat' in d) t.repeat = !!d.repeat;
-      if ('minutes' in d) {
-        t.minutes = Math.min(600, Math.max(1, Math.round(Number(d.minutes) || t.minutes)));
-        if (t.state === 'idle' || t.state === 'done') t.left = ms(t);
-      }
+      if ('times' in d) t.times = Math.max(0, Math.min(99, Math.round(Number(d.times) || 0)));
       break;
     default: return;
   }
   saveConfig(); pushTimers(); updateWidgets();
 }
 function alarm(kind) { if (config.timerSound !== false) overlay?.webContents.send('alarm', { kind }); }
+function say(text) { overlay?.webContents.send('chat', { id: 'me', text }); }
+// 지금 단계가 끝났을 때: 다음 단계 → 다음 바퀴 → 끝
+function advance(t, nowT, skipped) {
+  const done = t.steps[t.step];
+  if (t.step < t.steps.length - 1) {
+    t.step += 1;
+    const next = t.steps[t.step];
+    t.endsAt = nowT + stepMs(t); t.left = stepMs(t);
+    if (t.state === 'paused') t.state = 'running';
+    if (!skipped) {
+      notify(`⏰ ${t.name}`, `${done.name} 끝! 이제 ${next.name} ${next.minutes}분이에요.`);
+      say(`⏰ ${done.name} 끝! 이제 ${next.name} ${next.minutes}분!`);
+      alarm('round');
+    }
+    return;
+  }
+  const more = t.repeat && (!t.times || t.round < t.times);
+  if (more) {
+    t.round += 1; t.step = 0;
+    t.endsAt = nowT + stepMs(t); t.left = stepMs(t);
+    if (t.state === 'paused') t.state = 'running';
+    if (!skipped) {
+      const first = t.steps[0];
+      notify(`⏰ ${t.name}`, `${t.round - 1}바퀴 끝! ${t.round}바퀴째 ${first.name} ${first.minutes}분 시작해요.`);
+      say(`⏰ ${t.round - 1}바퀴 끝! 다시 ${first.name} 시작!`);
+      alarm('round');
+    }
+    return;
+  }
+  t.state = 'done'; t.left = 0;
+  if (!skipped) {
+    notify(`⏰ ${t.name}`, t.repeat && t.times ? `${t.times}바퀴를 다 했어요! 수고했어요 🎉` : '시간이 다 됐어요! 수고했어요 🎉');
+    say(`⏰ ${t.name} 끝! 수고했어요 🎉`);
+    overlay?.webContents.send('emote', { from: 'me', kind: 'cheer' });
+    alarm('done');
+  }
+}
 function tickTimers() {
   updateWidgets();   // 창 이벤트를 놓쳐도 1초 안에 미니맵 · 타이머 창 상태를 맞춤
   const nowT = Date.now();
@@ -775,19 +839,7 @@ function tickTimers() {
   for (const t of config.timers) {
     if (t.state !== 'running' || t.endsAt > nowT) continue;
     changed = true;
-    if (t.repeat) {
-      t.round = (t.round || 1) + 1;
-      t.endsAt = nowT + Math.round(t.minutes * 60_000);
-      notify(`⏰ ${t.name}`, `${t.round - 1}번째가 끝났어요! 바로 ${t.round}번째를 시작해요.`);
-      alarm('round');
-      overlay?.webContents.send('chat', { id: 'me', text: `⏰ ${t.name} ${t.round - 1}번째 끝! 계속 가 보자!` });
-    } else {
-      t.state = 'done'; t.left = 0;
-      notify(`⏰ ${t.name}`, '시간이 다 됐어요! 수고했어요 🎉');
-      alarm('done');
-      overlay?.webContents.send('chat', { id: 'me', text: `⏰ ${t.name} 끝! 수고했어요 🎉` });
-      overlay?.webContents.send('emote', { from: 'me', kind: 'cheer' });
-    }
+    advance(normTimer(t), nowT, false);
   }
   if (changed) { saveConfig(); pushTimers(); }
 }

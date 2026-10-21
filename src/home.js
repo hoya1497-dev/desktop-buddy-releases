@@ -897,17 +897,24 @@
     if (!timers.timers.length) { const li = document.createElement('li'); li.className = 'note'; li.textContent = '아직 타이머가 없어요. 위에서 만들어 보세요!'; ul.append(li); return; }
     for (const t of timers.timers) {
       const cmd = (op, extra) => buddy.send('timer-cmd', { op, id: t.id, ...extra });
-      const sub = `${t.minutes}분${t.repeat ? ` · 🔁 반복 (${t.round}번째)` : ''}${t.state === 'paused' ? ' · 멈춤' : t.state === 'done' ? ' · 끝!' : t.state === 'running' ? ' · 진행 중' : ''}`;
-      const li = shopRow(t.state === 'running' ? '⏳' : t.state === 'done' ? '✅' : '⏱️', t.name, sub, [
+      const multi = t.steps.length > 1;
+      const plan = t.steps.map((x) => `${x.name} ${x.minutes}분`).join(' → ');
+      const rep = t.repeat ? ` · 🔁 ${t.round}바퀴째${t.times ? `/${t.times}` : ''}` : '';
+      const now = t.state === 'running' || t.state === 'paused' ? ` · 지금: ${t.stepName}${multi ? ` (${t.step + 1}/${t.steps.length})` : ''}${t.state === 'paused' ? ' 멈춤' : ''}` : t.state === 'done' ? ' · 끝!' : '';
+      const buttons = [
         t.state === 'running' ? ['⏸', false, () => cmd('pause'), 'ghost small'] : ['▶', false, () => cmd('start'), 'primary small'],
-        ['↺', false, () => cmd('reset'), 'ghost small'],
-        ['🔁', false, () => cmd('update', { repeat: !t.repeat }), t.repeat ? 'primary small' : 'ghost small'],
-        ['🗑', false, () => { if (confirm(`'${t.name}' 타이머를 지울까요?`)) cmd('del'); }, 'ghost small'],
-      ]);
+      ];
+      const titles = [t.state === 'running' ? '멈춤' : '시작'];
+      if (multi) { buttons.push(['⏭', !(t.state === 'running' || t.state === 'paused'), () => cmd('skip'), 'ghost small']); titles.push('다음 단계로 건너뛰기'); }
+      buttons.push(['↺', false, () => cmd('reset'), 'ghost small'], ['🔁', false, () => cmd('update', { repeat: !t.repeat }), t.repeat ? 'primary small' : 'ghost small'],
+        ['🗑', false, () => { if (confirm(`'${t.name}' 타이머를 지울까요?`)) cmd('del'); }, 'ghost small']);
+      titles.push('처음으로', '반복 켜기/끄기', '지우기');
+      const icon = t.state === 'running' ? (/휴식|쉬/.test(t.stepName) ? '☕' : '⏳') : t.state === 'done' ? '✅' : '⏱️';
+      const li = shopRow(icon, t.name, plan + rep + now, buttons);
       li.classList.add(t.state); li.dataset.id = t.id;
       const tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = fmtT(tLeft(t));
       li.querySelector('.btns').before(tm);
-      li.querySelectorAll('.btns button').forEach((b, i) => { b.title = [t.state === 'running' ? '멈춤' : '시작', '처음으로', '반복 켜기/끄기', '지우기'][i]; });
+      li.querySelectorAll('.btns button').forEach((b, i) => { b.title = titles[i]; });
       ul.append(li);
     }
   }
@@ -920,16 +927,39 @@
   const gotTimers = (v) => { if (!v) return; timers = v; tSkew = v.now - Date.now(); renderTimers(); };
   buddy.on('timers', gotTimers);
   buddy.invoke('get-timers').then(gotTimers).catch(() => {});
+  // 단계 입력 줄 (이름 + 분)
+  function stepRow(name = '', min = 25) {
+    const row = document.createElement('div'); row.className = 'step-row';
+    const no = document.createElement('span'); no.className = 'no';
+    const nm = document.createElement('input'); nm.type = 'text'; nm.maxLength = 12; nm.placeholder = '단계 이름 (예: 공부)'; nm.value = name;
+    const mn = document.createElement('input'); mn.type = 'number'; mn.min = 1; mn.max = 600; mn.value = min;
+    const unit = document.createElement('span'); unit.className = 'note-inline'; unit.textContent = '분';
+    const x = document.createElement('button'); x.type = 'button'; x.textContent = '✕'; x.title = '이 단계 빼기';
+    x.onclick = () => { if ($('stepRows').children.length > 1) { row.remove(); numberSteps(); } };
+    row.append(no, nm, mn, unit, x);
+    return row;
+  }
+  function numberSteps() { [...$('stepRows').children].forEach((r, i) => { r.querySelector('.no').textContent = i + 1; }); }
+  function resetStepForm() { $('stepRows').textContent = ''; $('stepRows').append(stepRow('공부', 50)); numberSteps(); }
+  resetStepForm();
+  $('addStepBtn').onclick = () => {
+    if ($('stepRows').children.length >= 8) { toast('단계는 8개까지 넣을 수 있어요'); return; }
+    $('stepRows').append(stepRow($('stepRows').children.length === 1 ? '휴식' : '', 10)); numberSteps();
+  };
   $('timerForm').onsubmit = (e) => {
     e.preventDefault();
-    const minutes = Math.round(Number($('timerMin').value));
-    if (!(minutes >= 1 && minutes <= 600)) { toast('1~600분 사이로 정해 주세요'); return; }
-    buddy.send('timer-cmd', { op: 'add', name: $('timerName').value, minutes, repeat: $('timerRepeat').checked });
-    $('timerName').value = '';
+    const steps = [...$('stepRows').children].map((r) => ({ name: r.querySelector('input[type=text]').value.trim(), minutes: Math.round(Number(r.querySelector('input[type=number]').value)) }));
+    if (steps.some((x) => !(x.minutes >= 1 && x.minutes <= 600))) { toast('시간은 1~600분 사이로 정해 주세요'); return; }
+    buddy.send('timer-cmd', { op: 'add', name: $('timerName').value, steps, repeat: $('timerRepeat').checked, times: Number($('timerTimes').value) || 0 });
+    $('timerName').value = ''; resetStepForm();
     toast('⏱️ 타이머를 만들었어요. ▶를 누르면 시작해요');
   };
   document.querySelectorAll('.timer-quick button').forEach((b) => {
-    b.onclick = () => { const [m, n, r] = b.dataset.q.split('|'); buddy.send('timer-cmd', { op: 'add', name: n, minutes: Number(m), repeat: r === '1' }); };
+    b.onclick = () => {
+      const p = JSON.parse(b.dataset.preset);
+      buddy.send('timer-cmd', { op: 'add', name: p.name, steps: p.steps.map(([name, minutes]) => ({ name, minutes })), repeat: p.repeat });
+      toast(`⏱️ '${p.name}' 타이머를 만들었어요. ▶를 누르면 시작해요`);
+    };
   });
   $('timerPinBox').onchange = (e) => buddy.send('timer-pin', e.target.checked);
   $('miniPinBox').onchange = (e) => buddy.send('mini-pin', e.target.checked);

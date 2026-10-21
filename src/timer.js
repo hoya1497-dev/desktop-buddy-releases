@@ -28,7 +28,10 @@
       const nm = document.createElement('span'); nm.className = 'nm';
       const b = document.createElement('b'); b.textContent = t.name;
       const sm = document.createElement('small');
-      sm.textContent = (t.state === 'done' ? '끝! ' : t.state === 'paused' ? '멈춤 · ' : '') + (t.repeat ? `🔁 ${t.round}번째` : `${t.minutes}분`);
+      const multi = (t.stepCount || 1) > 1;
+      sm.textContent = (t.state === 'done' ? '끝! ' : t.state === 'paused' ? '멈춤 · ' : '')
+        + (multi ? `${t.stepName} ${t.step + 1}/${t.stepCount}` : `${t.minutes}분`)
+        + (t.repeat ? ` · 🔁 ${t.round}${t.times ? '/' + t.times : ''}바퀴` : '');
       const bar = document.createElement('div'); bar.className = 'bar'; bar.append(document.createElement('i'));
       nm.append(b, sm, bar);
       const tm = document.createElement('span'); tm.className = 'tm';

@@ -209,7 +209,15 @@ aside .pane { min-width: 300px; }
 .timer-form .row { gap: 6px; align-items: center; flex-wrap: wrap; }
 .timer-form .row input[type=number] { width: 80px; flex: none; }
 .check.inline { margin: 0; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.timer-quick { flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .timer-quick button { font-size: 11px; }
+.step-rows { display: flex; flex-direction: column; gap: 4px; }
+.step-row { display: flex; gap: 6px; align-items: center; }
+.step-row .no { width: 18px; color: var(--muted); font-size: 11px; text-align: center; }
+.step-row input[type=text] { flex: 1; min-width: 0; }
+.step-row input[type=number], #timerTimes { width: 64px; flex: none; }
+.step-row button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 13px; }
+#addStepBtn { align-self: flex-start; }
 .timer-list .tm { font: 700 17px ui-monospace, Consolas, monospace; min-width: 64px; text-align: right; }
 .timer-list li.running .tm { color: var(--accent); }
 .timer-list li.done .tm { color: var(--ok); }
