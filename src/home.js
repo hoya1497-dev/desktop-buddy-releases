@@ -343,7 +343,7 @@
   let saveTimer = null;
   function saveLayout(now = false) {
     clearTimeout(saveTimer);
-    const go = () => buddy.send('place', layout.map(({ item, x, y, rot, flip }) => ({ item, x, y, rot: rot || 0, flip: !!flip })));
+    const go = () => buddy.send('place', layout.map(({ item, x, y, rot, flip, uid }) => ({ item, x, y, rot: rot || 0, flip: !!flip, ...(uid ? { uid } : {}) })));
     if (now) go(); else saveTimer = setTimeout(go, 350);
   }
 
