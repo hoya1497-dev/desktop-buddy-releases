@@ -91,6 +91,9 @@ h3 { font-size: 13px; margin: 12px 0 6px; }
 .subtabs button { border: 1px solid var(--line); background: var(--input); color: var(--muted); border-radius: 99px; padding: 3px 10px; font-size: 12px; }
 .subtabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .wide-card { width: min(520px, 96%); }
+.aqua-card { width: min(1040px, 97%); }
+.aqua-view { aspect-ratio: 960 / 460; }
+.aqua-list { max-height: 190px; overflow-y: auto; }
 .water-view { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; image-rendering: pixelated; background: #1b4d7a; }
 .fishrow { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .fishrow li { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; font-size: 11px; width: 62px; text-align: center; }

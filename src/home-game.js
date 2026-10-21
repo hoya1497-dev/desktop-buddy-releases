@@ -29,7 +29,12 @@
   const btn = (text, cls, onclick, disabled, title) => el('button', { class: cls || 'primary small', text, onclick, disabled: !!disabled, title });
 
   const S = () => H.S;
-  const C = () => H.catalog;
+  // 운영자 전용 액세서리: 가진 것만 서버가 진짜 이름을 알려 줌
+  const C = () => {
+    const c = H.catalog, names = U()?.secretNames;
+    if (c && names) for (const [id, name] of Object.entries(names)) if (c.accessories[id]) c.accessories[id].name = name;
+    return c;
+  };
   const U = () => (H.S && H.S.session ? H.S.session.user : null);
   const FISH = () => (C() ? C().fish : {});
   const rar = (f) => C().rarity[f.rar];
@@ -94,6 +99,11 @@
     const acc = $('shopAcc'); acc.textContent = '';
     for (const [id, a] of Object.entries(c.accessories)) {
       const own = u.acc.owned[id];
+      if (a.secret) { // 운영자 전용: 안 가졌으면 ??? 로
+        acc.append(row(own ? accThumb(id) : secretThumb(), own ? a.name : '???', own ? `${a.code} · ✨ 운영자 보상 · 가지고 있음` : `${a.code} · 🔒 비밀 액세서리 · 살 수 없어요`,
+          [[own ? '있음' : '구매 불가', true, () => {}]]));
+        continue;
+      }
       const sub = `${a.code} · ` + (a.price == null ? '📅 출석 7일째 선물로만 나와요' : `🪙 ${a.price}`);
       acc.append(row(accThumb(id), a.name, own ? `${a.code} · 가지고 있음` : sub, [[own ? '있음' : a.price == null ? '출석 전용' : '사기', own || a.price == null || u.coins < a.price, () => srv({ type: 'buy', item: id })]]));
     }
@@ -107,6 +117,14 @@
         : [['사기', u.coins < w.price, () => srv({ type: 'buy', item: id })]];
       walls.append(row(H.wallThumb(id), w.name, sub, buttons));
     }
+  }
+  function secretThumb() {
+    const c = el('canvas', { width: 34, height: 34 });
+    const g = c.getContext('2d');
+    g.fillStyle = '#2a2236'; g.fillRect(2, 2, 30, 30);
+    g.fillStyle = '#f4cf4f'; g.font = 'bold 22px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('?', 17, 18);
+    return c;
   }
   function accThumb(id) {
     const c = el('canvas', { width: 34, height: 34 });
@@ -675,11 +693,12 @@
           ctx.font = `16px "Segoe UI Emoji","Apple Color Emoji",sans-serif`; ctx.textAlign = 'center';
           ctx.fillText('💗', r.x, r.y - 50 - (1.2 - r.heart) * 18);
           ctx.globalAlpha = 1;
-          ctx.font = `bold 10px ${FONT}`; ctx.fillStyle = 'rgba(0,0,0,0.65)';
-          const w = ctx.measureText(r.p.name).width + 10;
-          ctx.fillRect(Math.round(r.x - w / 2), Math.round(r.y - 40), w, 14);
-          ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(r.p.name, r.x, r.y - 33); ctx.textBaseline = 'alphabetic';
         }
+        // 이름표는 항상 보이게
+        ctx.font = `bold 10px ${FONT}`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        const w = ctx.measureText(r.p.name).width + 10;
+        ctx.fillRect(Math.round(r.x - w / 2), Math.round(r.y - 40), w, 14);
+        ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(r.p.name, r.x, r.y - 33); ctx.textBaseline = 'alphabetic';
       } });
     }
   }
@@ -731,7 +750,12 @@
 
   // ------------------------------------------------------------ 어항 · 아쿠아리움 크게 보기
   const viewer = { kind: null, uid: null, owner: null, fish: [], fed: 0, mine: false, swim: [] };
-  function waterCanvas(id) { const c = $(id); if (c.width !== 480) { c.width = 480; c.height = 270; } return c; }
+  // 어항은 480x270, 아쿠아리움은 훨씬 넓게 (물고기가 많이 들어가니까)
+  function waterCanvas(id) {
+    const c = $(id), [w, h] = id === 'aquaCanvas' ? [960, 460] : [480, 270];
+    if (c.width !== w) { c.width = w; c.height = h; }
+    return c;
+  }
   function openTank(uid) {
     viewer.kind = 'tank'; viewer.uid = uid; viewer.swim = [];
     $('tankModal').hidden = false;
@@ -827,19 +851,20 @@
     // 모래 · 수초 · 돌
     g.fillStyle = '#d9c38c'; g.fillRect(0, Hh - 22, W, 22);
     g.fillStyle = '#c4ab72'; for (let x = 0; x < W; x += 9) g.fillRect(x, Hh - 22 + (x % 3) * 3, 4, 2);
-    for (let i = 0; i < 7; i++) {
-      const bx = 30 + i * 70 + (i % 2) * 10;
+    const plants = Math.max(7, Math.round(W / 68));
+    for (let i = 0; i < plants; i++) {
+      const bx = 30 + i * ((W - 60) / plants) + (i % 2) * 10;
       for (let j = 0; j < 9; j++) { g.fillStyle = j % 2 ? '#3f8a3a' : '#5fae4a'; g.fillRect(bx + Math.round(Math.sin(t * 1.4 + j * 0.6 + i) * 3), Hh - 22 - j * 7, 5, 7); }
     }
     g.fillStyle = '#8a8a9a'; g.fillRect(W - 120, Hh - 34, 40, 14); g.fillRect(W - 112, Hh - 42, 22, 8);
     // 거품
     g.fillStyle = 'rgba(255,255,255,0.6)';
-    for (let i = 0; i < 10; i++) { const y = Hh - ((t * 30 + i * 37) % Hh); g.fillRect(40 + (i * 53) % (W - 80) + Math.sin(t * 3 + i) * 3, y, 3, 3); }
+    for (let i = 0; i < Math.round(W / 48); i++) { const y = Hh - ((t * 30 + i * 37) % Hh); g.fillRect(40 + (i * 53) % (W - 80) + Math.sin(t * 3 + i) * 3, y, 3, 3); }
     // 밥
     const fedAgo = (Date.now() - (viewer.fed || 0)) / 1000;
     if (viewer.fed && fedAgo < 300) {
       g.fillStyle = '#c87a3a';
-      for (let i = 0; i < 14; i++) g.fillRect((i * 37) % W, ((t * 18 + i * 29) % (Hh - 30)), 3, 3);
+      for (let i = 0; i < Math.round(W / 34); i++) g.fillRect((i * 67) % W, ((t * 18 + i * 29) % (Hh - 30)), 3, 3);
     }
     // 물고기
     const list = viewer.fish || [];

@@ -76,7 +76,8 @@
 
   // 액세서리: 그림(rows) · 놓을 자리. 'top'은 머리 꼭대기에 아랫줄을 맞춤
   const ACC_PAL = { o: '#2a2028', p: '#f47aa0', P: '#c84a78', y: '#f4cf4f', Y: '#c9962c', r: '#e0463a', b: '#4a8ae0',
-    v: '#8a5ad8', V: '#5a3aa8', k: '#1a1a22', w: '#ffffff', g: '#5cb85c', n: '#c08a50', s: '#9aa0a6', m: '#f0883a' };
+    v: '#8a5ad8', V: '#5a3aa8', k: '#1a1a22', w: '#ffffff', g: '#5cb85c', n: '#c08a50', s: '#9aa0a6', m: '#f0883a',
+    c: '#6fd6f4', C: '#2a6fb8', R: '#a8302a', S: '#d8dde4', e: '#b0b6bf' };
   const ACC = {
     ribbon:     { place: 'ear', rows: ['pp.pp', 'ppPpp', 'pp.pp'] },
     flower:     { place: 'ear', rows: ['.p.', 'pyp', '.p.'] },
@@ -87,9 +88,22 @@
     crown:      { place: 'top', x: 4, rows: ['y..y..y.', 'yy.yy.yy', 'yyyyyyyy', 'yryybyry'] },
     wizard:     { place: 'top', x: 3, rows: ['......o.....', '.....ovo....', '....ovyvo...', '...ovvvvvo..', '..ovvvyvvvo.', 'oVVVVVVVVVVo'] },
     halo:       { place: 'top', x: 4, dy: -3, rows: ['.yyyyyy.', 'y......y', '.yyyyyy.'] },
-    glasses:    { place: 'eyes', x: 3, rows: ['oooo..oooo', 'o..oooo..o', 'o..o..o..o', 'oooo..oooo'] },
-    sunglasses: { place: 'eyes', x: 3, rows: ['oooo..oooo', 'okkoooookko'.slice(0, 10), 'okko..okko', 'oooo..oooo'] },
+    // 안경: 가는 동그란 은테 + 귀걸이 다리, 렌즈는 투명(눈이 보임) + 반짝
+    glasses:    { place: 'eyes', x: 1, rows: ['..wSSw..wSSw..', 'SSS..SSSS..SSS', '..S..S..S..S..', '...SS....SS...'] },
+    // 선글라스: 굵은 검은 테 + 파랗게 반사되는 큰 렌즈
+    sunglasses: { place: 'eyes', x: 1, rows: ['kkkkkkkkkkkkkk', '.kwcck..kwcck.', '.kCCCk..kCCCk.', '..kkk....kkk..'] },
     bowtie:     { place: 'neck', x: 6, rows: ['rr.rr', 'rrRrr', 'rr.rr'].map((r) => r.replace('R', 'P').replace(/r/g, 'r')) },
+    // ---- 운영자 전용 ----
+    starband:   { place: 'top', x: 2, rows: ['.....y......', '....yyy.....', '.....y......', 'bbbbbbbbbbbb'] },
+    flamecrown: { place: 'top', x: 4, rows: ['m..rr..m', 'mr.mm.rm', 'rmmyymmr', 'YYYYYYYY', 'YrYbbYrY'] },
+    pirate:     { place: 'top', x: 1, rows: ['.....kkkk.....', '...kkkkkkkk...', '..kkkkwwkkkk..', '.kkkkwkkwkkkk.', 'kkkkkkkkkkkkkk', 'yyyyyyyyyyyyyy'] },
+    knight:     { place: 'top', x: 2, dy: 1, rows: ['.....rr.....', '....rrr.....', '...SSSSSS...', '..SSSSSSSS..', '.SwSSSSSSSS.', 'eeeeeeeeeeee'] },
+    horns:      { place: 'top', x: 2, rows: ['r..........r', 'rr........rr', '.Rr......rR.'] },
+    visor:      { place: 'eyes', x: 1, rows: ['kkkkkkkkkkkkkk', 'kvcwvvvvvvcwvk', 'kVvvvvvvvvvvVk', '.kkkkkkkkkkkk.'] },
+    eyepatch:   { place: 'eyes', x: 1, rows: ['.kkkkkkk.kkkk.', '.........kkkk.', '.........kkkk.', '..........kk..'] },
+    heartglass: { place: 'eyes', x: 2, rows: ['pp.pp..pp.pp', 'pPPPpkkpPPPp', '.pPp....pPp.', '..p......p..'] },
+    medal:      { place: 'neck', x: 5, rows: ['rb..br', '.rbbr.', '..yy..', '.yYYy.', '..yy..'] },
+    scarf:      { place: 'neck', x: 2, rows: ['rrrrrrrrrrrr', 'RRRRRRRRRrrR', '........rR..', '........rR..'] },
   };
   function accOrigin(sp, a, rows) {
     const h = rows.length;
