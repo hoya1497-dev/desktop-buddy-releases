@@ -45,7 +45,7 @@ const DEFAULT_CONFIG = {
   timers: [],              // 세션 타이머 [{ id, name, minutes, repeat, state, endsAt, left, round }]
   timerPin: false,         // 화면에 타이머 고정
   timerSound: true,        // 타이머가 끝나면 삐비빅 소리
-  miniPin: false,          // 집 창을 닫으면 미니맵으로 보이기
+  miniPin: true,           // 집 창을 닫으면 미니맵으로 보이기 (기본 켜짐)
   timerBounds: null, miniBounds: null,
   statusRules: [
     'steam = 🎮 게임중', 'league = 🎮 게임중', 'valorant = 🎮 게임중', 'minecraft = 🎮 게임중',
@@ -769,6 +769,7 @@ function timerCmd(d) {
 }
 function alarm(kind) { if (config.timerSound !== false) overlay?.webContents.send('alarm', { kind }); }
 function tickTimers() {
+  updateWidgets();   // 창 이벤트를 놓쳐도 1초 안에 미니맵 · 타이머 창 상태를 맞춤
   const nowT = Date.now();
   let changed = false;
   for (const t of config.timers) {
