@@ -146,35 +146,51 @@
     };
   }
 
-  /** opts: { species, legs, eyes, flip, scale, color | palette, tailFrame } */
-  function drawPet(ctx, left, top, opts) {
+  // 캐릭터를 1칸 = 1픽셀인 작은 그림으로 먼저 만들고(캐시), 그걸 통째로 키워서 그림.
+  // 칸마다 따로 사각형을 그리면 화면 배율이 125%·150%인 컴퓨터에서 칸 사이에 틈이 생겨
+  // 도트 무늬가 보이고 군데군데 비쳐 보였음.
+  const PAD_X = 6, PAD_Y = 10, BW = 16 + PAD_X * 2, BH = 18 + PAD_Y + 4;
+  const cache = new Map();
+  function bitmapOf(opts, pal) {
+    const accKey = opts.acc ? ['neck', 'face', 'head'].map((k) => opts.acc[k] || '').join(',') : '';
+    const key = [opts.species, opts.legs, opts.eyes, opts.flip ? 1 : 0, opts.tailFrame || 0, accKey, pal.o, pal.b, pal.d, pal.l, pal.e, pal.n, pal.p].join('|');
+    let c = cache.get(key);
+    if (c) return c;
     const sp = SPECIES[opts.species] || SPECIES.cat;
-    const s = opts.scale;
-    const pal = opts.palette || palette(opts.color);
+    c = document.createElement('canvas'); c.width = BW; c.height = BH;
+    const g = c.getContext('2d');
     const rows = eyes(sp.body, opts.eyes || 'open', sp.eyeRows).concat(LEGS[opts.legs] || LEGS.stand);
-    const px = (x, y, c) => {
+    const px = (x, y, col) => {
       const dx = opts.flip ? 15 - x : x;
-      ctx.fillStyle = c;
-      ctx.fillRect(left + dx * s, top + y * s, s, s);
+      g.fillStyle = col;
+      g.fillRect(dx + PAD_X, y + PAD_Y, 1, 1);
     };
     for (let y = 0; y < rows.length; y++) {
       const r = rows[y];
-      for (let x = 0; x < 16; x++) {
-        const ch = r[x];
-        if (ch && ch !== '.') px(x, y, pal[ch]);
-      }
+      for (let x = 0; x < 16; x++) { const ch = r[x]; if (ch && ch !== '.') px(x, y, pal[ch]); }
     }
-    for (const [x, y, c] of sp.tail[opts.tailFrame || 0]) px(x, y, pal[c]);
-    // 액세서리 (목 → 얼굴 → 머리 순서로)
+    for (const [x, y, col] of sp.tail[opts.tailFrame || 0]) px(x, y, pal[col]);
     const acc = opts.acc || {};
-    for (const slot of ['neck', 'face', 'head']) {
+    for (const slot of ['neck', 'face', 'head']) {   // 목 → 얼굴 → 머리 순서로
       const a = ACC[acc[slot]];
       if (!a) continue;
       const [ox, oy] = accOrigin(sp, a, a.rows);
-      a.rows.forEach((row, j) => [...row].forEach((ch, i) => {
-        if (ch !== '.' && ACC_PAL[ch]) px(ox + i, oy + j, ACC_PAL[ch]);
-      }));
+      a.rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.' && ACC_PAL[ch]) px(ox + i, oy + j, ACC_PAL[ch]); }));
     }
+    if (cache.size > 400) cache.clear();
+    cache.set(key, c);
+    return c;
+  }
+
+  /** opts: { species, legs, eyes, flip, scale, color | palette, tailFrame, acc } — (left, top)은 16×16 칸의 왼쪽 위 */
+  function drawPet(ctx, left, top, opts) {
+    const s = opts.scale;
+    const pal = opts.palette || palette(opts.color);
+    const bm = bitmapOf(opts, pal);
+    const was = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(bm, left - PAD_X * s, top - PAD_Y * s, BW * s, BH * s);
+    ctx.imageSmoothingEnabled = was;
   }
 
   window.Sprites = {

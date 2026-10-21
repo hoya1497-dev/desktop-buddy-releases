@@ -36,6 +36,7 @@ window.Skins = (() => {
     const flip = (dir > 0) !== (s.faces === 'right');
     ctx.save();
     ctx.imageSmoothingEnabled = im.naturalHeight >= 64; // 작은 도트 그림은 또렷하게
+    ctx.imageSmoothingQuality = 'high';
     ctx.translate(cx, bottom);
     if (flip) ctx.scale(-1, 1);
     if (tilt) ctx.rotate(tilt);

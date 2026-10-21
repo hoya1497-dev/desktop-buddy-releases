@@ -102,6 +102,7 @@
           const c = document.createElement('canvas'); c.width = w; c.height = h;
           const g = c.getContext('2d');
           g.imageSmoothingEnabled = !(im.width <= 64 && im.height <= 64);
+          g.imageSmoothingQuality = 'high';   // 크게 줄일 때 거칠어지지 않게
           g.drawImage(im, 0, 0, w, h);
           resolve(c.toDataURL('image/png'));
         };
@@ -177,6 +178,8 @@
   $('hideOthers').onchange = (e) => save({ hideOthers: e.target.checked });
   $('showPetsDesktop').checked = config.showPetsDesktop !== false;
   $('showPetsDesktop').onchange = (e) => save({ showPetsDesktop: e.target.checked });
+  $('showAllPets').checked = !!config.showAllPets;
+  $('showAllPets').onchange = (e) => save({ showAllPets: e.target.checked });
 
   // ---------------------------------------------------- 창 목록
   async function loadWindows() {

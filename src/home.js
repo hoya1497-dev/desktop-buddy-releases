@@ -710,6 +710,7 @@
     $('lightBtn').textContent = lightOn ? '💡 불 끄기' : '💡 불 켜기';
     $('lightBtn').classList.toggle('off', !v.editable);
 
+    $('allPetsBox').checked = !!S.view?.showAllPets;
     if (window.HomeGame) HomeGame.renderPanels();
     $('chatHint').textContent = S.room ? '' : '혼자일 땐 말풍선만 떠요. 친구 집에 놀러 가 보세요.';
     if (!$('computer').hidden) renderComputer();
@@ -821,6 +822,7 @@
     if (window.HomeGame) HomeGame.onState(st);
   });
   $('settingsBtn').onclick = () => buddy.send('open-settings');
+  $('allPetsBox').onchange = (e) => buddy.send('save-config', { showAllPets: e.target.checked });
 
   // ------------------------------------------------------------ 오른쪽 패널: 접기 · 넓이 조절 (이 컴퓨터에 기억)
   const aside = $('aside'), resizer = $('asideResizer');

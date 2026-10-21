@@ -42,6 +42,7 @@ const DEFAULT_CONFIG = {
   theme: 'system',   // 'system' | 'light' | 'dark'
   autoStart: true,
   showPetsDesktop: true,   // 꺼내 둔 펫이 바탕화면에서도 캐릭터를 따라다님
+  showAllPets: false,      // 친구들 펫 전부 보기 (꺼내 두지 않은 펫까지)
   timers: [],              // 세션 타이머 [{ id, name, steps: [{ name, minutes }], step, repeat, times, state, endsAt, left, round }]
   timerPin: false,         // 화면에 타이머 고정
   timerSound: true,        // 타이머가 끝나면 삐비빅 소리
@@ -294,7 +295,7 @@ function selfProfile() {
   };
 }
 function publicConfig() {
-  return { petScale: config.petScale, occlusion: config.occlusion, hideOthers: config.hideOthers, showPetsDesktop: config.showPetsDesktop !== false };
+  return { petScale: config.petScale, occlusion: config.occlusion, hideOthers: config.hideOthers, showPetsDesktop: config.showPetsDesktop !== false, showAllPets: !!config.showAllPets };
 }
 let lastSentProfile = '';
 function onSelfChanged() {
@@ -618,6 +619,7 @@ function pushPeers() {
 function homeState() {
   return {
     net: netState, session, room, myPeerId, peers: peerList(), self: selfProfile(), friends, knocks, fishing: fishingView,
+    view: { showAllPets: !!config.showAllPets },
   };
 }
 // 집 창 + 미니맵 (미니맵은 같은 집 화면을 작게 보여 줌)
@@ -952,7 +954,7 @@ function registerIpc() {
   });
   ipcMain.on('save-config', (_e, partial) => {
     const allowed = ['nickname', 'color', 'serverUrl', 'status', 'customStatus', 'targets',
-      'occlusion', 'hideOthers', 'petScale', 'statusRules', 'autoStart', 'species', 'showPetsDesktop'];
+      'occlusion', 'hideOthers', 'petScale', 'statusRules', 'autoStart', 'species', 'showPetsDesktop', 'showAllPets'];
     for (const k of allowed) if (partial && k in partial) config[k] = partial[k];
     config.nickname = String(config.nickname || '나').slice(0, 16);
     config.petScale = Math.min(8, Math.max(2, Number(config.petScale) || 3));
@@ -960,6 +962,7 @@ function registerIpc() {
     saveConfig();
     if (partial && 'autoStart' in partial) applyAutoStart();
     overlay?.webContents.send('config', publicConfig());
+    pushHome();
     if (config.status === 'auto') pollActive();
     onSelfChanged();
     pollWindows();

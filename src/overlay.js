@@ -369,7 +369,8 @@
     const alive = new Set();
     if (cfg.showPetsDesktop) {
       for (const owner of visiblePets()) {
-        (owner.profile.pets || []).slice(0, 4).forEach((p, i) => {
+        const list = !owner.isMe && cfg.showAllPets && owner.profile.allPets ? owner.profile.allPets : (owner.profile.pets || []);
+        list.slice(0, 12).forEach((p, i) => {
           const key = owner.id + ':' + p.id;
           alive.add(key);
           let f = followers.get(key);

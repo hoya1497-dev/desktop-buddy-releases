@@ -787,12 +787,17 @@
     const v = H.viewing();
     if (!v) return [];
     const S = H.S;
-    const list = (v.editable ? (U()?.pets || []).filter((p) => p.out) : (S.room?.home?.pets || [])).map((p) => ({ ...p, follow: null }));
+    const all = !!S.view?.showAllPets;   // 친구들 펫 전부 보기
+    const host = S.room && !S.room.isOwner ? (S.peers || []).find((p) => p.owner) : null;
+    let homePets = v.editable ? (U()?.pets || []).filter((p) => p.out) : (S.room?.home?.pets || []);
+    if (all && host && host.allPets) homePets = host.allPets.map((p, i) => ({ ...p, floor: homePets.find((x) => x.id === p.id)?.floor || (i % 2 ? 2 : 1) }));
+    const list = homePets.map((p) => ({ ...p, follow: null }));
     if (S.room) {
       if (!S.room.isOwner) (U()?.pets || []).filter((p) => p.out).slice(0, 4).forEach((p, i) => list.push({ ...p, follow: 'me', idx: i }));
       for (const peer of S.peers || []) {
         if (peer.owner) continue;
-        (peer.pets || []).slice(0, 4).forEach((p, i) => list.push({ ...p, follow: peer.id, idx: i }));
+        const theirs = all && peer.allPets ? peer.allPets : (peer.pets || []);
+        theirs.slice(0, 12).forEach((p, i) => list.push({ ...p, follow: peer.id, idx: i }));
       }
     }
     return list;
