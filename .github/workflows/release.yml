@@ -1,0 +1,97 @@
+# 앱 자동 빌드 & 배포
+# package.json 의 version 을 올려서 GitHub에 올리면,
+# GitHub가 Windows(.exe)와 Mac(.dmg)을 직접 만들어서 Releases에 새 버전으로 올려 줘요.
+# (같은 버전이 이미 올라가 있으면 아무것도 안 해요)
+name: 앱 빌드 & 배포
+
+on:
+  push:
+    branches: [main, master]
+    paths: ['package.json']
+  workflow_dispatch: # Actions 탭에서 "Run workflow" 로 직접 실행
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    name: 새 버전인지 확인
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      build: ${{ steps.v.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER=$(node -p "require('./package.json').version")
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          if gh release view "v$VER" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "v$VER 은(는) 이미 올라가 있어서 건너뛰어요."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "v$VER 을(를) 새로 만들어요."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: 빌드 (${{ matrix.name }})
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-latest
+            name: Mac
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 패키지 설치
+        run: npm install --no-audit --no-fund
+      - name: 앱 만들기
+        run: npx electron-builder --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false' # 애플 유료 서명 없이 만들기
+      - name: 결과 파일 모으기
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.name }}
+          if-no-files-found: error
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/*.dmg
+            dist/*.zip
+            dist/latest*.yml
+
+  release:
+    name: Releases에 올리기
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - run: ls -la out
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.check.outputs.version }}
+          name: ${{ needs.check.outputs.version }}
+          make_latest: 'true'
+          body: |
+            ## 다운로드
+            - **Windows**: `DesktopBuddy-Setup-${{ needs.check.outputs.version }}.exe`
+            - **Mac (M1·M2·M3·M4 칩)**: `DesktopBuddy-${{ needs.check.outputs.version }}-arm64.dmg`
+            - **Mac (인텔 칩)**: `DesktopBuddy-${{ needs.check.outputs.version }}-x64.dmg`
+
+            이미 설치한 Windows 사용자는 앱이 알아서 업데이트해요.
+          files: out/*
