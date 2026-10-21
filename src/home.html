@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>Desktop Buddy 집</title>
+  <link rel="stylesheet" href="control.css">
+  <link rel="stylesheet" href="home.css">
+</head>
+<body>
+  <header class="top">
+    <div class="where">
+      <span id="homeTitle">🏠 내 집</span>
+      <span id="roomBadge" class="badge off">혼자</span>
+    </div>
+    <div class="stats">
+      <span class="coins">🪙 <b id="coins">0</b></span>
+      <span class="lv">Lv.<b id="level">1</b> <span class="bar"><i id="expBar"></i></span></span>
+      <button id="attendBtn" class="ghost small" title="출석 체크">📅 출석 <span id="attendDot" class="dot-badge" hidden></span></button>
+      <button id="aquaBtn" class="ghost small" title="내 아쿠아리움">🐋</button>
+      <button id="friendsBtn" class="ghost small">👥 친구 <span id="friendDot" class="dot-badge" hidden></span></button>
+      <button id="themeBtn" class="ghost small" title="화면 모드">🖥️</button>
+      <button id="settingsBtn" class="ghost small" title="설정">⚙️</button>
+    </div>
+  </header>
+
+  <div id="updateBar" class="update-bar" hidden>
+    <span id="updateText"></span>
+    <button id="updateBtn" class="primary small"></button>
+  </div>
+
+  <main>
+    <section class="stage-wrap">
+      <div class="stage" id="stage">
+        <div class="canvas-box" id="canvasBox">
+          <canvas id="room"></canvas>
+          <div id="decoHint" class="deco-hint" hidden>가구를 눌러 고르고, 끌어서 옮기기 · 휠로 돌리기</div>
+          <div id="toasts"></div>
+
+          <!-- 어항 크게 보기 -->
+          <div id="tankModal" class="modal" hidden>
+            <div class="modal-card wide-card">
+              <div class="row between"><h2 id="tankTitle">🐠 어항</h2><button id="closeTank" class="link">닫기</button></div>
+              <canvas id="tankCanvas" class="water-view"></canvas>
+              <p class="note" id="tankNote"></p>
+              <ul id="tankList" class="fishrow"></ul>
+              <div id="tankOwnerBox">
+                <div class="row">
+                  <select id="tankPick"></select>
+                  <button id="tankPutBtn" class="primary small">풀어주기</button>
+                  <button id="tankFeedBtn" class="ghost small">🫙 밥 주기</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 아쿠아리움 -->
+          <div id="aquaModal" class="modal" hidden>
+            <div class="modal-card wide-card">
+              <div class="row between"><h2 id="aquaTitle">🐋 아쿠아리움</h2><button id="closeAqua" class="link">닫기</button></div>
+              <canvas id="aquaCanvas" class="water-view"></canvas>
+              <p class="note" id="aquaNote"></p>
+              <ul id="aquaList" class="fishrow"></ul>
+              <div id="aquaOwnerBox" class="row">
+                <select id="aquaPick"></select>
+                <button id="aquaPutBtn" class="primary small">넣기</button>
+                <button id="aquaFeedBtn" class="ghost small">🫙 밥 주기</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 출석 -->
+          <div id="attendModal" class="modal" hidden>
+            <div class="modal-card">
+              <div class="row between"><h2>📅 출석 체크</h2><button id="closeAttend" class="link">닫기</button></div>
+              <p class="note">매일 한 번! 1~6일째는 코인, 7일째는 액세서리를 받아요. 하루 빠져도 이어서 세요.</p>
+              <div id="attendGrid" class="attend-grid"></div>
+              <button id="checkinBtn" class="primary wide">오늘 출석하기</button>
+              <p class="note" id="attendNote"></p>
+            </div>
+          </div>
+
+          <!-- 물고기 자세히 -->
+          <div id="fishModal" class="modal" hidden>
+            <div class="modal-card">
+              <div class="row between"><h2 id="fishTitle"></h2><button id="closeFish" class="link">닫기</button></div>
+              <div class="fish-detail">
+                <canvas id="fishBig" width="200" height="110"></canvas>
+                <div id="fishInfo"></div>
+              </div>
+              <div id="fishActions" class="fish-actions"></div>
+              <div id="fishSub"></div>
+            </div>
+          </div>
+
+          <!-- 낚시 결과 -->
+          <div id="catchModal" class="modal" hidden>
+            <div class="modal-card catch-card">
+              <div id="catchBadge" class="rar-badge"></div>
+              <canvas id="catchCanvas" width="240" height="130"></canvas>
+              <h2 id="catchName"></h2>
+              <p id="catchInfo" class="note"></p>
+              <button id="catchOk" class="primary wide">좋아요!</button>
+            </div>
+          </div>
+
+          <div id="knockBox" class="knock" hidden>
+            <div><b>똑똑! 🚪</b> <span id="knockText"></span></div>
+            <div class="row">
+              <button id="knockYes" class="primary small">들어오게 하기</button>
+              <button id="knockNo" class="ghost small">다음에</button>
+            </div>
+          </div>
+
+          <!-- 컴퓨터 -->
+          <div id="computer" class="modal" hidden>
+            <div class="modal-card">
+              <div class="row between"><h2>🖥️ 컴퓨터</h2><button id="closeComputer" class="link">닫기</button></div>
+              <button id="openFriendsFromPc" class="primary wide">👥 친구 집 놀러가기</button>
+              <nav class="ctabs">
+                <button data-ctab="myroom" class="active">🏠 내 집</button>
+                <button data-ctab="code">🔑 코드로 가기</button>
+              </nav>
+              <div class="cpane active" id="cpane-myroom">
+                <p id="roomNow"></p>
+                <label class="check"><input id="doorBox" type="checkbox"> 🚪 문 열어두기 <span class="note-inline">(닫으면 친구가 두드려야 들어와요)</span></label>
+                <h3 id="membersTitle" hidden>지금 우리 집에 있는 사람</h3>
+                <ul id="memberList" class="people"></ul>
+                <button id="goHomeBtn" class="primary wide" hidden>🏠 내 집으로 돌아가기</button>
+                <button id="leaveBtn" class="danger wide" hidden>집 비우고 혼자 놀기</button>
+              </div>
+              <div class="cpane" id="cpane-code">
+                <label>데스크톱 코드로 놀러 가기
+                  <div class="row">
+                    <input id="joinCode" maxlength="8" placeholder="8자리 코드" autocomplete="off">
+                    <button id="joinBtn" class="primary">가기</button>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 친구 -->
+          <div id="friends" class="modal" hidden>
+            <div class="modal-card">
+              <div class="row between"><h2>👥 친구</h2><button id="closeFriends" class="link">닫기</button></div>
+              <div class="code-box">
+                <div class="note">내 데스크톱 코드 · 친구에게 알려 주세요</div>
+                <div class="row between"><b id="myCode" class="mono big"></b><button id="copyCode" class="ghost small">복사</button></div>
+              </div>
+              <form id="friendForm" class="row">
+                <input id="friendQuery" maxlength="8" placeholder="친구 데스크톱 코드 8자리" autocomplete="off">
+                <button class="primary small">친구 추가</button>
+              </form>
+              <div id="incomingBox" hidden>
+                <h3>받은 친구 신청</h3>
+                <ul id="incomingList" class="people"></ul>
+              </div>
+              <h3>친구 목록 <span class="note-inline" id="giftLeftNote"></span></h3>
+              <ul id="friendList" class="people"></ul>
+              <p class="note" id="outgoingNote"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button id="deskBtn" class="ghost">🖥️ 컴퓨터</button>
+        <button id="decoBtn" class="ghost">✏️ 꾸미기</button>
+        <button id="lightBtn" class="ghost">💡 불 끄기</button>
+        <button id="panelBtn" class="ghost panel-btn" title="오른쪽 패널 접기/펴기 (Ctrl+B)">패널 닫기 ▶</button>
+        <span class="pet-stats">
+          <span title="배부름">🍖 <span class="bar"><i id="fullBar"></i></span></span>
+          <span title="기분">💗 <span class="bar"><i id="moodBar"></i></span></span>
+        </span>
+      </div>
+      <div class="selbar" id="selBar" hidden>
+        <span id="selName"></span>
+        <button id="rotL" class="ghost small" title="왼쪽으로 15°">⟲</button>
+        <input id="rotRange" type="range" min="0" max="359" step="1">
+        <button id="rotR" class="ghost small" title="오른쪽으로 15°">⟳</button>
+        <span id="rotVal" class="mono">0°</span>
+        <button id="flipBtn" class="ghost small" title="좌우 뒤집기">↔</button>
+        <button id="bagBtn" class="ghost small">🎒 넣기</button>
+      </div>
+    </section>
+
+    <div id="asideResizer" class="aside-resizer" title="끌어서 패널 넓이 조절 · 두 번 누르면 접기"></div>
+    <aside id="aside">
+      <nav class="tabs">
+        <button data-tab="chat" class="active">💬</button>
+        <button data-tab="shop">🛒 상점</button>
+        <button data-tab="bag">🎒 가방</button>
+        <button data-tab="fishing">🎣 낚시</button>
+        <button data-tab="dex">📖 도감</button>
+        <button data-tab="pets">🐾 펫</button>
+      </nav>
+      <div class="pane active" id="pane-chat">
+        <div id="chatLog"></div>
+        <p class="note" id="chatHint"></p>
+        <form id="chatForm" class="row">
+          <input id="chatInput" maxlength="200" placeholder="메시지 입력" autocomplete="off">
+          <button class="primary">보내기</button>
+        </form>
+        <div class="row emotes">
+          <button data-emote="wave">👋</button><button data-emote="heart">💖</button>
+          <button data-emote="cheer">🎉</button><button data-emote="zzz">💤</button>
+        </div>
+      </div>
+      <div class="pane" id="pane-shop">
+        <p class="note" id="shopNote"></p>
+        <div class="subtabs" id="shopTabs">
+          <button data-shop="furniture" class="active">가구</button>
+          <button data-shop="food">음식</button>
+          <button data-shop="pet">펫</button>
+          <button data-shop="acc">액세서리</button>
+          <button data-shop="wall">벽지</button>
+        </div>
+        <div class="shop-sec" data-sec="furniture">
+          <h3>가구 · 인형</h3><ul id="shopItems" class="shop"></ul>
+          <h3>어항 <span class="note-inline">잡은 물고기를 풀어줄 수 있어요</span></h3><ul id="shopTanks" class="shop"></ul>
+          <h3>벽에 거는 것</h3><ul id="shopWallItems" class="shop"></ul>
+        </div>
+        <div class="shop-sec" data-sec="food" hidden>
+          <h3>내 캐릭터 음식</h3><ul id="shopFoods" class="shop"></ul>
+          <h3>펫 · 물고기 먹이</h3><ul id="shopPetFoods" class="shop"></ul>
+        </div>
+        <div class="shop-sec" data-sec="pet" hidden>
+          <h3>펫 <span class="note-inline">집에서 키워요</span></h3><ul id="shopPets" class="shop"></ul>
+        </div>
+        <div class="shop-sec" data-sec="acc" hidden>
+          <h3>액세서리 <span class="note-inline">출석 7일째에만 나오는 것도 있어요</span></h3><ul id="shopAcc" class="shop"></ul>
+        </div>
+        <div class="shop-sec" data-sec="wall" hidden>
+          <h3>벽지 · 바닥 <span class="note-inline">1층과 2층에 따로 발라요</span></h3><ul id="shopWalls" class="shop"></ul>
+        </div>
+      </div>
+      <div class="pane" id="pane-bag">
+        <div id="tradeBox" hidden>
+          <h3>🔄 교환 신청</h3>
+          <ul id="tradeList" class="shop"></ul>
+        </div>
+        <div class="subtabs" id="bagTabs">
+          <button data-bag="fish" class="active">물고기</button>
+          <button data-bag="food">음식</button>
+          <button data-bag="acc">액세서리</button>
+          <button data-bag="furniture">가구</button>
+        </div>
+        <div class="bag-sec" data-sec="fish">
+          <p class="note" id="bagFishNote"></p>
+          <div class="row" style="margin-bottom:6px">
+            <button id="sellTrashBtn" class="ghost small">🗑️ 쓰레기 전부 재활용</button>
+            <button id="sellDupBtn" class="ghost small">중복만 팔기</button>
+          </div>
+          <ul id="bagFish" class="fishgrid"></ul>
+        </div>
+        <div class="bag-sec" data-sec="food" hidden><ul id="bagFood" class="shop"></ul></div>
+        <div class="bag-sec" data-sec="acc" hidden><ul id="bagAcc" class="shop"></ul></div>
+        <div class="bag-sec" data-sec="furniture" hidden>
+          <p class="note" id="bagNote"></p>
+          <ul id="bagItems" class="shop"></ul>
+        </div>
+      </div>
+      <div class="pane" id="pane-fishing">
+        <canvas id="fishScene" class="fish-scene" width="300" height="190"></canvas>
+        <div class="fish-ctl">
+          <button id="castBtn" class="primary">🎣 던지기</button>
+          <span id="castInfo" class="note-inline"></span>
+        </div>
+        <p class="note" id="fishHint">찌가 쑥 들어가면 재빨리 <b>당기기</b>! 너무 빠르거나 늦으면 놓쳐요.</p>
+        <h3>최근에 낚은 것</h3>
+        <ul id="recentList" class="fishrow small-row"></ul>
+      </div>
+      <div class="pane" id="pane-dex">
+        <div class="row between">
+          <b id="dexCount"></b>
+          <span class="note-inline" id="dexNothing"></span>
+        </div>
+        <div class="dex-bar"><i id="dexBar"></i></div>
+        <div class="subtabs dex-tabs" id="dexTabs">
+          <button data-dex="S" class="active">작은 물고기</button>
+          <button data-dex="M">중간 물고기</button>
+          <button data-dex="L">큰 물고기</button>
+          <button data-dex="T">쓰레기</button>
+        </div>
+        <div class="dex-book" id="dexBook">
+          <div class="dex-page" id="dexPage">
+            <div class="dex-head">
+              <span id="dexCode" class="mono"></span>
+              <span id="dexPageNo" class="note-inline"></span>
+            </div>
+            <div class="dex-pic"><canvas id="dexPic" width="240" height="140"></canvas></div>
+            <h2 id="dexName"></h2>
+            <div class="dex-tags"><span id="dexRar" class="rar-badge"></span> <span id="dexCat" class="note-inline"></span></div>
+            <table class="dex-table">
+              <tr><th>나올 확률</th><td id="dexChance"></td></tr>
+              <tr><th>크기</th><td id="dexSize"></td></tr>
+              <tr><th>팔면</th><td id="dexPrice"></td></tr>
+              <tr><th>내 기록</th><td id="dexMine"></td></tr>
+            </table>
+            <div class="dex-home">
+              <div class="note-inline">들어가는 곳</div>
+              <div id="dexFit" class="dex-fit"></div>
+            </div>
+            <button id="dexMore" class="ghost small wide">🎒 팔기 · 어항에 풀기 · 선물 · 교환</button>
+          </div>
+          <div class="dex-nav">
+            <button id="dexPrev" class="ghost">◀ 이전</button>
+            <button id="dexNext" class="ghost">다음 ▶</button>
+          </div>
+          <div class="dex-strip" id="dexStrip"></div>
+        </div>
+      </div>
+      <div class="pane" id="pane-pets">
+        <p class="note" id="petNote"></p>
+        <ul id="petList" class="petlist"></ul>
+      </div>
+    </aside>
+  </main>
+
+  <div id="offlineCover" class="cover" hidden>
+    <div><b id="offlineText">서버와 연결이 끊겼어요</b><p class="note">다시 연결하는 중이에요…</p></div>
+  </div>
+
+  <script src="theme.js"></script>
+  <script src="sprites.js"></script>
+  <script src="skins.js"></script>
+  <script src="furniture.js"></script>
+  <script src="fishart.js"></script>
+  <script src="petart.js"></script>
+  <script src="home.js"></script>
+  <script src="home-game.js"></script>
+</body>
+</html>

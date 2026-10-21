@@ -1,0 +1,117 @@
+:root {
+  --bg: #f6f3ee;
+  --card: #ffffff;
+  --ink: #26222b;
+  --muted: #7a7380;
+  --line: #e7e1d8;
+  --accent: #e8894a;
+  --accent-ink: #ffffff;
+  --danger: #d65151;
+  --ok: #3aa36a;
+  --input: #faf8f5;
+}
+/* 다크 모드: 시스템 설정을 따르거나(기본), 앱에서 직접 고를 수 있음 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1c1a20; --card: #26232b; --ink: #efeaf2; --muted: #9b94a3;
+    --line: #36323d; --input: #1f1d24; --accent: #f09a5c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1c1a20; --card: #26232b; --ink: #efeaf2; --muted: #9b94a3;
+  --line: #36323d; --input: #1f1d24; --accent: #f09a5c;
+  color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; } /* 다른 display 규칙보다 항상 우선 */
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.5 "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+}
+header { display: flex; gap: 12px; align-items: center; padding: 16px 16px 8px; }
+#preview { image-rendering: pixelated; width: 48px; height: 48px; }
+h1 { font-size: 18px; margin: 0; }
+h2 { font-size: 14px; margin: 0 0 8px; }
+.sub { margin: 0; color: var(--muted); font-size: 12px; }
+.hint { color: var(--muted); font-weight: normal; font-size: 12px; margin-left: 6px; }
+
+nav { display: flex; gap: 4px; padding: 4px 16px 0; border-bottom: 1px solid var(--line); }
+nav button {
+  border: 0; background: none; color: var(--muted); padding: 8px 10px; font: inherit;
+  border-bottom: 2px solid transparent; cursor: pointer;
+}
+nav button.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+
+.tab { display: none; padding: 12px 16px 24px; }
+.tab.active { display: block; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+
+label { display: block; margin: 8px 0; color: var(--muted); font-size: 12px; }
+label > input:not([type=checkbox]):not([type=color]):not([type=range]), label .row input { margin-top: 4px; }
+label.check { display: flex; gap: 8px; align-items: center; color: var(--ink); font-size: 13px; }
+input, select, textarea {
+  width: 100%; font: inherit; color: var(--ink); background: var(--input);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+input[type=checkbox] { width: auto; }
+input[type=color] { width: 44px; height: 36px; padding: 2px; flex: none; }
+input[type=range] { padding: 0; }
+textarea { font-family: ui-monospace, Consolas, monospace; font-size: 12px; resize: vertical; }
+select + input { margin-top: 8px; }
+
+.row { display: flex; gap: 8px; align-items: center; }
+.row > input { flex: 1; }
+.between { justify-content: space-between; }
+
+button { font: inherit; cursor: pointer; border-radius: 8px; }
+.primary { background: var(--accent); color: var(--accent-ink); border: 0; padding: 8px 14px; font-weight: 600; }
+.ghost { background: none; border: 1px solid var(--line); color: var(--ink); padding: 7px 12px; }
+.danger { background: none; border: 1px solid var(--danger); color: var(--danger); padding: 6px 10px; }
+.small { padding: 4px 10px; font-size: 12px; }
+.link { background: none; border: 0; color: var(--accent); padding: 0 4px; font-size: 12px; }
+#newRoomBtn { margin-top: 4px; }
+
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--line); color: var(--muted); }
+.badge.on { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.badge.wait { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+
+.mono { font-family: ui-monospace, Consolas, monospace; letter-spacing: 0.05em; }
+.note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.note:empty { display: none; }
+.warn { color: var(--danger); font-size: 12px; }
+
+#peerList { list-style: none; padding: 0; margin: 10px 0 0; }
+#peerList li { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-top: 1px solid var(--line); }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.peer-status { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+.chat #chatLog {
+  height: 220px; overflow-y: auto; background: var(--input); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; margin-bottom: 8px;
+}
+.msg { margin: 2px 0; word-break: break-word; }
+.msg b { margin-right: 6px; }
+.msg.sys { color: var(--muted); font-size: 12px; }
+.emotes { margin-top: 8px; }
+.emotes button { background: var(--input); border: 1px solid var(--line); padding: 4px 10px; font-size: 16px; }
+
+#swatches button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--card); outline: 1px solid var(--line); padding: 0; }
+
+.checklist { list-style: none; padding: 0; margin: 8px 0; max-height: 260px; overflow-y: auto; }
+.checklist li { padding: 6px 0; border-top: 1px solid var(--line); }
+.checklist label { margin: 0; }
+.checklist .titles { color: var(--muted); font-size: 11px; margin-left: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.checklist .closed { color: var(--muted); font-size: 11px; }
+
+.skin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.skin-slot { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 0; padding: 8px 4px; border: 1px dashed var(--line); border-radius: 10px; cursor: pointer; color: var(--ink); }
+.skin-slot canvas { width: 72px; height: 72px; background: repeating-conic-gradient(var(--line) 0 25%, transparent 0 50%) 0 0 / 12px 12px; border-radius: 6px; }
+.skin-slot input { width: 100%; font-size: 10px; padding: 2px; }
+
+.species-row { display: flex; gap: 8px; margin-top: 4px; }
+.species-row button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; background: var(--input); border: 2px solid var(--line); color: var(--ink); font-size: 12px; }
+.species-row button.on { border-color: var(--accent); }
+.species-row canvas { width: 48px; height: 48px; image-rendering: pixelated; }
+.note-inline { color: var(--muted); font-size: 11px; }

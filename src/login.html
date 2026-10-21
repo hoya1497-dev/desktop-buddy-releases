@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>Desktop Buddy 로그인</title>
+  <link rel="stylesheet" href="control.css">
+  <style>
+    body { display: flex; flex-direction: column; align-items: center; padding: 28px 28px 20px; }
+    #hero { image-rendering: pixelated; width: 96px; height: 96px; margin-bottom: 6px; }
+    h1 { font-size: 20px; margin: 0 0 2px; }
+    .sub { margin-bottom: 18px; text-align: center; }
+    .switch { display: flex; width: 100%; background: var(--line); border-radius: 10px; padding: 3px; margin-bottom: 12px; }
+    .switch button { flex: 1; border: 0; background: none; padding: 7px; color: var(--muted); font: inherit; border-radius: 8px; }
+    .switch button.on { background: var(--card); color: var(--ink); font-weight: 600; }
+    form { width: 100%; }
+    .primary { width: 100%; margin-top: 10px; padding: 10px; }
+    .err { color: var(--danger); font-size: 12px; min-height: 18px; margin: 8px 0 0; text-align: center; }
+    .info { color: var(--muted); font-size: 12px; margin: 10px 0 0; text-align: center; }
+    details { width: 100%; margin-top: 14px; color: var(--muted); font-size: 12px; }
+    summary { cursor: pointer; }
+    .offline { margin-top: 10px; }
+    .note-inline { color: var(--muted); font-size: 11px; }
+  </style>
+</head>
+<body>
+  <canvas id="hero" width="48" height="48"></canvas>
+  <h1>Desktop Buddy</h1>
+  <p class="sub" id="note">화면 위의 작은 친구</p>
+
+  <div class="switch">
+    <button id="tabLogin" class="on" type="button">로그인</button>
+    <button id="tabRegister" type="button">처음이에요</button>
+  </div>
+
+  <form id="form">
+    <label>아이디 <input id="username" maxlength="16" autocomplete="username" required></label>
+    <label id="nickWrap" hidden>닉네임 <span class="note-inline">(친구들에게 보이는 이름 · 나중에 바꿀 수 있어요)</span> <input id="nickname" maxlength="16" autocomplete="nickname"></label>
+    <label>비밀번호 <input id="password" type="password" maxlength="72" autocomplete="current-password" required></label>
+    <label id="confirmWrap" hidden>비밀번호 확인 <input id="confirm" type="password" maxlength="72" autocomplete="new-password"></label>
+    <label class="check"><input id="remember" type="checkbox" checked> 자동 로그인</label>
+    <label class="check"><input id="autoStart" type="checkbox" checked> 컴퓨터를 켜면 자동으로 실행</label>
+    <button class="primary" id="submit">로그인</button>
+    <p class="err" id="err"></p>
+    <p class="info" id="regInfo" hidden>아이디는 로그인용이라 바꿀 수 없고, 닉네임 아래에 작게 표시돼요.<br>가입하면 바꿀 수 없는 나만의 <b>데스크톱 코드</b>도 생겨요.<br>친구가 이 코드로 내 집에 놀러 올 수 있어요.</p>
+  </form>
+
+  <details>
+    <summary>서버 설정</summary>
+    <label>서버 주소 <input id="serverUrl" placeholder="wss://my-buddy.example.com"></label>
+    <p id="serverWarn" class="note"></p>
+  </details>
+  <button class="link offline" id="offline" type="button">로그인 없이 혼자 놀기</button>
+  <p class="info" id="updateNote" hidden></p>
+  <button class="primary" id="updateBtn" type="button" hidden></button>
+
+  <script src="theme.js"></script>
+  <script src="sprites.js"></script>
+  <script src="login.js"></script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+// 홈에서 키우는 동물 8종 (12x12 도트)
+window.PetArt = (() => {
+  const ART = {
+    hamster: {
+      pal: { o: '#5a3a24', b: '#e8a85c', l: '#fbe3c2', p: '#f6a9bf', e: '#1a1a20', n: '#c0505a' },
+      rows: [
+        '............',
+        '..oo....oo..',
+        '.opbo..obpo.',
+        '.obbbbbbbbo.',
+        'obbbbbbbbbbo',
+        'obebbbbbbebo',
+        'obpbbnnbbpbo',
+        'obllllllllbo',
+        'obllllllllbo',
+        '.obbllllbbo.',
+        '..oooooooo..',
+        '.oo......oo.',
+      ],
+    },
+    chick: {
+      pal: { o: '#8a6a10', b: '#ffd84a', e: '#1a1a20', m: '#f08a20' },
+      rows: [
+        '....oooo....',
+        '...obbbbo...',
+        '..obbbbbbo..',
+        '..obebbebo..',
+        '..obbmmbbo..',
+        '.obbbbbbbbo.',
+        'obbbbbbbbbbo',
+        'obbbbbbbbbbo',
+        '.obbbbbbbbo.',
+        '..oooooooo..',
+        '...m....m...',
+        '..mm...mm...',
+      ],
+    },
+    turtle: {
+      pal: { o: '#2a4a24', g: '#6cbf55', G: '#3f8a3a', k: '#a8d890', e: '#1a1a20' },
+      rows: [
+        '............',
+        '............',
+        '............',
+        '...oooooo...',
+        '..oGgGgGgo..',
+        '.oGgGgGgGgoo',
+        '.oGgGgGgGgok',
+        '.ooooooooook',
+        '.okko...okko',
+        '.oo......oo.',
+        '............',
+        '............',
+      ].slice(0, 10),
+    },
+    hedgehog: {
+      pal: { o: '#3a2418', N: '#7a5030', c: '#f0d8b0', e: '#1a1a20', n: '#1a1a20' },
+      rows: [
+        '............',
+        '...o.o.o....',
+        '..oNoNoNo...',
+        '.oNNNNNNNo..',
+        'oNNNNNNNNco.',
+        'oNNNNNNNceco',
+        'oNNNNNNNcccn',
+        '.oNNNNNNcco.',
+        '..oooooooo..',
+        '..oc....oc..',
+      ],
+    },
+    parrot: {
+      pal: { o: '#1e3a1e', r: '#e0463a', g: '#4cb050', b: '#3a7ad8', y: '#f4c430', e: '#1a1a20', m: '#c08040' },
+      rows: [
+        '....ooo.....',
+        '...orrro....',
+        '..orrerryo..',
+        '..orrrrryyo.',
+        '..oggggggo..',
+        '.ogggggggo..',
+        '.oggbbgggo..',
+        '.ogbbbgggo..',
+        '..oggggggo..',
+        '...oggggo...',
+        '...om..mo...',
+      ],
+    },
+    penguin: {
+      pal: { o: '#101018', k: '#2a2a36', x: '#ffffff', e: '#1a1a20', m: '#f09a20' },
+      rows: [
+        '....oooo....',
+        '...okkkko...',
+        '..okkkkkko..',
+        '..okxxxxko..',
+        '..okexxeko..',
+        '..okxmmxko..',
+        '.okkxxxxkko.',
+        '.okxxxxxxko.',
+        '.okxxxxxxko.',
+        '..okxxxxko..',
+        '...oooooo...',
+        '..mm....mm..',
+      ],
+    },
+    fox: {
+      pal: { o: '#5a2a10', m: '#f0883a', x: '#ffffff', e: '#1a1a20', k: '#1a1a20' },
+      rows: [
+        '.oo......oo.',
+        '.omo....omo.',
+        '.ommoooommo.',
+        'ommmmmmmmmmo',
+        'ommemmmmemmo',
+        'oxxmmmmmmxxo',
+        '.oxxxkkxxxo.',
+        '..oxxxxxxo..',
+        '.ommmmmmmmo.',
+        '.ommmmmmmmo.',
+        '..oo....oo..',
+      ],
+    },
+    panda: {
+      pal: { o: '#101018', k: '#2a2a32', x: '#ffffff', e: '#ffffff' },
+      rows: [
+        '.oo......oo.',
+        'okko....okko',
+        'okkooooookko',
+        '.oxxxxxxxxo.',
+        'oxkkxxxxkkxo',
+        'oxkexxxxekxo',
+        'oxxxxkkxxxxo',
+        '.oxxxxxxxxo.',
+        'okkxxxxxxkko',
+        'okkxxxxxxkko',
+        '.oxxxxxxxxo.',
+        '.okko..okko.',
+      ],
+    },
+  };
+
+  const cache = new Map();
+  function bitmap(kind) {
+    if (cache.has(kind)) return cache.get(kind);
+    const a = ART[kind];
+    if (!a) return null;
+    const w = Math.max(...a.rows.map((r) => r.length)), h = a.rows.length;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    a.rows.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.' && a.pal[ch]) { g.fillStyle = a.pal[ch]; g.fillRect(x, y, 1, 1); } }));
+    cache.set(kind, c);
+    return c;
+  }
+  /** 발 위치(cx, bottom) 기준으로 그림. flip: 왼쪽 보기 */
+  function draw(ctx, kind, cx, bottom, scale, flip = false, hop = 0) {
+    const bm = bitmap(kind);
+    if (!bm) return;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.translate(Math.round(cx), Math.round(bottom - hop));
+    if (flip) ctx.scale(-1, 1);
+    ctx.drawImage(bm, -bm.width * scale / 2, -bm.height * scale, bm.width * scale, bm.height * scale);
+    ctx.restore();
+  }
+  function thumb(kind, side = 36) {
+    const c = document.createElement('canvas');
+    c.width = side; c.height = side;
+    const bm = bitmap(kind);
+    if (!bm) return c;
+    const g = c.getContext('2d');
+    const k = Math.floor(side / Math.max(bm.width, bm.height));
+    g.imageSmoothingEnabled = false;
+    g.drawImage(bm, (side - bm.width * k) / 2, side - bm.height * k, bm.width * k, bm.height * k);
+    return c;
+  }
+  return { bitmap, draw, thumb, kinds: Object.keys(ART) };
+})();

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>Desktop Buddy</title>
+  <link rel="stylesheet" href="control.css">
+</head>
+<body>
+  <header>
+    <canvas id="preview" width="48" height="48"></canvas>
+    <div>
+      <h1>Desktop Buddy</h1>
+      <p class="sub" id="selfLine">화면 위의 작은 친구</p>
+    </div>
+  </header>
+
+  <nav>
+    <button data-tab="me" class="active">내 캐릭터</button>
+    <button data-tab="windows">창 · 상태</button>
+    <button data-tab="account">계정</button>
+  </nav>
+
+  <!-- 내 캐릭터 -->
+  <section id="tab-me" class="tab active">
+    <div class="card">
+      <h2>내 캐릭터</h2>
+      <label>닉네임 <input id="nickname" maxlength="16"></label>
+      <label>색깔
+        <div class="row">
+          <input id="color" type="color">
+          <div id="swatches" class="row"></div>
+        </div>
+      </label>
+      <div class="note" style="margin-top:8px">캐릭터</div>
+      <div class="species-row" id="speciesRow"></div>
+      <label>바탕화면 크기 <span id="scaleVal" class="note-inline"></span><input id="petScale" type="range" min="2" max="8" step="1"></label>
+    </div>
+    <div class="card">
+      <h2>캐릭터 그림 바꾸기</h2>
+      <p class="note">서 있는 · 앉은 · 걷는 그림 3장을 골라 주세요. 배경이 투명한 PNG가 가장 예뻐요. 그림은 128px로 줄여서 올라가고, 친구 화면에도 보여요.</p>
+      <div class="skin-grid">
+        <label class="skin-slot"><span>서 있기</span><canvas id="pv-stand" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="stand"></label>
+        <label class="skin-slot"><span>앉기</span><canvas id="pv-sit" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="sit"></label>
+        <label class="skin-slot"><span>걷기</span><canvas id="pv-walk" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="walk"></label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span class="note" style="margin:0">그림 속 캐릭터가 보는 방향</span>
+        <label class="check" style="margin:0"><input type="radio" name="faces" value="right" checked> 오른쪽</label>
+        <label class="check" style="margin:0"><input type="radio" name="faces" value="left"> 왼쪽</label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="skinApply" class="primary small" disabled>적용하기</button>
+        <button id="skinReset" class="ghost small">기본 고양이로</button>
+      </div>
+      <p id="skinMsg" class="note"></p>
+    </div>
+
+    <div class="card">
+      <h2>상태 표시</h2>
+      <select id="status"></select>
+      <input id="customStatus" maxlength="24" placeholder="예: 🏃 운동중" hidden>
+      <p class="note">자동 감지는 지금 보고 있는 프로그램을 보고 상태를 정해요. 다른 사람에게는 상태 글자만 전달되고, 창 제목이나 프로그램 이름은 보내지 않아요.</p>
+    </div>
+    <div class="card">
+      <h2>바탕화면</h2>
+      <label class="check"><input id="hideOthers" type="checkbox"> 다른 사람 캐릭터를 바탕화면에서 숨기기</label>
+      <label>화면 모드
+        <select id="themeSel">
+          <option value="system">컴퓨터 설정 따라가기</option>
+          <option value="light">☀️ 화이트 모드</option>
+          <option value="dark">🌙 다크 모드</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <!-- 창 · 상태 -->
+  <section id="tab-windows" class="tab">
+    <div class="card">
+      <div class="row between">
+        <h2>캐릭터가 올라갈 창</h2>
+        <button id="refreshWins" class="ghost small">새로고침</button>
+      </div>
+      <p class="note">체크한 프로그램의 창 윗면을 캐릭터가 걸어 다니고, 창을 움직이면 같이 따라가요.</p>
+      <p id="gwError" class="warn" hidden></p>
+      <ul id="winList" class="checklist"></ul>
+      <label class="check"><input id="occlusion" type="checkbox"> 다른 창에 가려진 부분은 밟지 않기</label>
+    </div>
+    <div class="card">
+      <h2>자동 상태 규칙</h2>
+      <p class="note">한 줄에 하나씩 <span class="mono">키워드 = 상태</span>. 프로그램 이름이나 창 제목에 키워드가 들어 있으면 그 상태가 돼요. 위에 있는 줄이 먼저예요.</p>
+      <textarea id="statusRules" rows="9" spellcheck="false"></textarea>
+      <button id="saveRules" class="primary small">규칙 저장</button>
+    </div>
+  </section>
+
+  <!-- 계정 -->
+  <section id="tab-account" class="tab">
+    <div class="card" id="accountCard">
+      <h2>계정</h2>
+      <p id="accountLine" class="note"></p>
+      <div class="code-line">
+        <div class="note">내 데스크톱 코드 (바꿀 수 없어요)</div>
+        <b id="myCode" class="mono" style="font-size:20px"></b>
+      </div>
+      <button id="logoutBtn" class="danger small">로그아웃</button>
+    </div>
+    <div class="card" id="pwCard">
+      <h2>비밀번호 바꾸기</h2>
+      <label>지금 비밀번호 <input id="pwCur" type="password" maxlength="72" autocomplete="current-password"></label>
+      <label>새 비밀번호 (8자 이상) <input id="pwNew" type="password" maxlength="72" autocomplete="new-password"></label>
+      <label>새 비밀번호 확인 <input id="pwNew2" type="password" maxlength="72" autocomplete="new-password"></label>
+      <button id="pwBtn" class="primary small">바꾸기</button>
+      <p id="pwMsg" class="note"></p>
+    </div>
+    <div class="card">
+      <h2>차단한 사람</h2>
+      <p class="note">차단하면 그 사람의 채팅이 안 보이고, 내 집에 올 수 없고, 친구 신청·선물·교환도 못 해요. 집의 친구 창이나 캐릭터 우클릭에서 차단할 수 있어요.</p>
+      <ul id="blockedList" class="checklist"></ul>
+    </div>
+    <div class="card">
+      <h2>시작</h2>
+      <label class="check"><input id="autoStart" type="checkbox"> 컴퓨터를 켜면 자동으로 실행</label>
+      <p class="note">자동 로그인은 로그인할 때 고를 수 있어요. 로그인 정보는 운영체제의 암호화 저장소에 보관돼요.</p>
+    </div>
+    <div class="card">
+      <h2>서버</h2>
+      <p class="note">서버 주소는 로그인 화면의 "서버 설정"에서 바꿀 수 있어요.</p>
+      <p class="mono note" id="serverLine"></p>
+    </div>
+  </section>
+
+  <script src="theme.js"></script>
+  <script src="sprites.js"></script>
+  <script src="skins.js"></script>
+  <script src="control.js"></script>
+</body>
+</html>
