@@ -113,9 +113,14 @@
       this.setProfile(profile);
     }
     setProfile(p) {
+      const before = this.profile.pose;
       this.profile = { ...this.profile, ...p };
       this.pal = Sprites.palette(this.profile.color);
+      // 자세를 바꾸면 바로 그 자세로 (공중에 있으면 내려온 뒤에)
+      if (this.profile.pose !== before && !this.air && !this.dragging) this.think();
     }
+    // 우클릭 → 자세에서 고른 자세 (없으면 null = 자유롭게)
+    forcedState() { return { stand: 'idle', sit: 'sit', lie: 'sleep' }[this.profile.pose] || null; }
     get s() { return cfg.petScale; }
     get w() { return 16 * this.s; }
     get h() { return 16 * this.s; }
@@ -146,6 +151,8 @@
     }
 
     think() {
+      const forced = this.forcedState();
+      if (forced) { this.pendingJump = null; this.setState(forced, 3); return; }
       const m = { ...this.mood() };
       // 올라갈 창이 있으면 바닥에서 점프를 더 자주, 창 위에선 더 오래 머묾
       if (platforms.length > 1) {
@@ -309,8 +316,10 @@
       const skin = Skins.get(this.profile.username, this.profile.skin);
       this.dw = 0;
       if (skin) {
-        const pose = f.legs === 'sit' ? 'sit' : f.legs.startsWith('walk') ? 'walk' : 'stand';
-        const tilt = pose === 'walk' ? (f.legs === 'walkB' ? 0.07 : -0.07) : (this.air || this.dragging ? Math.sin(this.anim * 12) * 0.12 : 0);
+        const pose = this.dragging || this.air ? 'fall' : this.state === 'sleep' && !this.air ? 'lie'
+          : f.legs === 'sit' ? 'sit' : f.legs.startsWith('walk') ? 'walk' : 'stand';
+        const tilt = pose === 'walk' ? (f.legs === 'walkB' ? 0.07 : -0.07)
+          : pose === 'fall' ? Math.sin(this.anim * 12) * (Skins.has(skin, 'fall') ? 0.06 : 0.12) : 0;
         this.dw = Skins.draw(ctx, skin, pose, this.x, this.y + f.bob * s * 2, this.h * 1.15, this.dir, tilt);
       }
       if (!this.dw) {
@@ -636,7 +645,7 @@
     me.emote('✨');
   });
 
-  const EMOTE_ICON = { wave: '👋', heart: '💖', cheer: '🎉', zzz: '💤', coin: '🪙', gift: '🎁' };
+  const EMOTE_ICON = { wave: '👋', heart: '💖', cheer: '🎉', zzz: '💤', coin: '🪙', gift: '🎁', mail: '✉️' };
   buddy.on('emote', ({ from, kind, target, fromName }) => {
     const pet = pets.get(target || from);
     if (!pet) return;

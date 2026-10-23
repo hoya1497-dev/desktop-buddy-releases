@@ -22,7 +22,7 @@ const ON = [
   'init', 'config', 'self', 'windows', 'peers', 'chat', 'emote', 'summon',
   'login-state', 'login-error', 'account',
   'home-state', 'reward', 'toast', 'focus-chat', 'skins', 'skin-saved', 'theme', 'update', 'srv',
-  'timers', 'snack', 'alarm',
+  'timers', 'snack', 'alarm', 'open-dm',
 ];
 
 contextBridge.exposeInMainWorld('buddy', {

@@ -38,11 +38,13 @@
     </div>
     <div class="card">
       <h2>캐릭터 그림 바꾸기</h2>
-      <p class="note">서 있는 · 앉은 · 걷는 그림 3장을 골라 주세요. 배경이 투명한 PNG가 가장 예뻐요. 그림은 128px로 줄여서 올라가고, 친구 화면에도 보여요.</p>
+      <p class="note">서 있는 · 앉은 · 걷는 그림 3장은 꼭 골라 주세요. 누운 그림(잘 때)과 떨어지는 그림(창에서 떨어지거나 잡아서 들 때)은 넣고 싶을 때만 넣어요. 없으면 앉기 · 서 있기 그림으로 대신해요. 배경이 투명한 PNG가 가장 예뻐요. 그림은 128px로 줄여서 올라가고, 친구 화면에도 보여요.</p>
       <div class="skin-grid">
         <label class="skin-slot"><span>서 있기</span><canvas id="pv-stand" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="stand"></label>
         <label class="skin-slot"><span>앉기</span><canvas id="pv-sit" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="sit"></label>
         <label class="skin-slot"><span>걷기</span><canvas id="pv-walk" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="walk"></label>
+        <label class="skin-slot optional"><span>눕기 <small>(선택)</small></span><canvas id="pv-lie" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="lie"><button type="button" class="link-btn" data-clear="lie" hidden>빼기</button></label>
+        <label class="skin-slot optional"><span>떨어지기 <small>(선택)</small></span><canvas id="pv-fall" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="fall"><button type="button" class="link-btn" data-clear="fall" hidden>빼기</button></label>
       </div>
       <div class="row" style="margin-top:8px">
         <span class="note" style="margin:0">그림 속 캐릭터가 보는 방향</span>

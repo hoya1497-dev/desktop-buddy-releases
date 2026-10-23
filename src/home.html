@@ -198,6 +198,19 @@
             </div>
           </div>
 
+          <!-- 개인 채팅 -->
+          <div id="dmModal" class="modal" hidden>
+            <div class="modal-card dm-card">
+              <div class="row between"><h2 id="dmTitle">✉️ 개인 채팅</h2><button id="dmClose" class="link">닫기</button></div>
+              <p class="note">친구와 둘만 보는 대화예요. 최근 100개까지 남아요.</p>
+              <div id="dmLog" class="dm-log"></div>
+              <form id="dmForm" class="row">
+                <input id="dmInput" maxlength="300" placeholder="메시지 보내기 (Enter)" autocomplete="off">
+                <button class="primary small">보내기</button>
+              </form>
+            </div>
+          </div>
+
           <!-- 친구 -->
           <div id="friends" class="modal" hidden>
             <div class="modal-card">
@@ -452,5 +465,6 @@
   <script src="home-game.js"></script>
   <script src="minigame.js"></script>
   <script src="board.js"></script>
+  <script src="dm.js"></script>
 </body>
 </html>

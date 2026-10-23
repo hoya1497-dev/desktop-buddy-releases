@@ -7,7 +7,7 @@ window.Skins = (() => {
       const cur = data[username];
       if (cur && cur.v === s.v) continue;
       const imgs = {};
-      for (const pose of ['stand', 'sit', 'walk']) {
+      for (const pose of ['stand', 'sit', 'walk', 'lie', 'fall']) {
         if (!s[pose]) continue;
         const im = new Image();
         im.src = s[pose];
@@ -30,8 +30,15 @@ window.Skins = (() => {
    * 돌려준 값은 그려진 폭(아직 로딩 중이면 0).
    */
   function draw(ctx, s, pose, cx, bottom, height, dir, tilt = 0) {
-    const im = s.imgs[pose] || s.imgs.stand;
+    // 눕기 · 떨어지기 그림이 없으면 앉기 · 서 있기로 대신
+    const FALLBACK = { lie: 'sit', fall: 'stand' };
+    let im = s.imgs[pose];
+    if (!im || !im.complete || !im.naturalWidth) im = s.imgs[FALLBACK[pose]] || s.imgs.stand;
     if (!im || !im.complete || !im.naturalWidth) return 0;
+    // 누운 그림은 옆으로 길쭉하니까, 서 있는 그림과 같은 비율로 줄여서 너무 커지지 않게
+    if (im === s.imgs.lie && s.imgs.stand && s.imgs.stand.naturalHeight) {
+      height *= Math.max(0.35, Math.min(1, im.naturalHeight / s.imgs.stand.naturalHeight));
+    }
     const w = height * (im.naturalWidth / im.naturalHeight);
     const flip = (dir > 0) !== (s.faces === 'right');
     ctx.save();
@@ -45,5 +52,6 @@ window.Skins = (() => {
     return w;
   }
 
-  return { update, get, draw };
+  const has = (s, pose) => !!(s && s.imgs[pose]);
+  return { update, get, draw, has };
 })();

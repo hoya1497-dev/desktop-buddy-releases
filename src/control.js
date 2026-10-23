@@ -75,8 +75,10 @@
     const c = $('pv-' + pose); const g = c.getContext('2d');
     g.clearRect(0, 0, c.width, c.height);
     if (!src) {
-      const legs = pose === 'sit' ? 'sit' : pose === 'walk' ? 'walkA' : 'stand';
-      Sprites.drawPet(g, 0, 0, { species: config.species, scale: 6, color: config.color, legs, eyes: 'open' });
+      const legs = pose === 'sit' || pose === 'lie' ? 'sit' : pose === 'walk' ? 'walkA' : 'stand';
+      g.globalAlpha = pose === 'lie' || pose === 'fall' ? 0.45 : 1;   // 선택 칸은 흐리게: 안 넣으면 이렇게 대신 보여요
+      Sprites.drawPet(g, 0, 0, { species: config.species, scale: 6, color: config.color, legs, eyes: pose === 'lie' ? 'closed' : 'open' });
+      g.globalAlpha = 1;
       return;
     }
     const im = new Image();
@@ -112,9 +114,22 @@
     });
   }
   let currentSkin = null;
+  const REQUIRED = ['stand', 'sit', 'walk'], OPTIONAL = ['lie', 'fall'];
+  // 고른 그림 > 지금 쓰는 그림. 선택 칸에서 [빼기]를 누르면 picked[pose] = null
+  const finalOf = (pose) => (pose in picked ? picked[pose] : currentSkin && currentSkin[pose]) || null;
   function showCurrent() {
-    for (const pose of ['stand', 'sit', 'walk']) drawSkinPreview(pose, picked[pose] || (currentSkin && currentSkin[pose]));
+    for (const pose of [...REQUIRED, ...OPTIONAL]) drawSkinPreview(pose, finalOf(pose));
+    for (const pose of OPTIONAL) document.querySelector(`[data-clear=${pose}]`).hidden = !finalOf(pose);
   }
+  function syncApply() {
+    const changed = Object.keys(picked).length > 0;
+    const ready = REQUIRED.every((p) => finalOf(p));
+    $('skinApply').disabled = !(changed && ready);
+    if (changed && !ready) $('skinMsg').textContent = '서 있기 · 앉기 · 걷기 3장은 꼭 있어야 적용할 수 있어요.';
+  }
+  document.querySelectorAll('[data-clear]').forEach((b) => {
+    b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); picked[b.dataset.clear] = null; showCurrent(); syncApply(); };
+  });
   async function loadCurrent() {
     const acc = state.account;
     const all = await buddy.invoke('get-skins').catch(() => ({}));
@@ -131,17 +146,19 @@
         picked[inp.dataset.pose] = await shrink(f);
         $('skinMsg').textContent = '';
       } catch (e) { $('skinMsg').textContent = e.message; }
+      inp.value = '';
       showCurrent();
-      $('skinApply').disabled = !(picked.stand && picked.sit && picked.walk);
-      if ($('skinApply').disabled) $('skinMsg').textContent = '세 장을 모두 고르면 적용할 수 있어요.';
+      syncApply();
     };
   });
   $('skinApply').onclick = () => {
-    const total = picked.stand.length + picked.sit.length + picked.walk.length;
-    if (total > 200 * 1024) { $('skinMsg').textContent = '그림이 너무 복잡해서 용량이 커요. 더 단순한 그림을 써 주세요.'; return; }
+    const imgs = {};
+    for (const pose of [...REQUIRED, ...OPTIONAL]) { const v = finalOf(pose); if (v) imgs[pose] = v; }
+    const total = Object.values(imgs).reduce((n, v) => n + v.length, 0);
+    if (total > 380 * 1024) { $('skinMsg').textContent = '그림이 너무 복잡해서 용량이 커요. 더 단순한 그림을 써 주세요.'; return; }
     if (!state.account) { $('skinMsg').textContent = '로그인해야 바꿀 수 있어요.'; return; }
     const faces = document.querySelector('input[name=faces]:checked').value;
-    buddy.send('skin-set', { stand: picked.stand, sit: picked.sit, walk: picked.walk, faces });
+    buddy.send('skin-set', { ...imgs, faces });
     $('skinMsg').textContent = '올리는 중…';
   };
   $('skinReset').onclick = () => {

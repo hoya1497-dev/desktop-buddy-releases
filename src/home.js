@@ -84,7 +84,11 @@
       this.path = []; this.state = 'idle'; this.t = rand(1, 3); this.dir = 1; this.anim = 0;
       this.bubble = null; this.emotes = []; this.happyT = 0; this.onArrive = null; this.dragging = false;
     }
-    setProfile(p) { this.profile = p; this.pal = Sprites.palette(p.color); }
+    setProfile(p) {
+      const changed = this.profile && this.profile.pose !== p.pose;
+      this.profile = p; this.pal = Sprites.palette(p.color);
+      if (changed && this.state !== 'walk' && this.state !== 'climb') this.t = 0;   // 자세를 바꾸면 바로
+    }
     get floor() { return floorOf(this.y); }
     // 목적지까지 길 만들기: 다른 층이면 사다리를 거쳐 감
     goTo(x, y, cb) {
@@ -97,7 +101,7 @@
         this.path.push({ x: LADDER_X, y: ladderY(tf), climb: true });
       }
       this.path.push({ x: tx, y: ty });
-      this.state = 'walk'; this.onArrive = cb || null;
+      this.state = 'walk'; this.inBed = false; this.onArrive = cb || null;
     }
     emote(icon) { this.emotes.push({ icon, t: 1.8 }); if (this.emotes.length > 4) this.emotes.shift(); }
     say(text) { this.bubble = { text, t: Math.min(12, 4 + text.length * 0.12) }; }
@@ -125,7 +129,16 @@
       if ((this.t -= dt) <= 0) {
         const r = Math.random();
         const bed = findBed();
-        if (r < 0.1 && bed) this.goTo(bed.x, bed.y - 16, () => { this.state = 'sleep'; this.t = rand(8, 16); });
+        // 우클릭 → 자세에서 고른 자세로 가만히 있기 (눕기는 침대가 있으면 침대로 가서)
+        const pose = this.profile.pose;
+        if (pose === 'stand' || pose === 'sit') { this.state = pose === 'sit' ? 'sit' : 'idle'; this.inBed = false; this.t = 3; return; }
+        if (pose === 'lie') {
+          if (this.state === 'sleep') { this.t = 3; return; }
+          if (bed) this.goTo(bed.x, bed.y - 16, () => { this.state = 'sleep'; this.inBed = true; this.t = 3; });
+          else { this.state = 'sleep'; this.inBed = false; this.t = 3; }
+          return;
+        }
+        if (r < 0.1 && bed) this.goTo(bed.x, bed.y - 16, () => { this.state = 'sleep'; this.inBed = true; this.t = rand(8, 16); });
         else if (r < 0.62) {
           const f = Math.random() < 0.7 ? this.floor : (this.floor === 1 ? 2 : 1); // 가끔 다른 층으로
           this.goTo(rand(40, RW - 70), rand(band(f).min, band(f).max));
@@ -139,7 +152,7 @@
       if (cb) cb();
     }
     sortY() {
-      if (this.state === 'sleep') { const bed = findBed(); if (bed) return bed.y + 1; }
+      if (this.state === 'sleep' && this.inBed) { const bed = findBed(); if (bed) return bed.y + 1; }
       if (this.state === 'climb') return 10000; // 사다리 탈 때는 맨 앞
       return this.y;
     }
@@ -161,8 +174,10 @@
       const skin = Skins.get(this.profile.username, this.profile.skin);
       this.dw = 0;
       if (skin) {
-        const pose = legs === 'sit' ? 'sit' : legs.startsWith('walk') ? 'walk' : 'stand';
-        const tilt = pose === 'walk' ? (legs === 'walkB' ? 0.07 : -0.07) : (this.dragging ? Math.sin(this.anim * 12) * 0.12 : 0);
+        const pose = this.dragging ? 'fall' : this.state === 'sleep' ? 'lie'
+          : legs === 'sit' ? 'sit' : legs.startsWith('walk') ? 'walk' : 'stand';
+        const tilt = pose === 'walk' ? (legs === 'walkB' ? 0.07 : -0.07)
+          : pose === 'fall' ? Math.sin(this.anim * 12) * (Skins.has(skin, 'fall') ? 0.06 : 0.12) : 0;
         this.dw = Skins.draw(ctx, skin, pose, this.x, this.y + bob, PET_H, this.state === 'climb' ? (legs === 'walkB' ? 1 : -1) : this.dir, tilt);
       }
       if (!this.dw) {
@@ -436,7 +451,7 @@
     e.preventDefault();
     if (decorating) return;
     const pet = petAt(toRoom(e));
-    if (pet && !pet.isMe) buddy.send('char-menu', { id: pet.id });
+    if (pet) buddy.send('char-menu', { id: pet.id });   // 내 캐릭터: 자세 · 상태 메뉴, 친구: 간식 · 대결 메뉴
   });
   canvas.addEventListener('wheel', (e) => {
     if (!decorating) return;
@@ -546,7 +561,9 @@
     if (!S || !S.session) return;
     const u = S.session.user;
     const F = S.friends || { friends: [], incoming: [], outgoing: [] };
-    $('friendDot').hidden = !F.incoming.length;
+    const unreadDm = (F.friends || []).reduce((n, f) => n + (f.unread || 0), 0);
+    $('friendDot').hidden = !F.incoming.length && !unreadDm;
+    $('friendDot').textContent = unreadDm ? String(Math.min(99, unreadDm)) : '';
     if ($('friends').hidden) return;
     $('myCode').textContent = u.code;
     $('giftLeftNote').textContent = `· 오늘 선물 가능 🪙${u.giftLeft ?? 0}`;
@@ -578,6 +595,7 @@
         else { st.textContent = `🔒 문 닫힘 · ${f.count}명`; action = btn('똑똑', 'ghost small', () => buddy.send('knock', f.username)); }
         li.append(st);
         if (action) li.append(action);
+        li.append(btn(f.unread ? `✉️ ${f.unread}` : '✉️', f.unread ? 'primary small' : 'ghost small', () => window.DM && DM.open(f.username, f.nickname), false, '개인 채팅'));
         li.append(btn('🎁', 'ghost small', () => { giftOpen = giftOpen === f.username ? null : f.username; renderFriends(); }, false, '코인 선물'));
         li.append(btn('🐋', 'ghost small', () => window.HomeGame && HomeGame.openAquarium(f.username), false, '아쿠아리움 구경'));
         li.append(btn('✕', 'x', () => { if (confirm(`${f.nickname}(@${f.username})님을 친구에서 삭제할까요?`)) buddy.send('friend-remove', f.username); }, false, '친구 삭제'));

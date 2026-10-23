@@ -43,6 +43,7 @@ const DEFAULT_CONFIG = {
   autoStart: true,
   showPetsDesktop: true,   // 꺼내 둔 펫이 바탕화면에서도 캐릭터를 따라다님
   showAllPets: false,      // 친구들 펫 전부 보기 (꺼내 두지 않은 펫까지)
+  pose: 'auto',            // 내 캐릭터 자세 고정: auto(자유롭게) · stand · sit · lie
   timers: [],              // 세션 타이머 [{ id, name, steps: [{ name, minutes }], step, repeat, times, state, endsAt, left, round }]
   timerPin: false,         // 화면에 타이머 고정
   timerSound: true,        // 타이머가 끝나면 삐비빅 소리
@@ -181,13 +182,13 @@ function showControl() {
   if (control.webContents.isLoading()) control.webContents.once('did-finish-load', () => showWin(control));
   else { showWin(control); control.webContents.send('account', session ? { username: session.user.username, code: session.user.code } : null); }
 }
-function showHome(focusChat = false) {
+function showHome(focusChat = false, dmWith = null) {
   if (!session) { showLogin(); return; }
   if (!home || home.isDestroyed()) {
     home = makeWindow('home.html', { width: 1220, height: 720, minWidth: 720, minHeight: 560, title: `${BETA_TAG}🏠 Desktop Buddy 집` });
     for (const ev of ['show', 'hide', 'minimize', 'restore']) home.on(ev, () => setTimeout(updateWidgets, 50));
   }
-  const go = () => { showWin(home); pushHome(); pushTimers(); if (focusChat) home.webContents.send('focus-chat'); updateWidgets(); };
+  const go = () => { showWin(home); pushHome(); pushTimers(); if (focusChat) home.webContents.send('focus-chat'); if (dmWith) home.webContents.send('open-dm', dmWith); updateWidgets(); };
   if (home.webContents.isLoading()) home.webContents.once('did-finish-load', go); else go();
 }
 function showLogin(note = '') {
@@ -288,6 +289,7 @@ function selfProfile() {
   const pet = session?.user.pet;
   return {
     nickname: config.nickname, color: config.color, status: effectiveStatus(), species: config.species,
+    pose: POSES.includes(config.pose) ? config.pose : 'auto',
     username: session?.user.username || '', hungry: !!pet && pet.full < 30, sad: !!pet && pet.mood < 25,
     skin: session?.user.skin?.v ? session.user.skin : null,
     acc: session?.user.acc?.eq || {},
@@ -302,7 +304,7 @@ function onSelfChanged() {
   const p = selfProfile();
   overlay?.webContents.send('self', p);
   control?.webContents.send('self', p);
-  const wire = { nickname: p.nickname, color: p.color, status: p.status, species: p.species };
+  const wire = { nickname: p.nickname, color: p.color, status: p.status, species: p.species, pose: p.pose };
   const key = JSON.stringify(wire);
   if (session && key !== lastSentProfile) { lastSentProfile = key; wsSend({ type: 'profile', profile: wire }); }
   pushHome();
@@ -478,7 +480,7 @@ function handleServer(m, sock) {
       home?.webContents.send('toast', m.message);
       addChat({ system: true, text: m.message });
       if (m.friendRequest) notify('친구 신청', m.message);
-      if (m.popup) { notify('Desktop Buddy', m.message); overlay?.webContents.send('emote', { from: 'me', kind: 'gift' }); }
+      if (m.popup) { notify('Desktop Buddy', m.message); overlay?.webContents.send('emote', { from: 'me', kind: 'mail' }); }
       break;
     case 'knock':
       knocks = knocks.filter((k) => k.username !== m.from.username).concat([{ ...m.from, at: Date.now() }]);
@@ -493,7 +495,7 @@ function handleServer(m, sock) {
       } else home?.webContents.send('toast', `${m.nickname}님이 지금은 들어올 수 없대요.`);
       break;
     case 'skin':
-      skins.set(m.username, { v: m.v, faces: m.faces, stand: m.stand, sit: m.sit, walk: m.walk });
+      skins.set(m.username, { v: m.v, faces: m.faces, stand: m.stand, sit: m.sit, walk: m.walk, lie: m.lie, fall: m.fall });
       skinWanted.delete(m.username + ':' + m.v);
       pushSkins();
       break;
@@ -512,6 +514,16 @@ function handleServer(m, sock) {
       break;
     case 'fish-peer':   // 미니맵에도 같이 낚시하는 친구가 보이게
       for (const w of homes()) w.webContents.send('srv', m);
+      break;
+    case 'dm':   // 개인 채팅
+      home?.webContents.send('srv', m);
+      if (m.msg?.from !== session?.user.username && !(home && home.isVisible() && home.isFocused?.())) {
+        notify(`✉️ ${m.nickname || m.peer}(@${m.peer})`, m.msg.text);
+        overlay?.webContents.send('emote', { from: 'me', kind: 'gift' });
+      }
+      break;
+    case 'dm-history':
+      home?.webContents.send('srv', m);
       break;
     case 'board':
     case 'board-item':
@@ -691,6 +703,12 @@ function sendEmote(kind, target = null) {
 
 // ---------------------------------------------------------------- 캐릭터 우클릭 메뉴
 const EMOTES = [['wave', '👋 손 흔들기'], ['heart', '💖 하트'], ['cheer', '🎉 응원'], ['zzz', '💤 졸려요']];
+const POSES = ['auto', 'stand', 'sit', 'lie'];
+function setPose(v) {
+  if (!POSES.includes(v)) return;
+  config.pose = v; saveConfig();
+  onSelfChanged();
+}
 function setStatus(s) {
   config.status = s; saveConfig();
   if (s === 'auto') pollActive();
@@ -719,6 +737,11 @@ function petMenu({ id }, win = overlay) {
           { label: '표시 안 함', type: 'radio', checked: config.status === 'none', click: () => setStatus('none') },
         ],
       },
+      {
+        label: '자세',
+        submenu: [['auto', '🐾 자유롭게 움직이기'], ['stand', '🧍 서 있기'], ['sit', '🪑 앉기'], ['lie', '🛏️ 눕기']]
+          .map(([k, l]) => ({ label: l, type: 'radio', checked: (config.pose || 'auto') === k, click: () => setPose(k) })),
+      },
       { label: '이모트', submenu: EMOTES.map(([k, l]) => ({ label: l, click: () => sendEmote(k) })) },
       { label: '🚪 방 나가기 (혼자 놀기)', enabled: !!room, click: () => leaveRoom() },
       { label: '설정', click: () => showControl() },
@@ -733,6 +756,7 @@ function petMenu({ id }, win = overlay) {
       { label: '🍪 간식 나눠먹기', enabled: !!(room && p), submenu: snackMenu(id) },
       ...EMOTES.slice(0, 3).map(([k, l]) => ({ label: l + ' 보내기', click: () => sendEmote(k, id) })),
       { label: '💬 채팅하기', click: () => showHome(true) },
+      { label: '✉️ 개인 채팅', enabled: !!(p && friends.friends?.some((f) => f.username === p.username)), click: () => showHome(false, p.username) },
       { label: '🎮 미니게임 대결 신청', enabled: !!p, submenu: [['ttt', '⭕ 틱택토'], ['rps', '✊ 가위바위보'], ['basket', '🧺 바구니 받기']].map(([g, l]) => ({ label: l, click: () => wsSend({ type: 'mg-invite', game: g, to: p.username }) })) },
     ];
     if (room?.isOwner) template.push({ type: 'separator' }, { label: '내 방에서 내보내기', click: () => wsSend({ type: 'kick', id }) });
@@ -919,7 +943,7 @@ function registerIpc() {
   // 오버레이
   ipcMain.on('set-ignore', (_e, v) => overlay?.setIgnoreMouseEvents(!!v, { forward: true }));
   ipcMain.on('pet-menu', (_e, d) => petMenu(d || { id: 'me' }));
-  ipcMain.on('char-menu', (_e, d) => { if (d && typeof d.id === 'string' && d.id !== 'me') petMenu({ id: d.id }, home); });
+  ipcMain.on('char-menu', (_e, d) => { if (d && typeof d.id === 'string') petMenu({ id: d.id }, BrowserWindow.fromWebContents(_e.sender) || home); });
   ipcMain.on('open-home', () => showHome());
   ipcMain.on('fishing-view', (_e, on) => { if (fishingView !== !!on) { fishingView = !!on; pushHome(); } });
   // 타이머 · 미니맵
@@ -1014,8 +1038,8 @@ function registerIpc() {
   const SRV_TYPES = new Set(['checkin', 'acc-equip', 'buy', 'feed', 'pet-out', 'pet-rename', 'pet-pat',
     'fish-cast', 'fish-reel', 'fish-sell', 'fish-gift', 'fish-view', 'trade-offer', 'trade-answer', 'trade-cancel',
     'tank-put', 'tank-take', 'tank-feed', 'aqua-put', 'aqua-take', 'aqua-view', 'block', 'unblock', 'password-change', 'username-change',
-    'fish-here', 'share-snack', 'mg-invite', 'mg-answer', 'mg-move', 'mg-quit', 'rod-equip', 'pet-sell',
-    'board-get', 'board-add', 'board-del', 'board-clear']);
+    'fish-here', 'share-snack', 'mg-invite', 'mg-answer', 'mg-move', 'mg-quit', 'rod-equip', 'pet-sell', 'pet-private',
+    'board-get', 'board-add', 'board-del', 'board-clear', 'dm-send', 'dm-get', 'dm-read']);
   ipcMain.on('srv', (_e, m) => {
     if (!m || typeof m !== 'object' || !SRV_TYPES.has(m.type)) return;
     const json = JSON.stringify(m);
@@ -1050,7 +1074,7 @@ function registerIpc() {
   ipcMain.on('skin-set', (_e, d) => {
     if (!session) { control?.webContents.send('skin-saved', false); return; }
     if (d && d.reset) wsSend({ type: 'skin-set', reset: true });
-    else if (d) wsSend({ type: 'skin-set', stand: d.stand, sit: d.sit, walk: d.walk, faces: d.faces });
+    else if (d) wsSend({ type: 'skin-set', stand: d.stand, sit: d.sit, walk: d.walk, lie: d.lie || undefined, fall: d.fall || undefined, faces: d.faces });
   });
   ipcMain.handle('get-skins', () => Object.fromEntries(skins));
 }

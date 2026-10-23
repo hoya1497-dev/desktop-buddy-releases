@@ -768,7 +768,7 @@
     if (!u || !c) return;
     const outN = u.pets.filter((p) => p.out).length;
     $('petNote').textContent = u.pets.length
-      ? `${u.pets.length}/${c.limits.petsMax}마리 · 집에 꺼내 둔 펫 ${outN}/${c.limits.petsOut} · 꺼내면 친구들도 볼 수 있어요`
+      ? `${u.pets.length}/${c.limits.petsMax}마리 · 집에 꺼내 둔 펫 ${outN}/${c.limits.petsOut} · 👀 공개 펫은 친구들도 보고, 🔒 나만 보기 펫은 나만 봐요`
       : '아직 키우는 펫이 없어요. 🛒 상점 → 펫에서 데려올 수 있어요!';
     const ul = $('petList'); ul.textContent = '';
     const myPetFoods = Object.keys(u.food).filter((k) => c.petFoods[k] && !c.petFoods[k].tank && u.food[k] > 0);
@@ -786,14 +786,17 @@
         acts.append(btn('2층에 꺼내기', 'ghost small', () => srv({ type: 'pet-out', id: p.id, out: true, floor: 2 }), outN >= c.limits.petsOut));
         acts.append(btn('1층에 꺼내기', 'ghost small', () => srv({ type: 'pet-out', id: p.id, out: true, floor: 1 }), outN >= c.limits.petsOut));
       }
+      // 공개 / 나만 보기
+      acts.append(btn(p.private ? '🔒 나만 보기' : '👀 친구들에게 공개', p.private ? 'ghost small private-on' : 'ghost small', () => srv({ type: 'pet-private', id: p.id, private: !p.private }), false,
+        p.private ? '지금은 나만 봐요. 누르면 친구들에게도 보여요' : '지금은 친구들도 봐요. 누르면 나만 보게 바뀌어요'));
       if (myPetFoods.length) { acts.append(sel); acts.append(btn('밥 주기', 'primary small', () => srv({ type: 'feed', food: sel.value, target: p.id }), p.full >= 98)); }
+      else acts.append(el('span', { class: 'note-inline', text: '먹이가 없어요 (상점 → 음식)' }));
       // 되팔기: 산 값의 절반 (운영자 펫은 안 됨)
       if (kind.secret) acts.append(el('span', { class: 'note-inline', text: '✨ 운영자 펫' }));
       else if (kind.price) {
         const back = Math.floor(kind.price / 2);
         acts.append(btn(`되팔기 🪙${back}`, 'ghost small', () => { if (confirm(`'${p.name}'을(를) 되팔까요?\n산 값의 절반인 🪙${back}을 돌려받고, 펫은 사라져요. (되돌릴 수 없어요)`)) srv({ type: 'pet-sell', id: p.id }); }, false, '산 값의 절반을 돌려받아요'));
       }
-      else acts.append(el('span', { class: 'note-inline', text: '먹이가 없어요 (상점 → 음식)' }));
       // 이름 바꾸기: Electron에선 prompt()가 안 돼서 그 자리에서 입력칸으로 바꿔요
       let nameEl;
       if (petRename.id === p.id) {
@@ -819,7 +822,7 @@
       ul.append(el('li', {},
         el('div', { class: 'top' }, PetArt.thumb(p.kind, 40),
           el('div', { class: 'who' }, nameEl, el('span', { class: 'note-inline', text: `Lv.${p.level}` }),
-            el('small', { text: `${kind.code} ${kind.name}${p.out ? ` · ${p.floor}층에 나와 있어요` : ' · 쉬는 중'} · 좋아하는 것: ${kind.likes.map((x) => c.petFoods[x]?.name).join(', ')}` }))),
+            el('small', { text: `${kind.code} ${kind.name}${p.out ? ` · ${p.floor}층에 나와 있어요` : ' · 쉬는 중'}${p.private ? ' · 🔒 나만 보기' : ''} · 좋아하는 것: ${kind.likes.map((x) => c.petFoods[x]?.name).join(', ')}` }))),
         el('div', { class: 'bars' }, el('span', {}, '🍖 ', bar('full', p.full)), el('span', {}, '💗 ', bar('love', p.love)), el('span', { class: 'note-inline', text: `경험치 ${p.exp}/${p.next}` })),
         acts));
     }
