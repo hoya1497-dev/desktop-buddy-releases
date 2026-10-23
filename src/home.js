@@ -40,14 +40,24 @@
 
   // ------------------------------------------------------------ 또렷하게 크기 맞추기
   function fit() {
+    // 집이 넓어지면(증축) 가로로 길어져요: 칸 안에 꼭 맞게 비율 유지
     const box = $('stage').getBoundingClientRect();
-    const side = Math.max(200, Math.floor(Math.min(box.width, box.height)));
+    const s = Math.max(200 / RH, Math.min(box.width / RW, box.height / RH));
+    const cw = Math.floor(RW * s), ch = Math.floor(RH * s);
     const dpr = devicePixelRatio || 1;
-    const px = Math.round(side * dpr);
-    canvas.style.width = side + 'px';
-    canvas.style.height = side + 'px';
-    if (canvas.width !== px) { canvas.width = px; canvas.height = px; }
-    K = px / RW;
+    const pw = Math.round(cw * dpr), ph = Math.round(ch * dpr);
+    canvas.style.width = cw + 'px';
+    canvas.style.height = ch + 'px';
+    if (canvas.width !== pw || canvas.height !== ph) { canvas.width = pw; canvas.height = ph; }
+    K = pw / RW;
+  }
+  // 보고 있는 집의 증축 단계에 맞춰 넓이 바꾸기
+  function applyRoomSize() {
+    const v = viewing();
+    const steps = catalog?.room?.expand;
+    const lv = Math.max(0, Math.min((steps?.length || 1) - 1, v?.home?.level || 0));
+    const w = steps ? steps[lv].w : (catalog?.room?.w || 600);
+    if (w !== RW) { RW = w; LADDER_X = RW - 44; fit(); }
   }
   new ResizeObserver(fit).observe($('stage'));
   function toRoom(e) {
@@ -63,6 +73,7 @@
   };
   function syncLayout() {
     if (mouse && mouse.kind === 'item') return;
+    applyRoomSize();
     const v = viewing();
     const selIdx = selected ? layout.indexOf(selected) : -1;
     layout = v ? v.home.items.map((it) => ({ rot: 0, ...it })) : [];
@@ -108,6 +119,7 @@
     update(dt) {
       this.anim += dt;
       this.happyT = Math.max(0, this.happyT - dt);
+      this.hopT = Math.max(0, (this.hopT || 0) - dt);
       if (this.bubble && (this.bubble.t -= dt) <= 0) this.bubble = null;
       this.emotes = this.emotes.filter((e) => (e.t -= dt) > 0);
       if (this.dragging) return;
@@ -166,7 +178,9 @@
     }
     draw() {
       const legs = this.legs();
-      const bob = legs === 'walkB' ? -2 : 0;
+      // 콕 찌르면 폴짝 (hopT 동안 위로 뛰었다 내려옴)
+      const jump = this.hopT > 0 ? -Math.sin((1 - this.hopT / 0.45) * Math.PI) * 18 : 0;
+      const bob = (legs === 'walkB' ? -2 : 0) + jump;
       if (this.state !== 'climb') {
         ctx.fillStyle = 'rgba(0,0,0,0.15)';
         ctx.beginPath(); ctx.ellipse(this.x, this.y - 1, 17, 4, 0, 0, Math.PI * 2); ctx.fill();
@@ -431,7 +445,8 @@
         return;
       }
       pet.happyT = 0.8;
-      if (pet.isMe) { buddy.send('pat'); pet.emote('💗'); }
+      pet.hopT = 0.45;
+      if (pet.isMe) { buddy.send('pat'); pet.emote('💗'); buddy.send('poke', { target: 'me' }); }
       else { pet.emote('💥'); buddy.send('poke', { target: pet.id }); }
       return;
     }
@@ -678,12 +693,59 @@
     if (!v || !v.editable) { toast('불은 집주인만 켜고 끌 수 있어요'); return; }
     buddy.send('light', v.home.light === false);
   };
-  const THEME_ICON = { system: '🖥️', light: '☀️', dark: '🌙' };
-  const THEME_NEXT = { system: 'light', light: 'dark', dark: 'system' };
-  const THEME_NAME = { system: '컴퓨터 설정 따라가기', light: '화이트 모드', dark: '다크 모드' };
-  const showTheme = () => { const t = window.buddyTheme || 'system'; $('themeBtn').textContent = THEME_ICON[t] + ' 화면'; $('themeBtn').title = '화면 모드: ' + THEME_NAME[t]; };
+  // 화면 모드 고르기 (컴퓨터 설정 · 화이트 · 다크 · 오로라 · 사용자 지정)
+  const THEME_ICON = { system: '🖥️', light: '☀️', dark: '🌙', aurora: '🌈', custom: '🎨' };
+  const THEME_NAME = { system: '컴퓨터 설정 따라가기', light: '화이트 모드', dark: '다크 모드', aurora: '오로라 모드', custom: '사용자 지정' };
+  const CUSTOM_KEYS = ['bg', 'card', 'ink', 'accent', 'a1', 'a2', 'a3'];
+  const CUSTOM_PRESETS = {
+    '🍑 복숭아': { bg: '#fff3ec', card: '#ffffff', ink: '#3a2a26', accent: '#f2836b', aurora: true, a1: '#ffd3c4', a2: '#ffe7b8', a3: '#ffc9de' },
+    '🌊 바다': { bg: '#eef6fb', card: '#ffffff', ink: '#1f3346', accent: '#3a8fd6', aurora: true, a1: '#bfe3ff', a2: '#c9f1ec', a3: '#d7d4ff' },
+    '🌲 숲': { bg: '#eef5ee', card: '#ffffff', ink: '#233226', accent: '#4a9a5b', aurora: false, a1: '#cdeccf', a2: '#e8f3c4', a3: '#c4e7e0' },
+    '🌌 밤하늘': { bg: '#181a2e', card: '#24263f', ink: '#ece9ff', accent: '#9d8cff', aurora: true, a1: '#3b2f74', a2: '#1f4f6e', a3: '#5a2b5e' },
+  };
+  const showTheme = () => {
+    const t = window.buddyTheme || 'system';
+    $('themeBtn').textContent = THEME_ICON[t] + ' 화면'; $('themeBtn').title = '화면 모드: ' + THEME_NAME[t];
+    document.querySelectorAll('#themeModes button').forEach((b) => b.classList.toggle('active', b.dataset.mode === t));
+    $('themeCustomBox').hidden = t !== 'custom';
+    const c = window.buddyThemeCustom || {};
+    if (!themeEditing) {
+      for (const k of CUSTOM_KEYS) if (c[k]) $('tc-' + k).value = c[k];
+      $('tc-aurora').checked = !!c.aurora;
+    }
+    $('auroraColors').hidden = !$('tc-aurora').checked;
+  };
+  let themeEditing = false, themeTimer = null;
+  const readCustom = () => {
+    const c = { aurora: $('tc-aurora').checked };
+    for (const k of CUSTOM_KEYS) c[k] = $('tc-' + k).value;
+    return c;
+  };
+  const sendCustom = () => {
+    clearTimeout(themeTimer);
+    themeEditing = true;
+    $('auroraColors').hidden = !$('tc-aurora').checked;
+    themeTimer = setTimeout(() => { buddy.send('set-theme', { mode: 'custom', custom: readCustom() }); setTimeout(() => { themeEditing = false; }, 300); }, 80);
+  };
   document.addEventListener('buddy-theme', showTheme);
-  $('themeBtn').onclick = () => { const next = THEME_NEXT[window.buddyTheme || 'system']; buddy.send('set-theme', next); toast(THEME_NAME[next]); };
+  $('themeBtn').onclick = () => { $('themeModal').hidden = false; showTheme(); };
+  $('themeClose').onclick = () => { $('themeModal').hidden = true; };
+  $('themeModal').addEventListener('mousedown', (e) => { if (e.target === $('themeModal')) $('themeModal').hidden = true; });
+  document.querySelectorAll('#themeModes button').forEach((b) => {
+    b.onclick = () => {
+      const mode = b.dataset.mode;
+      if (mode === 'custom') buddy.send('set-theme', { mode, custom: readCustom() });
+      else buddy.send('set-theme', mode);
+    };
+  });
+  for (const k of [...CUSTOM_KEYS, 'aurora']) $('tc-' + k).addEventListener('input', sendCustom);
+  const presetBox = $('themePresets');
+  for (const [name, c] of Object.entries(CUSTOM_PRESETS)) {
+    const b = document.createElement('button'); b.className = 'ghost small'; b.textContent = name;
+    b.style.background = `linear-gradient(120deg, ${c.a1}, ${c.a2}, ${c.a3})`; b.style.color = c.ink;
+    b.onclick = () => { for (const k of CUSTOM_KEYS) $('tc-' + k).value = c[k]; $('tc-aurora').checked = c.aurora; sendCustom(); };
+    presetBox.append(b);
+  }
 
   // ------------------------------------------------------------ 패널
   document.querySelectorAll('.tabs button').forEach((b) => {
@@ -829,6 +891,7 @@
   buddy.on('emote', ({ from, kind, target }) => {
     const pet = pets.get(target || from);
     if (!pet || (kind === 'poke' && from === 'me')) return;
+    if (kind === 'poke') pet.hopT = 0.45;   // 누가 콕 찌르면 모두의 화면에서 폴짝
     if (EMOTE_ICON[kind]) pet.emote(EMOTE_ICON[kind]);
     pet.happyT = 0.6;
   });
@@ -851,6 +914,7 @@
     else if (r.reason === 'gift-sent') toast(`🎁 ${r.to}님에게 🪙${-r.amount}을 선물했어요`);
     else if (r.reason === 'gift' || r.reason === 'admin') { me?.emote('🎁'); }
     else if (r.reason === 'skin') toast('캐릭터 그림을 바꿨어요!');
+    else if (r.reason === 'expand') toast(`🏗️ ${r.name} 완료! 집이 넓어졌어요`, true);
     else if (r.reason === 'pet-sell') toast(`🐾 '${r.name}'을(를) 되팔아서 🪙${r.amount}을 돌려받았어요`, true);
     else if (r.reason === 'snack-sent') toast(`${catalog?.foods[r.food]?.icon || '🍪'} ${r.to}님과 간식을 나눠 먹었어요!`);
     else if (r.reason === 'snack-got') me?.emote('😋');
@@ -873,7 +937,7 @@
     if (st.session) {
       catalog = st.session.catalog;
       const R = catalog.room;
-      if (R && R.floors) { RW = R.w; RH = R.h; FLOORS = R.floors; LADDER_X = R.ladderX; }
+      if (R && R.floors) { RH = R.h; FLOORS = R.floors; }
     }
     if (roomChanged && decorating) $('decoBtn').click();
     $('offlineCover').hidden = st.net === 'online' || !st.session;
@@ -990,6 +1054,12 @@
   }, 500);
   const gotTimers = (v) => { if (!v) return; timers = v; tSkew = v.now - Date.now(); renderTimers(); };
   buddy.on('timers', gotTimers);
+  // 🗒 메모장 켜고 끄기 (화면 위에 떠 있는 작은 창)
+  let stickyOn = false;
+  const showSticky = () => { $('stickyBtn').classList.toggle('on', stickyOn); $('stickyBtn').textContent = stickyOn ? '🗒 메모장 끄기' : '🗒 메모장'; };
+  buddy.on('timers', (t) => { if (t && 'stickyPin' in t) { stickyOn = !!t.stickyPin; showSticky(); } });
+  buddy.invoke('get-timers').then((t) => { stickyOn = !!t?.stickyPin; showSticky(); }).catch(() => {});
+  $('stickyBtn').onclick = () => { stickyOn = !stickyOn; showSticky(); buddy.send('sticky-pin', stickyOn); };
   buddy.invoke('get-timers').then(gotTimers).catch(() => {});
   // 단계 입력 줄 (이름 + 분)
   function stepRow(name = '', min = 25) {

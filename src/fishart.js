@@ -264,6 +264,107 @@ window.FishArt = (() => {
       eye(b, b.w * 0.68, cy + 1);
     },
     // ---------------- 쓰레기
+    // ---- 신비 등급 (특이한 바다 생물)
+    blob(b, a) {   // 블롭피쉬: 축 처진 분홍 젤리 얼굴
+      const cx = b.w * 0.52, cy = b.h * 0.5, rx = b.w * 0.34, ry = b.h * 0.42;
+      tri(b, [cx - rx + 2, cy], [1, cy - 3], [1, cy + 3], mix(a.c1, '#000000', 0.12));
+      ellipse(b, cx, cy, rx, ry, (x, y) => (y > cy + ry * 0.45 ? mix(a.c1, '#ffffff', 0.25) : a.c1));
+      ellipse(b, cx + rx * 0.62, cy + ry * 0.28, 3.4, 2.6, a.c2);   // 늘어진 코
+      b.set(cx + rx * 0.62, cy + ry * 0.28 - 1, mix(a.c2, '#ffffff', 0.4));
+      line(b, cx + rx * 0.25, cy + ry * 0.72, cx + rx * 0.62, cy + ry * 0.62, mix(a.c1, '#000000', 0.35));   // 시무룩한 입
+      b.set(cx + rx * 0.3, cy - ry * 0.22, '#1a1a20'); b.set(cx + rx * 0.78, cy - ry * 0.28, '#1a1a20');
+    },
+    clione(b, a) {  // 바다의 천사(클리오네): 투명한 몸 + 주황 속 + 날개
+      const cy = b.h / 2;
+      tri(b, [b.w * 0.55, cy - 2], [b.w * 0.55, cy + 2], [2, cy], a.c1);   // 꼬리처럼 가늘어지는 몸
+      ellipse(b, b.w * 0.58, cy, b.w * 0.16, b.h * 0.3, a.c1);
+      ellipse(b, b.w * 0.8, cy, b.w * 0.12, b.h * 0.26, a.c1);           // 머리
+      ellipse(b, b.w * 0.6, cy, 2, 1.6, a.c2);                            // 빨간 속
+      b.set(b.w * 0.86, cy - 2, a.c2); b.set(b.w * 0.88, cy - 3, a.c2);   // 작은 뿔
+      ellipse(b, b.w * 0.62, 2, 3, 1.8, mix(a.c1, '#9fd8ff', 0.4));      // 위 날개
+      ellipse(b, b.w * 0.62, b.h - 3, 3, 1.8, mix(a.c1, '#9fd8ff', 0.4)); // 아래 날개
+      eye(b, b.w * 0.86, cy);
+    },
+    kraken(b, a) {  // 크라켄: 오른쪽 머리, 뒤로 휘날리는 큰 촉수
+      const cy = b.h / 2;
+      for (let k = 0; k < 7; k++) {
+        const off = (k - 3) * (b.h * 0.12);
+        for (let x = 1; x < b.w * 0.62; x += 0.5) {
+          const y = cy + off * (0.4 + (b.w * 0.62 - x) / (b.w * 0.62) * 0.9) + Math.sin(x * 0.5 + k) * 1.4;
+          b.set(x, y, Math.round(x * 2) % 9 === 0 && k % 2 ? a.c2 : mix(a.c1, '#000000', 0.1 * (k % 2)));
+        }
+      }
+      ellipse(b, b.w * 0.74, cy, b.w * 0.2, b.h * 0.38, a.c1);
+      for (let i = 0; i < 5; i++) b.set(b.w * 0.66 + i * 2, cy - b.h * 0.2 + (i % 2), mix(a.c1, '#ffffff', 0.2));
+      ellipse(b, b.w * 0.8, cy - 1, 2, 2, '#f4cf4f'); b.set(b.w * 0.8, cy - 1, '#1a1a20'); b.set(b.w * 0.8, cy, '#1a1a20');
+    },
+    oarfish(b, a) { // 산갈치: 아주 긴 은빛 리본 + 빨간 지느러미
+      const cy = b.h * 0.58;
+      for (let x = 1; x < b.w - 3; x += 0.5) {
+        const y = cy + Math.sin(x * 0.35) * b.h * 0.12, t = Math.max(1, 2.2 * (x / b.w) + 0.6);
+        ellipse(b, x, y, 0.8, t, (xx, yy) => (yy > y + t * 0.3 ? mix(a.c1, '#ffffff', 0.5) : a.c1));
+        if (Math.round(x * 2) % 2 === 0) b.set(x, y - t - 1, a.c2);
+      }
+      const hx = b.w - 4, hy = cy + Math.sin(hx * 0.35) * b.h * 0.12;
+      ellipse(b, hx, hy, 2.6, 2.4, a.c1);
+      for (let i = 0; i < 5; i++) line(b, hx - 1, hy - 2, hx - 3 + i, hy - 7 - (i % 2), a.c2);   // 머리 깃털
+      eye(b, hx + 1, hy - 1);
+    },
+    angler(b, a) {  // 초롱아귀: 어두운 몸 + 날카로운 이빨 + 빛나는 초롱
+      const cx = b.w * 0.5, cy = b.h * 0.58, rx = b.w * 0.3, ry = b.h * 0.36;
+      tri(b, [cx - rx + 2, cy], [1, cy - 4], [1, cy + 4], mix(a.c1, '#000000', 0.25));
+      ellipse(b, cx, cy, rx, ry, a.c1);
+      line(b, cx + rx * 0.2, cy + 1, cx + rx, cy + 2, '#1a1020');   // 큰 입
+      for (let i = 0; i < 4; i++) { b.set(cx + rx * 0.3 + i * 1.6, cy + 2, '#ffffff'); b.set(cx + rx * 0.4 + i * 1.6, cy, '#ffffff'); }
+      line(b, cx + rx * 0.1, cy - ry, cx + rx * 0.7, cy - ry - 3, mix(a.c1, '#ffffff', 0.3));   // 초롱 줄기
+      line(b, cx + rx * 0.7, cy - ry - 3, cx + rx * 1.05, cy - ry - 1, mix(a.c1, '#ffffff', 0.3));
+      ellipse(b, cx + rx * 1.12, cy - ry, 1.6, 1.6, a.c2); b.set(cx + rx * 1.12, cy - ry - 1, '#ffffff');
+      eye(b, cx + rx * 0.45, cy - ry * 0.4);
+    },
+    barreleye(b, a) { // 배럴아이: 투명한 머리 안에 초록 눈
+      const cx = b.w * 0.5, cy = b.h * 0.6, rx = b.w * 0.3, ry = b.h * 0.3;
+      tri(b, [cx - rx + 2, cy], [1, cy - 4], [1, cy + 4], mix(a.c1, '#000000', 0.2));
+      ellipse(b, cx, cy, rx, ry, painter(a, cx, cy, rx, ry));
+      ellipse(b, cx + rx * 0.45, cy - ry * 1.1, rx * 0.5, ry * 0.85, 'rgba(190,240,255,0.55)');   // 투명 머리
+      ellipse(b, cx + rx * 0.35, cy - ry * 1.05, 1.4, 1.4, a.c2); ellipse(b, cx + rx * 0.65, cy - ry * 1.05, 1.4, 1.4, a.c2);
+      b.set(cx + rx * 0.95, cy, '#1a1a20');
+    },
+    dumbo(b, a) {   // 덤보문어: 귀처럼 생긴 지느러미
+      const cx = b.w * 0.55, cy = b.h * 0.42;
+      ellipse(b, cx, cy, b.w * 0.24, b.h * 0.34, a.c1);
+      ellipse(b, cx - b.w * 0.24, cy - b.h * 0.18, 2.6, 2, a.c2); ellipse(b, cx + b.w * 0.24, cy - b.h * 0.18, 2.6, 2, a.c2);   // 귀
+      for (let k = 0; k < 5; k++) { const x0 = cx - b.w * 0.18 + k * (b.w * 0.36 / 4); for (let j = 0; j < b.h * 0.32; j++) b.set(x0 + Math.sin(j * 0.9 + k) * 0.8, cy + b.h * 0.3 + j, a.c1); }
+      eye(b, cx - 2, cy); eye(b, cx + 2, cy);
+    },
+    leafy(b, a) {   // 나뭇잎해룡: 잎사귀를 두른 해마
+      const x0 = b.w * 0.5;
+      ellipse(b, x0 + 3, 3, 2.6, 1.8, a.c1); line(b, x0 + 5, 3, x0 + 9, 3, a.c1);
+      for (let i = 0; i < 7; i++) ellipse(b, x0 + Math.sin(i / 2) * 1.5, 5 + i, 2 - i * 0.12, 1, i % 2 ? a.c2 : a.c1);
+      const leaf = mix(a.c2, '#3f8a3a', 0.3);
+      [[x0 - 3, 4], [x0 + 3, 7], [x0 - 4, 9], [x0 + 3, 10], [x0 - 2, 1], [x0 - 5, 6]].forEach(([x, y]) => { ellipse(b, x, y, 1.6, 1, leaf); b.set(x - 2, y, leaf); });
+      line(b, x0 - 1, 11, x0 - 4, 11, a.c1);
+      eye(b, x0 + 4, 2);
+    },
+    axolotl(b, a) { // 우파루파: 분홍 몸 + 머리 양옆 깃털 아가미
+      const cy = b.h * 0.55;
+      ellipse(b, b.w * 0.45, cy, b.w * 0.3, b.h * 0.22, a.c1);
+      tri(b, [b.w * 0.2, cy], [1, cy - 2], [1, cy + 2], mix(a.c1, '#ffffff', 0.3));
+      ellipse(b, b.w * 0.76, cy - 1, b.w * 0.14, b.h * 0.28, a.c1);   // 머리
+      for (let i = 0; i < 3; i++) { line(b, b.w * 0.7, cy - 3, b.w * 0.62 - i, cy - 6 - i, a.c2); line(b, b.w * 0.7, cy + 1, b.w * 0.62 - i, cy + 4 + i, a.c2); }
+      b.set(b.w * 0.36, cy + b.h * 0.26, a.c1); b.set(b.w * 0.56, cy + b.h * 0.26, a.c1);   // 다리
+      eye(b, b.w * 0.82, cy - 2); b.set(b.w * 0.88, cy, mix(a.c1, '#000000', 0.4));
+    },
+    nessie(b, a) {  // 네시: 긴 목 + 혹 + 지느러미발
+      const cy = b.h * 0.72;
+      ellipse(b, b.w * 0.42, cy, b.w * 0.24, b.h * 0.2, a.c1);
+      ellipse(b, b.w * 0.3, cy - b.h * 0.18, b.w * 0.08, b.h * 0.12, a.c1);   // 혹
+      tri(b, [b.w * 0.2, cy], [1, cy - 1], [3, cy + 3], a.c1);
+      for (let i = 0; i < 12; i++) { const t = i / 11; ellipse(b, b.w * 0.6 + t * b.w * 0.24, cy - 2 - Math.sin(t * Math.PI / 2) * b.h * 0.52, 1.6, 1.6, a.c1); }
+      ellipse(b, b.w * 0.88, cy - 2 - b.h * 0.52, 2.6, 1.8, a.c1);   // 머리
+      ellipse(b, b.w * 0.32, cy + b.h * 0.17, 2.4, 1.2, a.c2); ellipse(b, b.w * 0.54, cy + b.h * 0.17, 2.4, 1.2, a.c2);
+      for (let i = 0; i < 4; i++) b.set(b.w * 0.34 + i * 3, cy - 1, a.c2);
+      eye(b, b.w * 0.9, cy - 3 - b.h * 0.52);
+    },
     can(b) { rect(b, 5, 2, 6, 10, '#c8ccd2'); rect(b, 5, 5, 6, 4, '#d9534f'); rect(b, 5, 2, 6, 1, '#8a9098'); b.set(7, 6, '#ffffff'); b.set(8, 6, '#ffffff'); },
     tire(b) { ellipse(b, 8, 7, 6, 6, '#2a2a30'); ellipse(b, 8, 7, 2.8, 2.8, null); for (let y = 0; y < 14; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - 8, y - 7); if (d < 3) b.g[y] && (b.g[y][x] = null); else if (d < 4 && b.g[y][x]) b.g[y][x] = '#6a6a72'; } },
     boot(b) { rect(b, 4, 1, 5, 9, '#7a5030'); rect(b, 4, 9, 10, 3, '#7a5030'); rect(b, 4, 12, 10, 1, '#3a2418'); b.set(6, 4, '#5a3820'); b.set(11, 10, '#a07048'); },

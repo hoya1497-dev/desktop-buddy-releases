@@ -26,11 +26,42 @@
       <button id="aquaBtn" class="ghost small" title="내 아쿠아리움 보기">🐋 내 아쿠아리움</button>
       <button id="friendAquaBtn" class="ghost small" hidden>🐋 친구 아쿠아리움</button>
       <button id="friendsBtn" class="ghost small">👥 친구 <span id="friendDot" class="dot-badge" hidden></span></button>
+      <button id="stickyBtn" class="ghost small" title="메모 · 할 일 · 체크리스트 · 다이어리를 화면에 띄우기">🗒 메모장</button>
       <button id="themeBtn" class="ghost small" title="화면 모드">🖥️ 화면</button>
       <button id="settingsBtn" class="ghost small" title="설정">⚙️ 설정</button>
       <button id="supportBtn" class="ghost small" hidden title="제작자에게 커피 한 잔 사 주기">☕ 커피 사주기</button>
     </div>
   </header>
+
+  <!-- 🎨 화면 모드 -->
+  <div id="themeModal" class="notice-modal" hidden>
+    <div class="notice-card theme-card">
+      <div class="row between"><h2>🎨 화면 모드</h2><button id="themeClose" class="link">닫기</button></div>
+      <div id="themeModes" class="theme-modes">
+        <button data-mode="system"><span class="sw sw-system"></span>🖥️ 컴퓨터 설정 따라가기</button>
+        <button data-mode="light"><span class="sw sw-light"></span>☀️ 화이트</button>
+        <button data-mode="dark"><span class="sw sw-dark"></span>🌙 다크</button>
+        <button data-mode="aurora"><span class="sw sw-aurora"></span>🌈 오로라</button>
+        <button data-mode="custom"><span class="sw sw-custom"></span>🎨 사용자 지정</button>
+      </div>
+      <div id="themeCustomBox" class="theme-custom" hidden>
+        <div class="theme-presets" id="themePresets"><span class="note-inline">빠른 선택:</span></div>
+        <div class="theme-colors">
+          <label>배경 <input type="color" id="tc-bg"></label>
+          <label>카드 <input type="color" id="tc-card"></label>
+          <label>글자 <input type="color" id="tc-ink"></label>
+          <label>강조색 <input type="color" id="tc-accent"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="tc-aurora"> 🌈 오로라 켜기 (내가 고른 색으로 그라데이션)</label>
+        <div id="auroraColors" class="theme-colors" hidden>
+          <label>오로라 1 <input type="color" id="tc-a1"></label>
+          <label>오로라 2 <input type="color" id="tc-a2"></label>
+          <label>오로라 3 <input type="color" id="tc-a3"></label>
+        </div>
+        <p class="note">고르는 즉시 모든 창(집 · 설정 · 타이머 · 메모)에 적용돼요.</p>
+      </div>
+    </div>
+  </div>
 
   <!-- 📢 공지: 맨 위 한 줄에 최신 공지, 누르면 전체 공지 -->
   <div id="noticeBar" class="notice-bar" hidden role="button" tabindex="0" title="공지 전체 보기">
@@ -194,29 +225,45 @@
           </div>
 
           <!-- 화이트보드 (흔적 남기기) -->
-          <div id="boardModal" class="modal" hidden>
+          <div id="boardModal" class="modal board-modal" hidden>
             <div class="modal-card board-card">
               <div class="row between"><h2 id="boardTitle">📝 화이트보드</h2><button id="boardClose" class="link">닫기</button></div>
               <div class="row board-tools">
                 <div class="subtabs" id="boardModes">
-                  <button data-mode="view" class="active">👆 보기</button>
+                  <button data-mode="view" class="active" title="끌어서 화이트보드 밀기 · 내 흔적은 끌어서 옮기기 · 눌러서 고치기">✋ 보기·옮기기</button>
                   <button data-mode="note">📝 메모 붙이기</button>
                   <button data-mode="draw">🖊 그림 그리기</button>
                 </div>
-                <span id="noteColors" class="swatches"></span>
-                <span id="penColors" class="swatches" hidden></span>
-                <select id="penSize" hidden><option value="3">가늘게</option><option value="6" selected>보통</option><option value="12">굵게</option></select>
-                <button id="drawUndo" class="ghost small" hidden>↶ 되돌리기</button>
-                <button id="drawPost" class="primary small" hidden>그림 붙이기</button>
+                <span id="noteTools" class="tool-group" hidden><span id="noteColors" class="swatches"></span><input type="color" id="noteColorPick" title="메모 색 직접 고르기"></span>
+                <span id="penTools" class="tool-group" hidden>
+                  <span id="penColors" class="swatches"></span><input type="color" id="penColorPick" title="펜 색 직접 고르기 (컬러서클)">
+                  <select id="penSize" title="펜 굵기"><option value="2">아주 가늘게</option><option value="4">가늘게</option><option value="8" selected>보통</option><option value="14">굵게</option><option value="24">아주 굵게</option></select>
+                  <button id="penEraser" class="ghost small" title="지우개">🧽 지우개</button>
+                  <button id="drawUndo" class="ghost small">↶ 되돌리기</button>
+                  <button id="drawCancel" class="ghost small" hidden>취소</button>
+                  <button id="drawPost" class="primary small">그림 붙이기</button>
+                </span>
+                <span class="tool-group zoom-group">
+                  <button id="zoomOut" class="ghost small" title="축소">−</button>
+                  <button id="zoomVal" class="ghost small" title="눌러서 전체 보기">100%</button>
+                  <button id="zoomIn" class="ghost small" title="확대">+</button>
+                </span>
+                <span id="boardBgTools" class="tool-group" hidden title="화이트보드 바탕색 (집주인만)">🎨 바탕 <input type="color" id="boardBgPick"><button id="boardBgReset" class="ghost small">기본</button></span>
               </div>
               <div class="board-area" id="boardArea">
-                <div id="boardItems"></div>
-                <canvas id="boardDraw" width="800" height="500"></canvas>
-                <div id="noteInputBox" class="note-input" hidden>
-                  <textarea id="noteInput" maxlength="80" rows="3" placeholder="메모 (80자까지) · Enter로 붙이기"></textarea>
+                <div id="boardMover">
+                  <div id="boardStage">
+                    <div id="boardItems"></div>
+                    <canvas id="boardDraw" width="2400" height="1500"></canvas>
+                    <div id="noteInputBox" class="note-input" hidden>
+                      <textarea id="noteInput" maxlength="200" rows="4" placeholder="메모 (200자까지) · Enter로 붙이기 · Shift+Enter 줄바꿈"></textarea>
+                      <div class="row note-input-btns"><button id="noteSave" class="primary small">붙이기</button><button id="noteCancel" class="ghost small">취소</button></div>
+                    </div>
+                  </div>
                 </div>
+                <div id="itemActions" class="item-actions" hidden></div>
               </div>
-              <p class="note" id="boardStatus">메모나 그림에 마우스를 올리면 누가 언제 남겼는지 보여요.</p>
+              <p class="note" id="boardStatus"></p>
             </div>
           </div>
 
@@ -430,6 +477,7 @@
           <button data-dex="S" class="active">작은 물고기</button>
           <button data-dex="M">중간 물고기</button>
           <button data-dex="L">큰 물고기</button>
+          <button data-dex="X">🔮 신비</button>
           <button data-dex="T">쓰레기</button>
         </div>
         <div class="dex-book" id="dexBook">

@@ -384,8 +384,17 @@
           alive.add(key);
           let f = followers.get(key);
           if (!f) { f = { x: owner.x - owner.dir * 30, y: owner.y, dir: owner.dir, hop: 0, t: Math.random() * 6 }; followers.set(key, f); }
-          f.kind = p.kind; f.owner = owner;
+          f.kind = p.kind; f.owner = owner; f.p = p;
           f.t += dt;
+          // 🐾 교감: 5레벨 펫은 가끔 주인 이름을 부르며 인사, 배고프면 배고파
+          if (f.say && (f.say.t -= dt) <= 0) f.say = null;
+          f.sayT = (f.sayT ?? rand(10, 30)) - dt;
+          if (f.sayT <= 0) {
+            f.sayT = rand(45, 90);
+            const nick = owner.profile.nickname || '주인님';
+            if (p.hungry) f.say = { text: '배고파…', t: 3.5 };
+            else if ((p.level || 1) >= 5) f.say = { text: [`${nick} 안녕!`, `${nick}, 안녕~ 💕`, `${nick} 좋아!`][Math.floor(Math.random() * 3)], t: 3.5 };
+          }
           // 주인 뒤쪽에 줄 서서 따라감
           const gap = owner.w * 0.55 + (i + 1) * Math.max(18, cfg.petScale * 9);
           const tx = clamp(owner.x - owner.dir * gap, 10, W - 10);
@@ -410,6 +419,17 @@
       ctx.fillStyle = 'rgba(0,0,0,0.15)';
       ctx.fillRect(Math.round(f.x - 5 * sc), Math.round(f.y - 1), 10 * sc, Math.max(2, sc));
       PetArt.draw(ctx, f.kind, f.x, f.y, sc, f.dir < 0, f.hop);
+      if (f.say) {
+        ctx.font = `12px ${FONT}`;
+        const tw = Math.min(170, ctx.measureText(f.say.text).width) + 14, th = 20;
+        const bx = Math.round(clamp(f.x - tw / 2, 2, W - tw - 2)), by = Math.round(f.y - 14 * sc - th - 8);
+        ctx.globalAlpha = Math.min(1, f.say.t * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.96)'; ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.roundRect(bx, by, tw, th, 8); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#26222b'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(f.say.text, bx + tw / 2, by + th / 2 + 0.5, tw - 8);
+        ctx.textBaseline = 'alphabetic'; ctx.globalAlpha = 1;
+      }
     }
   }
 
@@ -532,7 +552,7 @@
     const p = drag.pet;
     p.dragging = false;
     if (!drag.moved) {
-      if (p.isMe) openChat();
+      if (p.isMe) { p.hop(380); buddy.send('poke', { target: 'me' }); openChat(); }   // 콕: 친구들 화면에서도 점프
       else {
         // 친구 캐릭터 클릭: 콕 찌르기
         p.happyT = 0.7;
@@ -657,6 +677,7 @@
     if (kind === 'poke') {
       // 다른 사람이 내(또는 누군가의) 캐릭터를 찔렀을 때
       if (from === 'me') return; // 내가 찌른 건 이미 표시함
+      if (!target) { pet.happyT = 0.7; pet.hop(420); pet.emote('✨'); return; }   // 자기 캐릭터를 콕 → 점프만
       pet.happyT = 0.7;
       pet.hop(480);
       pet.emote('💥');

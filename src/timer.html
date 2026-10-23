@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="control.css">
   <style>
     html, body { background: transparent !important; margin: 0; overflow: hidden; user-select: none; }
+    body::before { display: none !important; } /* 오로라 배경은 투명 창엔 안 그림 */
     .card { margin: 6px; background: color-mix(in srgb, var(--card) 94%, transparent); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 22px rgba(0,0,0,.22); overflow: hidden; }
     .head { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 10px; font-size: 12px; font-weight: 700; color: var(--muted); -webkit-app-region: drag; cursor: move; }
     .head span { flex: 1; }

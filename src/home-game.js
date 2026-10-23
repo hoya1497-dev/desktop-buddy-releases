@@ -55,7 +55,7 @@
   subtabs('bagTabs', 'bag', 'bag-sec');
   subtabs('dexTabs', 'dex', 'dex-sec');
   let dexFilter = 'S';
-  const dexPageOf = { S: 0, M: 0, L: 0, T: 0 };
+  const dexPageOf = { S: 0, M: 0, L: 0, X: 0, T: 0 };
   $('dexTabs').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { dexFilter = b.dataset.dex; renderDex(); }));
   const openTab = (name) => document.querySelector(`.tabs button[data-tab=${name}]`)?.click();
 
@@ -67,6 +67,13 @@
     const row = H.shopRow;
     const items = $('shopItems'), tanks = $('shopTanks'), wallItems = $('shopWallItems');
     items.textContent = ''; tanks.textContent = ''; wallItems.textContent = '';
+    // 🏗️ 집 넓히기 (가로로 한 단계씩)
+    const steps = c.room?.expand || [];
+    const lv = u.home.level || 0, next = steps[lv + 1];
+    if (steps.length > 1) {
+      const sub = next ? `지금 ${steps[lv].name} (가로 ${steps[lv].w}) → ${next.name} (가로 ${next.w}) · 🪙 ${next.price.toLocaleString()}` : `가장 넓은 집이에요 (가로 ${steps[lv].w})`;
+      items.append(row('🏗️', `집 넓히기 ${lv}/${steps.length - 1}단계`, sub, next ? [['넓히기', u.coins < next.price, () => { if (confirm(`🪙${next.price.toLocaleString()}로 ${next.name}을(를) 할까요?\n집이 가로로 넓어져요. (되돌릴 수 없어요)`)) srv({ type: 'home-expand' }); }]] : [['완료', true, () => {}, 'ghost small']]));
+    }
     for (const [id, it] of Object.entries(c.items)) {
       if (it.free === true) continue;
       const own = u.owned[id] || 0;
@@ -398,7 +405,8 @@
 
   // ------------------------------------------------------------ 도감
   // 한 장에 한 마리씩 넘겨 보는 도감
-  const dexList = (cat) => Object.values(FISH()).filter((f) => f.cat === cat).sort((a, b) => a.code.localeCompare(b.code));
+  // 🔮 신비 등급은 따로 한 칸에 모아 보여 줘요
+  const dexList = (cat) => Object.values(FISH()).filter((f) => (cat === 'X' ? f.rar === 'X' : f.cat === cat && f.rar !== 'X')).sort((a, b) => a.code.localeCompare(b.code));
   function fitsOf(f) {
     const c = C();
     const tanks = Object.entries(c.items).filter(([, it]) => it.tank).map(([, it]) => ({ name: it.name, ok: it.tank.allow.includes(f.cat) }));
@@ -416,7 +424,7 @@
     $('dexTabs').querySelectorAll('button').forEach((b) => {
       const L = dexList(b.dataset.dex);
       const n = L.filter((f) => u.dex[f.code]).length;
-      b.textContent = `${{ S: '작은', M: '중간', L: '큰', T: '쓰레기' }[b.dataset.dex]} ${n}/${L.length}`;
+      b.textContent = `${{ S: '작은', M: '중간', L: '큰', X: '🔮 신비', T: '쓰레기' }[b.dataset.dex]} ${n}/${L.length}`;
       b.classList.toggle('active', b.dataset.dex === dexFilter);
     });
     const list = dexList(dexFilter);
@@ -573,7 +581,7 @@
     if (m.record) bits.push('🏆 최고 기록!');
     bits.push(`확률 ${f.chance}%`);
     $('catchInfo').textContent = bits.join(' · ');
-    $('catchOk').textContent = f.cat === 'T' ? '버려진 걸 주웠어요 ♻️' : (f.rar === 'L' ? '전설이다!! 🎉' : '좋아요!');
+    $('catchOk').textContent = f.cat === 'T' ? '버려진 걸 주웠어요 ♻️' : (f.rar === 'L' ? '전설이다!! 🎉' : f.rar === 'X' ? '신비한 생물이다!! 🔮' : '좋아요!');
   }
   let lastCatch = null;
   $('catchOk').onclick = () => { $('catchModal').hidden = true; };
@@ -821,9 +829,9 @@
       }
       ul.append(el('li', {},
         el('div', { class: 'top' }, PetArt.thumb(p.kind, 40),
-          el('div', { class: 'who' }, nameEl, el('span', { class: 'note-inline', text: `Lv.${p.level}` }),
+          el('div', { class: 'who' }, nameEl, el('span', { class: 'note-inline', text: `Lv.${p.level}/5${p.level >= 5 ? ' ⭐' : ''}` }),
             el('small', { text: `${kind.code} ${kind.name}${p.out ? ` · ${p.floor}층에 나와 있어요` : ' · 쉬는 중'}${p.private ? ' · 🔒 나만 보기' : ''} · 좋아하는 것: ${kind.likes.map((x) => c.petFoods[x]?.name).join(', ')}` }))),
-        el('div', { class: 'bars' }, el('span', {}, '🍖 ', bar('full', p.full)), el('span', {}, '💗 ', bar('love', p.love)), el('span', { class: 'note-inline', text: `경험치 ${p.exp}/${p.next}` })),
+        el('div', { class: 'bars' }, el('span', {}, '🍖 ', bar('full', p.full)), el('span', {}, '💗 ', bar('love', p.love)), el('span', { class: 'note-inline', text: p.level >= 5 ? '최고 레벨! 주인 이름을 부르며 인사해요' : `경험치 ${p.exp}/${p.next} · 밥 주기나 쓰다듬기(30초마다)로 올라요` })),
         acts));
     }
   }
@@ -888,9 +896,34 @@
       r.hop = Math.abs(Math.sin(r.t * 9)) * 3;
     } else { r.hop = 0; r.dir = ch.dir > 0 ? 1 : -1; }
   }
+  // 🐾 교감: 펫 주인 닉네임 (내 펫이면 내 닉네임)
+  function ownerNick(r) {
+    if (r.follow) return H.charOf(r.follow)?.profile?.nickname || '';
+    const S = H.S;
+    return S.room && !S.room.isOwner ? S.room.owner.nickname : (U()?.nickname || '');
+  }
+  const GREET = (n) => [`${n} 안녕!`, `${n}, 안녕~ 💕`, `${n} 좋아!`, `${n} 보고 싶었어!`];
+  function petLine(r) {
+    const p = r.p || {};
+    const hungry = p.hungry ?? (p.full != null && p.full < 30);
+    if (hungry) return Math.random() < 0.5 ? '배고파…' : '배고파… 밥 줘 🍖';
+    if ((p.level || 1) >= 5) { const n = ownerNick(r); const g = GREET(n || '주인님'); return g[Math.floor(Math.random() * g.length)]; }
+    return null;
+  }
+  function petTalk(r, dt) {
+    if (r.say && (r.say.t -= dt) <= 0) r.say = null;
+    if (r.exp && (r.exp.t -= dt) <= 0) r.exp = null;
+    r.sayT = (r.sayT ?? rand(6, 20)) - dt;
+    if (r.sayT <= 0) {
+      r.sayT = rand(35, 75);
+      const line = petLine(r);
+      if (line) r.say = { text: line, t: 3.5 };
+    }
+  }
   function updateRoomPets(dt) {
     for (const r of roomPets.values()) {
       r.heart = Math.max(0, r.heart - dt);
+      petTalk(r, dt);
       if (r.follow) { followOwner(r, dt); continue; }
       const b = H.band(r.floor || 1);
       if (r.tx != null) {
@@ -916,11 +949,27 @@
           ctx.fillText('💗', r.x, r.y - 50 - (1.2 - r.heart) * 18);
           ctx.globalAlpha = 1;
         }
-        // 이름표는 항상 보이게
-        ctx.font = `bold 10px ${FONT}`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,0.55)';
-        const w = ctx.measureText(r.p.name).width + 10;
+        // 이름표는 항상 보이게 (레벨도 같이)
+        const label = `${r.p.name}${r.p.level ? ' Lv.' + r.p.level : ''}`;
+        ctx.font = `bold 10px ${FONT}`; ctx.textAlign = 'center'; ctx.fillStyle = (r.p.level || 1) >= 5 ? 'rgba(160,90,10,0.8)' : 'rgba(0,0,0,0.55)';
+        const w = ctx.measureText(label).width + 10;
         ctx.fillRect(Math.round(r.x - w / 2), Math.round(r.y - 40), w, 14);
-        ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(r.p.name, r.x, r.y - 33); ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(label, r.x, r.y - 33); ctx.textBaseline = 'alphabetic';
+        if (r.exp) {   // 쓰다듬기 경험치
+          ctx.globalAlpha = Math.min(1, r.exp.t * 2); ctx.font = `bold 11px ${FONT}`; ctx.fillStyle = '#e8894a';
+          ctx.fillText(`+${r.exp.n} EXP`, r.x, r.y - 46 - (1.2 - r.exp.t) * 14); ctx.globalAlpha = 1;
+        }
+        if (r.say) {   // 말풍선
+          ctx.font = `12px ${FONT}`;
+          const tw = Math.min(170, ctx.measureText(r.say.text).width) + 14, th = 20;
+          const bx = Math.round(clamp(r.x - tw / 2, 2, H.RW - tw - 2)), by = Math.round(r.y - 68);
+          ctx.globalAlpha = Math.min(1, r.say.t * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.96)'; ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.roundRect(bx, by, tw, th, 8); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(r.x - 4, by + th); ctx.lineTo(r.x, by + th + 5); ctx.lineTo(r.x + 4, by + th); ctx.fill();
+          ctx.fillStyle = '#26222b'; ctx.textBaseline = 'middle'; ctx.fillText(r.say.text, bx + tw / 2, by + th / 2 + 0.5, tw - 8); ctx.textBaseline = 'alphabetic';
+          ctx.globalAlpha = 1;
+        }
       } });
     }
   }
@@ -928,6 +977,8 @@
     for (const [id, r] of roomPets) {
       if (Math.abs(p.x - r.x) < 22 && p.y < r.y + 4 && p.y > r.y - 46) {
         r.heart = 1.2; r.hop = 8;
+        const line = petLine(r);   // 5레벨이면 주인 이름 부르며 인사, 배고프면 배고파
+        if (line) { r.say = { text: line, t: 3.5 }; r.sayT = rand(35, 75); }
         if ((U()?.pets || []).some((x) => x.id === id)) srv({ type: 'pet-pat', id });
         return true;
       }
@@ -1147,7 +1198,8 @@
     } else if (r.reason === 'fish-gift-sent') H.toast(`🎁 ${r.to}님에게 ${eul(F[r.code]?.name || '물고기')} 선물했어요`);
     else if (r.reason === 'trade-done') H.toast(`🔄 교환 완료! #${r.got} ${iga(F[r.got]?.name || '물고기')} 들어왔어요`, true);
     else if (r.reason === 'trade-sent') H.toast('🔄 교환을 신청했어요');
-    else if (r.reason === 'pet-feed') { H.toast(r.levelUp ? `⭐ 펫이 레벨 ${r.levelUp}이 됐어요!` : r.liked ? '💗 좋아하는 먹이라 엄청 기뻐해요!' : '냠냠 😋'); const rp = roomPets.get(r.pet); if (rp) rp.heart = 1.2; }
+    else if (r.reason === 'pet-feed') { H.toast(r.levelUp ? `⭐ ${r.name || '펫'}이(가) Lv.${r.levelUp}이 됐어요!${r.levelUp >= 5 ? ' 이제 말을 해요!' : ''}` : r.liked ? '💗 좋아하는 먹이라 엄청 기뻐해요!' : '냠냠 😋'); const rp = roomPets.get(r.pet); if (rp) { rp.heart = 1.2; rp.say = null; rp.sayT = 0.5; } }
+    else if (r.reason === 'pet-pat') { const rp = roomPets.get(r.pet); if (rp) rp.exp = { n: r.exp, t: 1.2 }; if (r.levelUp) H.toast(`⭐ ${r.name || '펫'}이(가) Lv.${r.levelUp}이 됐어요!${r.levelUp >= 5 ? ' 이제 말을 해요!' : ''}`); }
     else if (r.reason === 'tank-feed') { H.toast('🫙 물고기들이 밥을 먹어요'); viewer.fed = Date.now(); }
     else if (r.reason === 'online-max') H.toast(`오늘 접속 코인 🪙${c.limits.onlinePerDay}을 다 받았어요. 내일 또 쌓여요!`);
     else if (r.reason === 'fish-gift' || r.reason === 'admin') { /* 알림은 따로 떠요 */ }

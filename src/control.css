@@ -12,7 +12,7 @@
 }
 /* 다크 모드: 시스템 설정을 따르거나(기본), 앱에서 직접 고를 수 있음 */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme]) {
     --bg: #1c1a20; --card: #26232b; --ink: #efeaf2; --muted: #9b94a3;
     --line: #36323d; --input: #1f1d24; --accent: #f09a5c;
     color-scheme: dark;
@@ -119,3 +119,30 @@ button { font: inherit; cursor: pointer; border-radius: 8px; }
 .skin-slot.optional { border-style: dotted; }
 .skin-slot small { color: var(--muted, #888); font-weight: normal; }
 .link-btn { background: none; border: 0; padding: 0; font-size: 11px; color: var(--accent, #e07a3a); cursor: pointer; text-decoration: underline; }
+
+/* 🌈 오로라 모드: 파스텔 색이 천천히 어우러지는 배경 + 살짝 비치는 카드 */
+:root[data-theme="aurora"] {
+  --bg: #f7f3fb; --card: rgba(255,255,255,.74); --ink: #2b2540; --muted: #7c7290;
+  --line: rgba(120,100,160,.2); --input: rgba(255,255,255,.62); --accent: #a77be0;
+  --a1: #ffd1e8; --a2: #cfc4ff; --a3: #bff0e0; --a4: #cde7ff;
+  color-scheme: light;
+}
+:root[data-aurora="1"] body { background: var(--bg); }
+:root[data-aurora="1"] body::before {
+  content: ''; position: fixed; inset: -20%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(40% 45% at 15% 20%, var(--a1) 0, transparent 70%),
+    radial-gradient(45% 40% at 85% 15%, var(--a2) 0, transparent 70%),
+    radial-gradient(50% 45% at 70% 85%, var(--a3) 0, transparent 70%),
+    radial-gradient(40% 40% at 20% 85%, var(--a4) 0, transparent 70%);
+  filter: blur(30px) saturate(1.1);
+  animation: aurora-drift 22s ease-in-out infinite alternate;
+}
+@keyframes aurora-drift {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate(3%, -2%) rotate(6deg) scale(1.05); }
+  100% { transform: translate(-3%, 2%) rotate(-5deg) scale(1.02); }
+}
+@media (prefers-reduced-motion: reduce) { :root[data-aurora="1"] body::before { animation: none; } }
+:root[data-aurora="1"] .card, :root[data-aurora="1"] .modal-card, :root[data-aurora="1"] .notice-card,
+:root[data-aurora="1"] .music-card { backdrop-filter: blur(10px); }

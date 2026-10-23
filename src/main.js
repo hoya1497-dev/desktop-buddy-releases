@@ -39,7 +39,9 @@ const DEFAULT_CONFIG = {
   hideOthers: false,
   petScale: 3,
   species: 'cat',
-  theme: 'system',   // 'system' | 'light' | 'dark'
+  theme: 'system',   // 'system' | 'light' | 'dark' | 'aurora' | 'custom'
+  // 사용자 지정 색: 배경 · 카드 · 글자 · 강조색, 오로라(파스텔 그라데이션)를 켜면 그 3가지 색으로
+  themeCustom: { bg: '#f6f3ee', card: '#ffffff', ink: '#26222b', accent: '#e8894a', aurora: false, a1: '#ffd1e8', a2: '#cfc4ff', a3: '#bff0e0' },
   autoStart: true,
   showPetsDesktop: true,   // 꺼내 둔 펫이 바탕화면에서도 캐릭터를 따라다님
   showAllPets: false,      // 친구들 펫 전부 보기 (꺼내 두지 않은 펫까지)
@@ -48,6 +50,7 @@ const DEFAULT_CONFIG = {
   timerPin: false,         // 화면에 타이머 고정
   timerSound: true,        // 타이머가 끝나면 삐비빅 소리
   miniPin: true,           // 집 창을 닫으면 미니맵으로 보이기 (기본 켜짐)
+  stickyPin: false,        // 🗒 메모장(메모 · 할 일 · 체크리스트 · 다이어리)을 화면에 띄우기
   timerBounds: null, miniBounds: null,
   statusRules: [
     'steam = 🎮 게임중', 'league = 🎮 게임중', 'valorant = 🎮 게임중', 'minecraft = 🎮 게임중',
@@ -127,7 +130,7 @@ function serverSafety(url) {
 
 // ---------------------------------------------------------------- 창
 let overlay = null, control = null, home = null, login = null, tray = null;
-let mini = null, timerWin = null;   // 미니맵 · 화면 고정 타이머
+let mini = null, timerWin = null, stickyWin = null;   // 미니맵 · 화면 고정 타이머 · 붙이는 메모
 let quitting = false;
 
 function secure(win) {
@@ -240,6 +243,7 @@ function updateTray() {
     { label: '캐릭터 불러오기', click: () => overlay?.webContents.send('summon') },
     { label: '⏱️ 타이머 화면에 고정', type: 'checkbox', checked: !!config.timerPin, click: (i) => setPin('timer', i.checked) },
     { label: '🗺️ 미니맵 (집 창 닫으면 작게 보기)', type: 'checkbox', checked: !!config.miniPin, click: (i) => setPin('mini', i.checked) },
+    { label: '🗒 메모장 화면에 띄우기', type: 'checkbox', checked: !!config.stickyPin, click: (i) => setPin('sticky', i.checked) },
     { label: '설정', click: () => showControl() },
     { type: 'separator' },
     ...(updateState.state === 'ready'
@@ -317,7 +321,7 @@ function selfProfile() {
     username: session?.user.username || '', hungry: !!pet && pet.full < 30, sad: !!pet && pet.mood < 25,
     skin: session?.user.skin?.v ? session.user.skin : null,
     acc: session?.user.acc?.eq || {},
-    pets: (session?.user.pets || []).filter((x) => x.out).map((x) => ({ id: x.id, kind: x.kind, name: x.name })),
+    pets: (session?.user.pets || []).filter((x) => x.out).map((x) => ({ id: x.id, kind: x.kind, name: x.name, level: x.level, hungry: x.full < 30 })),
   };
 }
 function publicConfig() {
@@ -564,6 +568,8 @@ function handleServer(m, sock) {
       home?.webContents.send('srv', m);
       break;
     case 'board':
+    case 'board-upd':
+    case 'board-style':
     case 'board-item':
     case 'board-del':
     case 'board-clear':
@@ -742,6 +748,8 @@ function sendEmote(kind, target = null) {
 // ---------------------------------------------------------------- 캐릭터 우클릭 메뉴
 const EMOTES = [['wave', '👋 손 흔들기'], ['heart', '💖 하트'], ['cheer', '🎉 응원'], ['zzz', '💤 졸려요']];
 const POSES = ['auto', 'stand', 'sit', 'lie'];
+const THEME_MODES = ['system', 'light', 'dark', 'aurora', 'custom'];
+const themePayload = () => ({ mode: THEME_MODES.includes(config.theme) ? config.theme : 'system', custom: { ...DEFAULT_CONFIG.themeCustom, ...(config.themeCustom || {}) } });
 function setPose(v) {
   if (!POSES.includes(v)) return;
   config.pose = v; saveConfig();
@@ -826,7 +834,7 @@ function timerView() {
       // minutes · stepName: 지금 단계 기준 (화면 고정 타이머가 진행 막대를 그릴 때 씀)
       return { ...t, steps: t.steps.map((s) => ({ ...s })), minutes: cur.minutes, stepName: cur.name, stepCount: t.steps.length };
     }),
-    pin: !!config.timerPin, miniPin: !!config.miniPin, sound: config.timerSound !== false, now: Date.now(),
+    pin: !!config.timerPin, miniPin: !!config.miniPin, stickyPin: !!config.stickyPin, sound: config.timerSound !== false, now: Date.now(),
   };
 }
 function pushTimers() {
@@ -931,8 +939,11 @@ function tickTimers() {
 }
 
 // ---------------------------------------------------------------- 화면 위 작은 창 (타이머 · 미니맵)
+function loadStickies() {
+  try { return JSON.parse(fs.readFileSync(userFile('stickies.json'), 'utf8')); } catch { return null; }
+}
 function setPin(which, on) {
-  if (which === 'timer') config.timerPin = on; else config.miniPin = on;
+  if (which === 'timer') config.timerPin = on; else if (which === 'sticky') config.stickyPin = on; else config.miniPin = on;
   saveConfig(); updateWidgets(); pushTimers(); updateTray();
 }
 function widgetWindow(file, opts, boundsKey, query) {
@@ -966,6 +977,14 @@ function updateWidgets() {
     } else if (!timerWin.isVisible() && !timerWin.webContents.isLoading()) timerWin.showInactive();
   } else if (timerWin && !timerWin.isDestroyed() && timerWin.isVisible()) timerWin.hide();
 
+  // 🗒 메모장: 켜 두면 항상 (로그인 안 해도 돼요)
+  if (config.stickyPin) {
+    if (!stickyWin || stickyWin.isDestroyed()) {
+      stickyWin = widgetWindow('sticky.html', { width: 310, height: 420, y: 420, resizable: true, minWidth: 230, minHeight: 220, title: 'Desktop Buddy 메모장' }, 'stickyBounds');
+      stickyWin.webContents.on('did-finish-load', () => stickyWin.showInactive());
+    } else if (!stickyWin.isVisible() && !stickyWin.webContents.isLoading()) stickyWin.showInactive();
+  } else if (stickyWin && !stickyWin.isDestroyed() && stickyWin.isVisible()) stickyWin.hide();
+
   // 미니맵: 고정을 켰고, 로그인했고, 집 창이 안 보일 때만
   const wantMini = !!(config.miniPin && session && !homeShowing());
   if (wantMini) {
@@ -997,6 +1016,15 @@ function registerIpc() {
   ipcMain.on('timer-cmd', (_e, d) => timerCmd(d));
   ipcMain.on('timer-pin', (_e, on) => setPin('timer', !!on));
   ipcMain.on('mini-pin', (_e, on) => setPin('mini', !!on));
+  // 🗒 메모장: 이 컴퓨터에만 저장 (stickies.json)
+  ipcMain.on('sticky-pin', (_e, on) => setPin('sticky', !!on));
+  ipcMain.handle('sticky-get', () => loadStickies());
+  ipcMain.on('sticky-save', (e, data) => {
+    const json = JSON.stringify(data || {});
+    if (json.length > 400_000) return;
+    try { fs.writeFileSync(userFile('stickies.json'), json); } catch {}
+    for (const w of [stickyWin, home]) if (w && !w.isDestroyed() && w.webContents !== e.sender) w.webContents.send('sticky-data', data);
+  });
   ipcMain.on('timer-sound', (_e, on) => { config.timerSound = !!on; saveConfig(); pushTimers(); });
   ipcMain.on('timer-test', () => overlay?.webContents.send('alarm', { kind: 'done' }));
   ipcMain.on('widget-size', (e, d) => {
@@ -1009,6 +1037,7 @@ function registerIpc() {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (win === timerWin) setPin('timer', false);
     if (win === mini) setPin('mini', false);
+    if (win === stickyWin) setPin('sticky', false);
   });
   ipcMain.on('open-control', () => showHome());
   ipcMain.on('poke', (_e, { target }) => sendEmote('poke', target));
@@ -1079,19 +1108,19 @@ function registerIpc() {
     overlay.setFocusable(!!on);
     if (on) overlay.focus(); else overlay.blur();
   });
-  ipcMain.handle('get-theme', () => config.theme);
+  ipcMain.handle('get-theme', () => themePayload());
   ipcMain.handle('yt-info', (_e, vid) => ytInfo(vid));
   // 게임 기능 요청은 정해진 종류만 서버로 전달
   const SRV_TYPES = new Set(['checkin', 'acc-equip', 'buy', 'feed', 'pet-out', 'pet-rename', 'pet-pat',
     'fish-cast', 'fish-reel', 'fish-sell', 'fish-gift', 'fish-view', 'trade-offer', 'trade-answer', 'trade-cancel',
     'tank-put', 'tank-take', 'tank-feed', 'aqua-put', 'aqua-take', 'aqua-view', 'block', 'unblock', 'password-change', 'username-change',
     'fish-here', 'share-snack', 'mg-invite', 'mg-answer', 'mg-move', 'mg-quit', 'rod-equip', 'pet-sell', 'pet-private',
-    'board-get', 'board-add', 'board-del', 'board-clear', 'dm-send', 'dm-get', 'dm-read', 'notices-get', 'notice-post', 'notice-edit', 'notice-del', 'invite',
-    'music-get', 'music-add', 'music-request', 'music-answer', 'music-skip', 'music-remove', 'music-duration', 'music-error']);
+    'board-get', 'board-add', 'board-del', 'board-clear', 'board-edit', 'board-style', 'dm-send', 'dm-get', 'dm-read', 'notices-get', 'notice-post', 'notice-edit', 'notice-del', 'invite',
+    'home-expand', 'music-get', 'music-add', 'music-request', 'music-answer', 'music-skip', 'music-remove', 'music-duration', 'music-error']);
   ipcMain.on('srv', (_e, m) => {
     if (!m || typeof m !== 'object' || !SRV_TYPES.has(m.type)) return;
     const json = JSON.stringify(m);
-    if (json.length > (m.type === 'board-add' ? 60_000 : /^notice-(post|edit)$/.test(m.type) ? 16_000 : 4000)) return;   // 화이트보드 그림만 크게 허용
+    if (json.length > (m.type === 'board-add' || m.type === 'board-edit' ? 90_000 : /^notice-(post|edit)$/.test(m.type) ? 16_000 : 4000)) return;   // 화이트보드 그림만 크게 허용
     wsSend(JSON.parse(json));
   });
   ipcMain.handle('get-update', () => ({ ...updateState, current: app.getVersion() }));
@@ -1099,9 +1128,17 @@ function registerIpc() {
   ipcMain.on('update-open', () => updater.openDownload());
   ipcMain.on('update-check', () => updater.check());
   ipcMain.on('set-theme', (_e, t) => {
-    if (!['system', 'light', 'dark'].includes(t)) return;
-    config.theme = t; saveConfig();
-    for (const w of [home, control, login, mini, timerWin]) if (w && !w.isDestroyed()) w.webContents.send('theme', t);
+    const mode = typeof t === 'string' ? t : t && t.mode;
+    if (!THEME_MODES.includes(mode)) return;
+    config.theme = mode;
+    if (t && typeof t === 'object' && t.custom) {
+      const hex = (v, d) => (/^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : d);
+      const c = t.custom, d = DEFAULT_CONFIG.themeCustom;
+      config.themeCustom = { bg: hex(c.bg, d.bg), card: hex(c.card, d.card), ink: hex(c.ink, d.ink), accent: hex(c.accent, d.accent), aurora: !!c.aurora, a1: hex(c.a1, d.a1), a2: hex(c.a2, d.a2), a3: hex(c.a3, d.a3) };
+    }
+    saveConfig();
+    const p = themePayload();
+    for (const w of [home, control, login, mini, timerWin, stickyWin]) if (w && !w.isDestroyed()) w.webContents.send('theme', p);
   });
   ipcMain.on('feed', (_e, food) => wsSend({ type: 'feed', food: String(food) }));
   ipcMain.on('pat', () => wsSend({ type: 'pat' }));

@@ -15,14 +15,14 @@ const SEND = [
   'skin-set', 'light', 'gift', 'overlay-focus', 'set-theme',
   'update-install', 'update-open', 'update-check', 'srv',
   // 캐릭터 메뉴 · 타이머 · 미니맵
-  'char-menu', 'open-home', 'timer-cmd', 'timer-pin', 'mini-pin', 'widget-size', 'widget-close', 'timer-sound', 'timer-test', 'fishing-view',
+  'char-menu', 'open-home', 'timer-cmd', 'timer-pin', 'mini-pin', 'sticky-pin', 'sticky-save', 'widget-size', 'widget-close', 'timer-sound', 'timer-test', 'fishing-view',
 ];
-const INVOKE = ['get-state', 'list-windows', 'get-chat', 'get-skins', 'get-theme', 'get-update', 'get-timers', 'yt-info'];
+const INVOKE = ['get-state', 'list-windows', 'get-chat', 'get-skins', 'get-theme', 'get-update', 'get-timers', 'yt-info', 'sticky-get'];
 const ON = [
   'init', 'config', 'self', 'windows', 'peers', 'chat', 'emote', 'summon',
   'login-state', 'login-error', 'account',
   'home-state', 'reward', 'toast', 'focus-chat', 'skins', 'skin-saved', 'theme', 'update', 'srv',
-  'timers', 'snack', 'alarm', 'open-dm',
+  'timers', 'snack', 'alarm', 'open-dm', 'sticky-data',
 ];
 
 contextBridge.exposeInMainWorld('buddy', {
