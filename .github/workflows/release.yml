@@ -3,16 +3,16 @@
 # GitHub가 Windows(.exe)와 Mac(.dmg)을 직접 만들어서 Releases에 새 버전으로 올려 줘요.
 # (같은 버전이 이미 올라가 있으면 아무것도 안 해요)
 name: 앱 빌드 & 배포
-
+ 
 on:
   push:
     branches: [main, master]
     paths: ['package.json']
   workflow_dispatch: # Actions 탭에서 "Run workflow" 로 직접 실행
-
+ 
 permissions:
   contents: write
-
+ 
 jobs:
   check:
     name: 새 버전인지 확인
@@ -35,7 +35,7 @@ jobs:
             echo "v$VER 을(를) 새로 만들어요."
             echo "build=true" >> "$GITHUB_OUTPUT"
           fi
-
+ 
   build:
     name: 빌드 (${{ matrix.name }})
     needs: check
@@ -71,10 +71,12 @@ jobs:
             dist/*.dmg
             dist/*.zip
             dist/latest*.yml
-
+ 
   release:
     name: Releases에 올리기
     needs: [check, build]
+    # 맥 빌드가 GitHub 사정으로 실패해도 Windows 업데이트는 먼저 올라가게 (나중에 맥만 다시 돌리면 같은 릴리스에 추가돼요)
+    if: ${{ !cancelled() && needs.check.outputs.build == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -88,10 +90,15 @@ jobs:
           name: ${{ needs.check.outputs.version }}
           make_latest: 'true'
           body: |
-            ## 다운로드
-            - **Windows**: `DesktopBuddy-Setup-${{ needs.check.outputs.version }}.exe`
-            - **Mac (M1·M2·M3·M4 칩)**: `DesktopBuddy-${{ needs.check.outputs.version }}-arm64.dmg`
-            - **Mac (인텔 칩)**: `DesktopBuddy-${{ needs.check.outputs.version }}-x64.dmg`
-
+            ## 👇 여기서 내 컴퓨터에 맞는 것 하나만 누르세요
+            - 🪟 **Windows** → [DesktopBuddy-Setup-${{ needs.check.outputs.version }}.exe 받기](https://github.com/${{ github.repository }}/releases/download/v${{ needs.check.outputs.version }}/DesktopBuddy-Setup-${{ needs.check.outputs.version }}.exe)
+            - 🍎 **Mac (M1·M2·M3·M4 칩, 요즘 맥)** → [DesktopBuddy-${{ needs.check.outputs.version }}-arm64.dmg 받기](https://github.com/${{ github.repository }}/releases/download/v${{ needs.check.outputs.version }}/DesktopBuddy-${{ needs.check.outputs.version }}-arm64.dmg)
+            - 🍎 **Mac (인텔 칩)** → [DesktopBuddy-${{ needs.check.outputs.version }}-x64.dmg 받기](https://github.com/${{ github.repository }}/releases/download/v${{ needs.check.outputs.version }}/DesktopBuddy-${{ needs.check.outputs.version }}-x64.dmg)
+ 
+            맥 칩 확인: 왼쪽 위 사과 메뉴 → 이 Mac에 관하여 → "칩: Apple M…"이면 위쪽, "Intel"이면 아래쪽.
+ 
+            ⚠️ 아래 Assets 목록의 `.yml`, `.blockmap`, `.zip` 파일은 자동 업데이트용이라 받을 필요 없어요.
+ 
             이미 설치한 Windows 사용자는 앱이 알아서 업데이트해요.
           files: out/*
+ 
