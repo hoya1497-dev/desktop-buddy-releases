@@ -61,6 +61,7 @@ aside { width: 330px; border-left: 1px solid var(--line); display: flex; flex-di
 .pane.active { display: flex; }
 #pane-chat #chatLog { flex: 1; overflow-y: auto; background: var(--input); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; min-height: 0; }
 .msg small { color: var(--muted); font-size: 10px; margin-right: 6px; }
+.msg-time { color: var(--muted); font-size: 10px; margin-left: 6px; white-space: nowrap; opacity: .8; }
 h3 { font-size: 13px; margin: 12px 0 6px; }
 .shop { list-style: none; padding: 0; margin: 0; }
 .shop li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
@@ -120,6 +121,8 @@ h3 { font-size: 13px; margin: 12px 0 6px; }
 .catch-card { text-align: center; }
 .catch-card canvas { width: 240px; height: 130px; image-rendering: pixelated; display: block; margin: 8px auto; }
 .catch-card h2 { margin: 4px 0; font-size: 20px; }
+.rod-row { gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.rod-row select { flex: 1; min-width: 140px; }
 .fish-scene { width: 100%; aspect-ratio: 300 / 190; border-radius: 10px; image-rendering: pixelated; display: block; }
 .fish-ctl { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .fish-ctl .primary { min-width: 110px; }
@@ -199,7 +202,7 @@ aside .pane { min-width: 300px; }
 .pet-stats { margin-left: 8px; }
 
 /* ---------------- 패널 탭: 글자까지 보이게 두 줄 */
-.tabs { display: grid; grid-template-columns: repeat(4, 1fr); }
+.tabs { display: grid; grid-template-columns: repeat(5, 1fr); }
 .tabs button { padding: 8px 2px; font-size: 12px; white-space: nowrap; }
 .stats { flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .stats button { white-space: nowrap; }
@@ -264,3 +267,30 @@ body.fishing-mode #leaveFishBtn { display: inline-block; }
 body.fishing-mode #deskBtn, body.fishing-mode #decoBtn, body.fishing-mode #lightBtn { display: none; }
 #castBtn.bite { animation: bitePulse .35s infinite alternate; background: var(--danger); border-color: var(--danger); color: #fff; }
 @keyframes bitePulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+
+/* ---------------- 화이트보드 (흔적 남기기) */
+.board-card { width: min(980px, 97%); }
+.board-tools { flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 8px; }
+.board-tools .subtabs { margin: 0; }
+.swatches { display: inline-flex; gap: 4px; }
+.swatches button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); padding: 0; cursor: pointer; }
+.swatches button.sel { border-color: var(--ink); transform: scale(1.12); }
+.board-area { position: relative; width: 100%; aspect-ratio: 800 / 500; border-radius: 12px; overflow: hidden; border: 1px solid var(--line);
+  background: #fbfaf6; background-image: radial-gradient(rgba(0,0,0,.06) 1px, transparent 1px); background-size: 18px 18px; }
+:root[data-theme="dark"] .board-area { background-color: #2b2a30; background-image: radial-gradient(rgba(255,255,255,.06) 1px, transparent 1px); }
+#boardItems { position: absolute; inset: 0; }
+#boardDraw { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.board-area.mode-draw #boardDraw { pointer-events: auto; cursor: crosshair; }
+.board-area.mode-note { cursor: copy; }
+.b-item { position: absolute; transform-origin: top left; }
+.b-note { padding: 8px 10px 6px; border-radius: 4px; box-shadow: 0 3px 8px rgba(0,0,0,.18); color: #2a2430; font-size: 14px; line-height: 1.35; max-width: 190px; min-width: 90px; white-space: pre-wrap; word-break: break-word; }
+.b-draw img { display: block; image-rendering: auto; }
+.b-meta { display: block; font-size: 10px; color: rgba(40,30,50,.6); margin-top: 4px; white-space: nowrap; }
+.b-draw .b-meta { color: var(--muted); background: color-mix(in srgb, var(--card) 80%, transparent); border-radius: 4px; padding: 0 4px; display: inline-block; }
+.b-del { position: absolute; top: -9px; right: -9px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: var(--danger); color: #fff; font-size: 11px; cursor: pointer; display: none; padding: 0; }
+.b-item:hover .b-del { display: block; }
+.b-item.new { animation: pop .3s ease-out; }
+.note-input { position: absolute; z-index: 3; background: #fff3a8; border-radius: 4px; box-shadow: 0 4px 14px rgba(0,0,0,.25); padding: 6px; }
+.note-input textarea { width: 180px; border: 0; background: transparent; resize: none; font: 14px inherit; color: #2a2430; outline: none; }
+.board-list li .name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board-list .bthumb { width: 34px; height: 34px; border-radius: 6px; object-fit: contain; background: var(--input); flex: none; display: flex; align-items: center; justify-content: center; font-size: 18px; }

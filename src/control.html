@@ -108,6 +108,15 @@
       </div>
       <button id="logoutBtn" class="danger small">로그아웃</button>
     </div>
+    <div class="card" id="unameCard">
+      <h2>아이디 바꾸기</h2>
+      <p class="note">지금 아이디와 비밀번호만 있으면 바꿀 수 있어요. 코인 · 집 · 친구 · 물고기 · 펫은 그대로예요. 하루에 한 번 바꿀 수 있고, 옛 아이디는 7일 동안 다른 사람이 못 가져가요.</p>
+      <label>지금 아이디 <input id="unCur" maxlength="16" autocomplete="username"></label>
+      <label>비밀번호 <input id="unPw" type="password" maxlength="72" autocomplete="current-password"></label>
+      <label>새 아이디 (한글/영문/숫자/_ 2~16자) <input id="unNew" maxlength="16"></label>
+      <button id="unBtn" class="primary small">아이디 바꾸기</button>
+      <p id="unMsg" class="note"></p>
+    </div>
     <div class="card" id="pwCard">
       <h2>비밀번호 바꾸기</h2>
       <label>지금 비밀번호 <input id="pwCur" type="password" maxlength="72" autocomplete="current-password"></label>

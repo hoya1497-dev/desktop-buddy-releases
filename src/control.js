@@ -238,6 +238,17 @@
     $('pwMsg').textContent = '바꾸는 중…';
     $('pwCur').value = ''; $('pwNew').value = ''; $('pwNew2').value = '';
   };
+  $('unBtn').onclick = () => {
+    const current = $('unCur').value.trim(), password = $('unPw').value, next = $('unNew').value.trim();
+    if (!state.account) { $('unMsg').textContent = '로그인해야 바꿀 수 있어요.'; return; }
+    if (!current || !password || !next) { $('unMsg').textContent = '세 칸을 모두 채워 주세요.'; return; }
+    if (!/^[A-Za-z0-9_가-힣]{2,16}$/.test(next)) { $('unMsg').textContent = '새 아이디는 한글/영문/숫자/_ 2~16자예요.'; return; }
+    if (current.toLowerCase() !== state.account.username.toLowerCase()) { $('unMsg').textContent = '지금 아이디가 맞지 않아요.'; return; }
+    if (!confirm(`아이디를 @${current} → @${next}(으)로 바꿀까요?`)) return;
+    buddy.send('srv', { type: 'username-change', current, password, next });
+    $('unMsg').textContent = '바꾸는 중…';
+    $('unPw').value = '';
+  };
   function renderBlocked(list) {
     const ul = $('blockedList'); ul.textContent = '';
     if (!list || !list.length) { const li = document.createElement('li'); li.className = 'note'; li.textContent = '차단한 사람이 없어요.'; ul.append(li); return; }
@@ -253,6 +264,7 @@
   renderBlocked(state.blocked);
   buddy.on('srv', (m) => {
     if (m.type === 'password-result') $('pwMsg').textContent = m.message;
+    if (m.type === 'username-result') { $('unMsg').textContent = (m.ok ? '✅ ' : '') + m.message; if (m.ok) { $('unCur').value = ''; $('unNew').value = ''; } }
     if (m.type === 'friends') renderBlocked(m.blocked);
   });
 

@@ -407,11 +407,232 @@ window.Furniture = (() => {
   ART.tree = treeArt();
   ART.curtainWindow = ART.window.map((row, i, all) => (i === all.length - 1 ? '..' + row + '..' : 'pp' + row + 'pp'));
 
+  const GLOW_EXTRA = {};
+  // ---------------------------------------------------------------- 새 가구 (0.8)
+  // 침대 3종: 하늘색 · 공주(캐노피) · 이층
+  ART.bedBlue = ART.bed.map((r) => r.replace(/p/g, 'b').replace(/P/g, 'B').replace(/w/g, 'S'));
+  ART.bedCanopy = [
+    'oooooooooooooooooooooooo',
+    'oPpPpPpPpPpPpPpPpPpPpPpo',
+    'oppppoo..........oopppo.',
+    'opppo..............oppo.',
+    'oppo................owo.',
+    'owwo................owo.',
+    ...ART.bed.slice(2).map((r) => r.replace(/x/g, 'a')),
+  ];
+  ART.bedBunk = [
+    'oo....................oo',
+    'oNo..................oNo',
+    'oNoooooooooooooooooooooNo'.slice(0, 24),
+    'oNxxxxxobbbbbbbbbbbbbbNo',
+    'oNoooooobBbBbBbBbBbBbBNo',
+    'oNwwwwwwwwwwwwwwwwwwwwNo',
+    'oNo..............oNNNoNo',
+    'oNo..............oN.NoNo',
+    'oNo..............oNNNoNo',
+    'oNo..............oN.NoNo',
+    'oNoooooooooooooooooooooNo'.slice(0, 24),
+    'oNxxxxxorrrrrrrrrrrrrrNo',
+    'oNoooooorRrRrRrRrRrRrRNo',
+    'oNwwwwwwwwwwwwwwwwwwwwNo',
+    'oo....................oo',
+  ];
+  ART.desk = [
+    '..ooo..........oooo.....',
+    '..oro..........obbo.oyo.',
+    '..oro..........obbo.oyo.',
+    'oooooooooooooooooooooooo',
+    'olllllllllllllllllllllllo'.slice(0, 24),
+    'oooooooooooooooooooooooo',
+    'owwwwwwo..........owwwwo',
+    'owoyyowo..........owwwwo',
+    'owwwwwwo..........owwwwo',
+    'owoyyowo..........owwwwo',
+    'owwwwwwo..........owwwwo',
+    'oooooooo..........oooooo',
+  ];
+  ART.wardrobe = [
+    'oooooooooooooooo',
+    'oWWWWWWWWWWWWWWo',
+    'owwwwwwoowwwwwwo',
+    'owlllllooolllllwo'.slice(0, 16),
+    'owlllllooolllllo',
+    'owllllyooyllllwo',
+    'owlllllooolllllo',
+    'owlllllooolllllo',
+    'owlllllooolllllo',
+    'owlllllooolllllo',
+    'owlllllooolllllo',
+    'owwwwwwoowwwwwwo',
+    'owwwwwwwwwwwwwwo',
+    'oyywwwwwwwwwwyyo',
+    'oooooooooooooooo',
+    '.oo..........oo.',
+  ];
+  ART.fridge = [
+    'oooooooooooo',
+    'oSSSSSSSSSSo',
+    'oxxxxxxxxxso',
+    'oxxxxxxxxxso',
+    'oxxxxxxxxksko'.slice(0, 12),
+    'oxxxxxxxxxso',
+    'oooooooooooo',
+    'oxxxxxxxxxso',
+    'oxxxxxxxxkso',
+    'oxxxxxxxxkso',
+    'oxxxxxxxxxso',
+    'oxxxxxxxxxso',
+    'oxxxxxxxxxso',
+    'oxxxxxxxxxso',
+    'oSSSSSSSSSSo',
+    'oooooooooooo',
+  ];
+  ART.arcade = [
+    '.oooooooooooo.',
+    '.oVVVVVVVVVVo.',
+    '.ovyrvbvgvyvo.',
+    'ooooooooooooooo'.slice(0, 14),
+    'okkkkkkkkkkkko',
+    'okttttttttttko',
+    'oktxtttttgttko',
+    'okttttgttttTko',
+    'oktttttttrttko',
+    'okkkkkkkkkkkko',
+    'ooooooooooooooo'.slice(0, 14),
+    'oVVVVVVVVVVVVo',
+    'oVkVVrVVbVVVVo',
+    'oVVVVVVVVVVVVo',
+    'ovvvvvvvvvvvvo',
+    'ovvvvvvvvvvvvo',
+    'ovvvvvvvvvvvvo',
+    'oooooooooooooo',
+  ];
+  ART.beanbag = [
+    '.....oooooo.....',
+    '...oommmmmmoo...',
+    '..ommmmmmmmmmo..',
+    '.ommmmmmmmmmmmo.',
+    '.ommqqqqqqqqmmo.',
+    'ommqqqqqqqqqqmmo',
+    'ommmqqqqqqqqmmmo',
+    'oqmmmmmmmmmmmmqo',
+    'oqqqmmmmmmmmqqqo',
+    '.oqqqqqqqqqqqqo.',
+    '..oooooooooooo..',
+  ];
+  ART.globe = [
+    '....oooo....',
+    '..oobbggoo..',
+    '.obbggggbbo.',
+    'obbbbgggbbbo',
+    'obggbbbbbbbo',
+    'obgggbbbggbo',
+    'obbggbbbgggo',
+    '.obbbbbbbgo.',
+    '..oobbbboo..',
+    '....oYYo....',
+    '.....oYo....',
+    '...oooooo...',
+    '...oYYYYo...',
+    '...oooooo...',
+  ];
+  ART.speaker = [
+    'oooooooooo',
+    'okkkkkkkko',
+    'okkssssskko'.slice(0, 10),
+    'oksskkssko',
+    'oksskkssko',
+    'okkssssskko'.slice(0, 10),
+    'okkkkkkkko',
+    'okkkSSkkko',
+    'okkSkkSkko',
+    'okSkkkkSko',
+    'okSkkkkSko',
+    'okkSkkSkko',
+    'okkkSSkkko',
+    'okkkkkkkko',
+    'oooooooooo',
+  ];
+  ART.mirror = [
+    '..oooooooo..',
+    '.oyyyyyyyyo.',
+    'oyttttttttyo',
+    'oytxtttttTyo',
+    'oyttxttttTyo',
+    'oytttttttTyo',
+    'oyttttttTTyo',
+    'oytttttTTtyo',
+    'oyttttttttyo',
+    'oyttttttttyo',
+    'oyttttttttyo',
+    '.oyyyyyyyyo.',
+    '..oooooooo..',
+    '....oYYo....',
+    '..oooooooo..',
+  ];
+  ART.cattower = [
+    '..ooooooooo.....',
+    '..ovvvvvvvo.....',
+    '..oVVVVVVVo.....',
+    '....ocAco.......',
+    '....oAcAo.......',
+    '....ocAco.oooooo',
+    '....oAcAo.ovvvvo',
+    '....ocAco.oVVVVo',
+    '....oAcAo...oco.',
+    '....ocAco...oAo.',
+    '....oAcAo...oco.',
+    '....ocAco...oAo.',
+    'oooooooooooooooo',
+    'ovvvvvvvvvvvvvvo',
+    'oVVVVVVVVVVVVVVo',
+    'oooooooooooooooo',
+  ];
+  // 벽에 거는 것
+  ART.poster = [
+    'oooooooooooo',
+    'oxxxxxxxxxxo',
+    'oxbbbbbbbbxo',
+    'oxbbbyybbbxo',
+    'oxbbyyyybbxo',
+    'oxbbbyybbbxo',
+    'oxggggggggxo',
+    'oxgGgggGggxo',
+    'oxxxxxxxxxxo',
+    'oxkkkxkkkkxo',
+    'oxxxxxxxxxxo',
+    'oooooooooooo',
+  ];
+  ART.shelf = [
+    '..ooo.ooo....ooo....',
+    '..oro.obo...oggo....'.slice(0, 20),
+    '..oro.obo..ogGgo....'.slice(0, 20),
+    '..oro.obo..oqqqo....'.slice(0, 20),
+    'oooooooooooooooooooo',
+    'owwwwwwwwwwwwwwwwwwo',
+    'oooooooooooooooooooo',
+    '.oWo............oWo.',
+    '.oo..............oo.',
+  ];
+  ART.neon = [
+    '.ppp....ppp.',
+    'pPPPp..pPPPp',
+    'pPxPPppPPPPp',
+    'pPPPPPPPPPPp',
+    'pPPPPPPPPPPp',
+    '.pPPPPPPPPp.',
+    '..pPPPPPPp..',
+    '...pPPPPp...',
+    '....pPPp....',
+    '.....pp.....',
+  ];
+  Object.assign(GLOW_EXTRA, { arcade: [0.5, 0.4, 20], neon: [0.5, 0.45, 24], fridge: [0.5, 0.3, 6] });
+
   // 어항 속 물이 있는 칸 (물고기가 헤엄치는 범위): [x1, y1, x2, y2]
   const TANK_WATER = { tankS: [2, 3, 11, 6], tankM: [1, 2, 14, 8], tankL: [1, 3, 22, 10] };
 
   // 빛나는 가구 (불 끄면 은은하게 밝혀 줌): [가로 위치 비율, 세로 위치 비율, 반지름(칸)]
-  const GLOW = { lamp: [0.5, 0.12, 30], tv: [0.5, 0.5, 18], tree: [0.5, 0.45, 22], tankS: [0.5, 0.45, 10], tankM: [0.5, 0.45, 14], tankL: [0.5, 0.45, 18], computer: [0.5, 0.25, 14] };
+  const GLOW = { lamp: [0.5, 0.12, 30], tv: [0.5, 0.5, 18], tree: [0.5, 0.45, 22], tankS: [0.5, 0.45, 10], tankM: [0.5, 0.45, 14], tankL: [0.5, 0.45, 18], computer: [0.5, 0.25, 14], ...GLOW_EXTRA };
 
   // ---------------------------------------------------------------- 캐시
   const cache = new Map();

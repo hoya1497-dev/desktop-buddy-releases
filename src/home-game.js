@@ -32,7 +32,7 @@
   // 운영자 전용 액세서리: 가진 것만 서버가 진짜 이름을 알려 줌
   const C = () => {
     const c = H.catalog, names = U()?.secretNames;
-    if (c && names) for (const [id, name] of Object.entries(names)) if (c.accessories[id]) c.accessories[id].name = name;
+    if (c && names) for (const [id, name] of Object.entries(names)) for (const group of [c.accessories, c.pets, c.rods]) if (group && group[id]) group[id].name = name;
     return c;
   };
   const U = () => (H.S && H.S.session ? H.S.session.user : null);
@@ -89,9 +89,24 @@
         ['5개', u.coins < f.price * 5, () => srv({ type: 'buy', item: id, n: 5 }), 'ghost small'],
       ]));
     }
+    // 낚싯대
+    const rodsUl = $('shopRods'); rodsUl.textContent = '';
+    for (const [id, r] of Object.entries(c.rods || {})) {
+      const own = !!(u.rods || {})[id], on = u.rod === id;
+      if (r.secret && !own) { rodsUl.append(row(secretThumb(), '???', `${r.code} · 🔒 운영자 전용 낚싯대 · 살 수 없어요`, [['구매 불가', true, () => {}]])); continue; }
+      const sub = `${r.code} · 전설 1종당 ${r.legend}% · 꽝 ${r.nothing}%` + (own ? '' : r.price ? ` · 🪙 ${r.price.toLocaleString()}` : '');
+      const btns = own ? [[on ? '장착 중' : '장착', on, () => srv({ type: 'rod-equip', id }), on ? 'ghost small' : 'primary small']]
+        : [['사기', u.coins < r.price, () => { if (confirm(`${r.name}을(를) 🪙${r.price.toLocaleString()}에 살까요? 사면 바로 장착돼요.`)) srv({ type: 'buy', item: id }); }]];
+      rodsUl.append(row(rodThumb(r.color), r.name, sub, btns));
+    }
     const pets = $('shopPets'); pets.textContent = '';
     const full = u.pets.length >= c.limits.petsMax;
     for (const [id, p] of Object.entries(c.pets)) {
+      if (p.secret) {   // 운영자 전용 펫
+        const own = u.pets.some((x) => x.kind === id);
+        pets.append(row(own ? PetArt.thumb(id, 34) : secretThumb(), own ? p.name : '???', `${p.code} · ${own ? '✨ 운영자 보상 · 가지고 있음' : '🔒 비밀 펫 · 살 수 없어요'}`, [[own ? '있음' : '구매 불가', true, () => {}]]));
+        continue;
+      }
       const likes = p.likes.map((x) => c.petFoods[x]?.name).join(', ');
       pets.append(row(PetArt.thumb(id, 34), p.name, `${p.code} · 🪙 ${p.price} · 좋아하는 것: ${likes}`, [['데려오기', full || u.coins < p.price, () => srv({ type: 'buy', item: id })]]));
     }
@@ -118,6 +133,28 @@
       walls.append(row(H.wallThumb(id), w.name, sub, buttons));
     }
   }
+  function rodThumb(color) {
+    const cv = el('canvas', { width: 34, height: 34 });
+    const g = cv.getContext('2d');
+    g.lineCap = 'round';
+    g.strokeStyle = '#3b2a25'; g.lineWidth = 5; g.beginPath(); g.moveTo(6, 30); g.lineTo(28, 5); g.stroke();
+    g.strokeStyle = color; g.lineWidth = 3; g.beginPath(); g.moveTo(6, 30); g.lineTo(28, 5); g.stroke();
+    g.fillStyle = '#5c3a26'; g.fillRect(7, 22, 6, 6);                       // 릴
+    g.strokeStyle = 'rgba(80,80,80,.7)'; g.lineWidth = 1; g.beginPath(); g.moveTo(28, 5); g.lineTo(30, 26); g.stroke();
+    g.fillStyle = '#e04a3a'; g.fillRect(28, 25, 4, 3); g.fillStyle = '#fff'; g.fillRect(28, 28, 4, 2);
+    return cv;
+  }
+  function renderRodPick() {
+    const u = U(), c = C();
+    if (!u || !c || !c.rods) return;
+    const sel = $('rodPick');
+    if (document.activeElement === sel) return;
+    sel.textContent = '';
+    for (const [id, r] of Object.entries(c.rods)) if ((u.rods || {})[id]) sel.append(el('option', { value: id, text: `${r.code} ${r.name}`, selected: u.rod === id }));
+    const cur = c.rods[u.rod] || c.rods.rod1;
+    $('rodInfo').textContent = `전설 1종당 ${cur.legend}% · 꽝 ${cur.nothing}% · 상점에서 더 좋은 낚싯대를 살 수 있어요`;
+  }
+  $('rodPick').onchange = (e) => srv({ type: 'rod-equip', id: e.target.value });
   function secretThumb() {
     const c = el('canvas', { width: 34, height: 34 });
     const g = c.getContext('2d');
@@ -403,7 +440,8 @@
     $('dexName').textContent = d ? f.name : '???';
     const badge = $('dexRar'); badge.textContent = r.name; badge.style.background = r.color;
     $('dexCat').textContent = CAT_NAME[f.cat];
-    $('dexChance').textContent = `${f.chance}% (한 번 던질 때)`;
+    const myRod = C().rods?.[U()?.rod];
+    $('dexChance').textContent = myRod && U().rod !== 'rod1' ? `${f.chance}% → 내 낚싯대 ${myRod.chance[f.code]}%` : `${f.chance}% (한 번 던질 때)`;
     $('dexSize').textContent = f.size ? `${f.size[0]}~${f.size[1]}cm` : '-';
     $('dexPrice').textContent = f.cat === 'T' ? `재활용 🪙${f.price}` : `🪙${f.price}`;
     $('dexMine').textContent = d ? `${d.n}마리 잡음${d.best ? ` · 최고 ${d.best}cm` : ''} · 가방에 ${u.fishInv[f.code] || 0}마리` : '아직 못 잡았어요';
@@ -467,7 +505,7 @@
   }
   function onFishPeer(m) {
     const prev = fishPeers.get(m.id) || {};
-    fishPeers.set(m.id, { ...prev, here: m.here !== false, state: m.state || 'idle', kind: m.kind, code: m.code, size: m.size, t: performance.now(), t0: performance.now() });
+    fishPeers.set(m.id, { ...prev, here: m.here !== false, state: m.state || 'idle', kind: m.kind, code: m.code, size: m.size, rod: m.rod || prev.rod, t: performance.now(), t0: performance.now() });
     if (m.state === 'result' && m.kind === 'catch') {
       const p = (H.S?.peers || []).find((x) => x.id === m.id), f = FISH()[m.code];
       if (p && f && !H.isMini && $('pane-fishing').classList.contains('active')) H.toast(`🎣 ${p.nickname}님이 ${f.name}${m.size ? `(${m.size}cm)` : ''}을(를) 낚았어요!`);
@@ -489,7 +527,7 @@
     const b = $('castBtn');
     const u = U();
     b.classList.toggle('bite', fishing.state === 'bite');
-    b.textContent = { idle: '🎣 던지기', result: '🎣 다시 던지기', casting: '던지는 중…', waiting: '당기기', bite: '❗ 지금 당겨!', reeling: '감는 중…' }[fishing.state];
+    b.textContent = { idle: '🎣 던지기', result: '🎣 다시 던지기', casting: '던지는 중…', waiting: '당기기', bite: '❗ 걸렸다! 당기기', reeling: '감는 중…' }[fishing.state];
     b.disabled = fishing.state === 'casting' || fishing.state === 'reeling' || (u && u.castsLeft <= 0 && (fishing.state === 'idle' || fishing.state === 'result'));
     if (u) $('castInfo').textContent = u.castsLeft >= 9999 ? '횟수 제한 없음 🎣' : `오늘 ${u.castsLeft}번 남음`;
   }
@@ -554,9 +592,7 @@
   // 낚시 상태 갱신 (찌가 물렸는지, 너무 늦었는지) — 그리기와 따로 매 프레임
   function updateFishing(dt) {
     if (fishing.state === 'waiting' && performance.now() >= fishing.biteAt) { fishing.state = 'bite'; updateCastBtn(); }
-    if ((fishing.state === 'bite' || fishing.state === 'waiting') && performance.now() > fishing.end + 400) {
-      srv({ type: 'fish-reel' }); fishing.state = 'reeling'; updateCastBtn();
-    }
+    // 입질(!)이 온 뒤에는 물고기가 계속 걸려 있음 — 자동으로 당기지 않고, 늦게 당겨도 안 놓침
     fishing.t += dt;
     if (fishing.msgT > 0) fishing.msgT -= dt;
     fishing.splash = Math.max(0, fishing.splash - dt);
@@ -585,10 +621,13 @@
   function drawFisher(g, i, who, st, t, mini) {
     const x = SLOT_X(i), y = DECK_Y;
     const fs = mini ? 19 : 13;
-    // 낚싯대
+    // 낚싯대 (종류마다 색이 다름)
     const tip = { x: x + 62, y: y - 78 };
-    g.strokeStyle = '#6e452c'; g.lineWidth = 4; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(x + 14, y - 16); g.lineTo(tip.x, tip.y); g.stroke();
+    const rodColor = (C()?.rods?.[who.rod] || {}).color || '#c9a45c';
+    g.lineCap = 'round';
+    g.strokeStyle = '#3b2a25'; g.lineWidth = 6; g.beginPath(); g.moveTo(x + 14, y - 16); g.lineTo(tip.x, tip.y); g.stroke();
+    g.strokeStyle = rodColor; g.lineWidth = 3.5; g.beginPath(); g.moveTo(x + 14, y - 16); g.lineTo(tip.x, tip.y); g.stroke();
+    if (who.rod === 'rod7') { g.fillStyle = `rgba(255,220,120,${0.5 + 0.5 * Math.sin(t * 6)})`; g.fillRect(tip.x - 3, tip.y - 3, 6, 6); }   // 전설의 낚싯대는 반짝
     g.lineCap = 'butt';
     // 찌
     const rest = { x: x + 80, y: 452 + (i % 2) * 26 };
@@ -686,14 +725,14 @@
     const u = U();
     const self = H.S?.self || {};
     const meSt = mini ? { state: 'idle', t: 9 } : { ...fishing, kind: fishing.kind, pop: fishing.pop };
-    drawFisher(g, 0, { mine: true, nickname: u?.nickname || '나', username: u?.username, skin: self.skin, species: u?.species, color: u?.color, acc: u?.acc?.eq }, meSt, t, mini);
+    drawFisher(g, 0, { mine: true, nickname: u?.nickname || '나', username: u?.username, skin: self.skin, species: u?.species, color: u?.color, acc: u?.acc?.eq, rod: u?.rod }, meSt, t, mini);
     const list = fishersHere();
     list.forEach((p, i) => {
       const st = fishPeers.get(p.id) || { state: 'idle' };
       const age = (performance.now() - (st.t0 || st.t || 0)) / 1000;
       const view = { state: st.state === 'waiting' && age > 15 ? 'idle' : st.state, t: age, kind: st.kind, code: st.code,
         pop: st.state === 'result' && st.kind === 'catch' && age < 1.6 ? { code: st.code, t: 1.6 - age } : null };
-      drawFisher(g, i + 1, p, view, t, mini);
+      drawFisher(g, i + 1, { ...p, rod: st.rod || p.rod }, view, t, mini);
     });
     // 내 낚시 결과 · 물보라
     if (!mini && fishing.splash > 0) {
@@ -748,6 +787,12 @@
         acts.append(btn('1층에 꺼내기', 'ghost small', () => srv({ type: 'pet-out', id: p.id, out: true, floor: 1 }), outN >= c.limits.petsOut));
       }
       if (myPetFoods.length) { acts.append(sel); acts.append(btn('밥 주기', 'primary small', () => srv({ type: 'feed', food: sel.value, target: p.id }), p.full >= 98)); }
+      // 되팔기: 산 값의 절반 (운영자 펫은 안 됨)
+      if (kind.secret) acts.append(el('span', { class: 'note-inline', text: '✨ 운영자 펫' }));
+      else if (kind.price) {
+        const back = Math.floor(kind.price / 2);
+        acts.append(btn(`되팔기 🪙${back}`, 'ghost small', () => { if (confirm(`'${p.name}'을(를) 되팔까요?\n산 값의 절반인 🪙${back}을 돌려받고, 펫은 사라져요. (되돌릴 수 없어요)`)) srv({ type: 'pet-sell', id: p.id }); }, false, '산 값의 절반을 돌려받아요'));
+      }
       else acts.append(el('span', { class: 'note-inline', text: '먹이가 없어요 (상점 → 음식)' }));
       // 이름 바꾸기: Electron에선 prompt()가 안 돼서 그 자리에서 입력칸으로 바꿔요
       let nameEl;
@@ -1118,6 +1163,7 @@
     updateCastBtn();
   }
   function renderPanels() {
+    renderRodPick();
     renderShop();
     renderBag();
     renderDex();

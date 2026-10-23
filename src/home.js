@@ -70,6 +70,8 @@
     renderSel();
   }
   const findItem = (id) => layout.find((it) => it.item === id);
+  // 침대 종류(침대 · 하늘색 · 공주 · 이층) 아무거나
+  const findBed = () => layout.find((it) => catalog && catalog.items[it.item] && catalog.items[it.item].bed);
   const itemScale = (id) => (catalog && catalog.items[id] && catalog.items[id].scale) || 4;
 
   // ------------------------------------------------------------ 캐릭터
@@ -122,7 +124,7 @@
       if (this.state === 'desk') return;
       if ((this.t -= dt) <= 0) {
         const r = Math.random();
-        const bed = findItem('bed');
+        const bed = findBed();
         if (r < 0.1 && bed) this.goTo(bed.x, bed.y - 16, () => { this.state = 'sleep'; this.t = rand(8, 16); });
         else if (r < 0.62) {
           const f = Math.random() < 0.7 ? this.floor : (this.floor === 1 ? 2 : 1); // 가끔 다른 층으로
@@ -137,7 +139,7 @@
       if (cb) cb();
     }
     sortY() {
-      if (this.state === 'sleep') { const bed = findItem('bed'); if (bed) return bed.y + 1; }
+      if (this.state === 'sleep') { const bed = findBed(); if (bed) return bed.y + 1; }
       if (this.state === 'climb') return 10000; // 사다리 탈 때는 맨 앞
       return this.y;
     }
@@ -738,14 +740,30 @@
 
   // ------------------------------------------------------------ 채팅
   const log = $('chatLog');
+  // 채팅 시간: 컴퓨터 지역 설정과 상관없이 한국 표준시(KST)로, 오늘이 아니면 날짜도
+  const KST_TIME = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: 'numeric', minute: '2-digit' });
+  const KST_DAY = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' });
+  function kstLabel(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const today = KST_DAY.format(new Date()) === KST_DAY.format(d);
+    const md = Object.fromEntries(KST_DAY.formatToParts(d).map((x) => [x.type, x.value]));
+    return (today ? '' : `${md.month}/${md.day} `) + KST_TIME.format(d);
+  }
+  function timeTag(ts) {
+    const t = document.createElement('time'); t.className = 'msg-time';
+    t.textContent = kstLabel(ts);
+    if (ts) t.title = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'long', timeStyle: 'medium' }).format(new Date(ts)) + ' (한국 시간)';
+    return t;
+  }
   function addMsg(m) {
     const div = document.createElement('div');
-    if (m.system) { div.className = 'msg sys'; div.textContent = m.text; }
+    if (m.system) { div.className = 'msg sys'; div.append(document.createTextNode(m.text), timeTag(m.ts)); }
     else {
       div.className = 'msg';
       const b = document.createElement('b'); b.textContent = m.from; b.style.color = m.color || 'inherit'; b.style.marginRight = '3px';
       const id = document.createElement('small'); id.textContent = m.username ? '@' + m.username : '';
-      div.append(b, id, document.createTextNode(m.text));
+      div.append(b, id, document.createTextNode(m.text), timeTag(m.ts));
     }
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
     log.append(div);
@@ -796,6 +814,7 @@
     else if (r.reason === 'gift-sent') toast(`🎁 ${r.to}님에게 🪙${-r.amount}을 선물했어요`);
     else if (r.reason === 'gift' || r.reason === 'admin') { me?.emote('🎁'); }
     else if (r.reason === 'skin') toast('캐릭터 그림을 바꿨어요!');
+    else if (r.reason === 'pet-sell') toast(`🐾 '${r.name}'을(를) 되팔아서 🪙${r.amount}을 돌려받았어요`, true);
     else if (r.reason === 'snack-sent') toast(`${catalog?.foods[r.food]?.icon || '🍪'} ${r.to}님과 간식을 나눠 먹었어요!`);
     else if (r.reason === 'snack-got') me?.emote('😋');
     else if (r.reason === 'feed' || r.reason === 'levelup') {

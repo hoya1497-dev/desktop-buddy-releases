@@ -135,6 +135,59 @@ window.PetArt = (() => {
     },
   };
 
+  // ---- 운영자 전용 펫 (P09~P11)
+  ART.unicorn = {
+    pal: { o: '#6a5a78', b: '#ffffff', l: '#ece6f4', y: '#f4cf4f', p: '#f6a9bf', v: '#b79be8', c: '#7fd6e8', e: '#1a1a20' },
+    rows: [
+      '.........y..',
+      '........yy..',
+      '.pv....obbo.',
+      'pvcv..obbbbo',
+      '.pvc.obbebbo',
+      '..pvobbbbbbo',
+      '..pobbbbllo.',
+      '.obbbbbbbo..',
+      'obbbbbbbbo..',
+      'obllllllbo..',
+      '.olo..olo...',
+      '.oo...oo....',
+    ],
+  };
+  ART.dragon = {
+    pal: { o: '#2a4a24', g: '#6cbf55', G: '#3f8a3a', y: '#f4e08a', v: '#b79be8', V: '#7d62b8', r: '#e0564f', e: '#1a1a20', x: '#ffffff' },
+    rows: [
+      '..x......x..',
+      '.oGo....oGo.',
+      '.oggoooogggo'.slice(0, 12),
+      '.oggggggggo.',
+      'Vogxegggexgo'.slice(0, 12),
+      'VVogggrrgggo'.slice(0, 12),
+      'VVVogggggo..',
+      'VVoggyyyggo.',
+      '.ogggyyyggo.',
+      '.ogggyyygggo',
+      '..oggoogggo.',
+      '..oo....oo..',
+    ],
+  };
+  ART.phoenix = {
+    pal: { o: '#7a2a1a', r: '#e0463a', m: '#f08a3a', y: '#f4cf4f', Y: '#fff1a0', e: '#1a1a20' },
+    rows: [
+      '...y.y......',
+      '..yoyoy.....',
+      '...orro.....',
+      '..orermo....',
+      '.yorrrmo....',
+      '..ormmmmo...',
+      '.ormyYymmo..',
+      'ormmyYYmmmo.',
+      '.ormmyymmmmo',
+      '..ormmmmmyYo',
+      '...oooroyYy.',
+      '....y.y..y..',
+    ],
+  };
+
   const cache = new Map();
   function bitmap(kind) {
     if (cache.has(kind)) return cache.get(kind);

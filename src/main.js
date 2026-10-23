@@ -321,10 +321,12 @@ let retry = 0, retryTimer = null;
 let netState = 'offline';
 let fishingView = false;   // 집 창에서 낚시터에 있는지 (미니맵에 낚시터를 보여 줌)
 const chatLog = [];
+let clockSkew = 0;   // 서버 시계 - 내 컴퓨터 시계 (채팅 시간을 컴퓨터 시계가 틀려도 정확하게)
+const serverTime = () => Date.now() + clockSkew;
 let friends = { friends: [], incoming: [], outgoing: [] };
 let knocks = [];             // 내 방 문을 두드린 친구들
 const skins = new Map();     // username -> { v, faces, stand, sit, walk }
-const skinWanted = new Set();
+const skinWanted = new Map(); // 'username:v' -> 요청한 시각 (응답이 없으면 10초 뒤 다시 요청)
 
 function wsSend(obj) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj)); }
 function setNet(s) { netState = s; pushHome(); updateTray(); }
@@ -379,6 +381,7 @@ function handleServer(m, sock) {
       if (m.token) { token = m.token; if (remember) saveToken(token); }
       pendingAuth = null;
       session = { user: m.user, catalog: m.catalog };
+      if (typeof m.serverNow === 'number') clockSkew = m.serverNow - Date.now();
       config.nickname = m.user.nickname; config.color = m.user.color; config.species = m.user.species || config.species; saveConfig();
       lastSentProfile = '';
       setNet('online');
@@ -387,6 +390,7 @@ function handleServer(m, sock) {
       // 로그인하면 기본으로 내 집에 있음(친구가 놀러 올 수 있게). 끊겼다 다시 붙으면 있던 방으로.
       wsSend({ type: 'join', code: wantRoom || m.user.code });
       wantRoom = null;
+      skinWanted.clear();
       requestSkin(m.user.username, m.user.skin?.v);
       updateWidgets();
       break;
@@ -410,7 +414,9 @@ function handleServer(m, sock) {
       break;
     case 'me': {
       if (!session) return;
+      const renamed = session.user.username !== m.user.username;
       session.user = m.user;
+      if (renamed) control?.webContents.send('account', { username: m.user.username, code: m.user.code });
       requestSkin(m.user.username, m.user.skin?.v);
       if (m.reward?.reason === 'skin') control?.webContents.send('skin-saved', true);
       if (m.reward) {
@@ -428,6 +434,8 @@ function handleServer(m, sock) {
       myPeerId = m.id;
       room = { code: m.room, owner: m.owner, isOwner: m.isOwner, locked: m.locked, home: m.home };
       peers = new Map(m.peers.map((p) => [p.id, p.profile]));
+      // 이미 방에 있던 사람들 그림도 받아 오기 (예전엔 빠져서 집주인이 기본 고양이로 보였음)
+      for (const p of peers.values()) requestSkin(p.username, p.skin?.v);
       pushPeers();
       addChat({ system: true, text: m.isOwner ? '내 집에 있어요. 친구들이 놀러 올 수 있어요.' : `${m.owner.nickname}(@${m.owner.username})님의 집에 들어왔어요. (${peers.size + 1}명)` });
       updateTray();
@@ -492,7 +500,7 @@ function handleServer(m, sock) {
     case 'chat': {
       const p = peers.get(m.id);
       overlay?.webContents.send('chat', { id: m.id, text: m.text });
-      addChat({ pid: m.id, from: p ? p.nickname : '?', username: p?.username, color: p?.color, text: m.text });
+      addChat({ pid: m.id, from: p ? p.nickname : '?', username: p?.username, color: p?.color, text: m.text, ts: typeof m.ts === 'number' ? m.ts : serverTime() });
       break;
     }
     case 'emote':
@@ -504,6 +512,12 @@ function handleServer(m, sock) {
       break;
     case 'fish-peer':   // 미니맵에도 같이 낚시하는 친구가 보이게
       for (const w of homes()) w.webContents.send('srv', m);
+      break;
+    case 'board':
+    case 'board-item':
+    case 'board-del':
+    case 'board-clear':
+      home?.webContents.send('srv', m);
       break;
     case 'fish-cast':
     case 'fish-result':
@@ -538,6 +552,7 @@ function handleServer(m, sock) {
       break;
     }
     case 'password-result':
+    case 'username-result':
       control?.webContents.send('srv', m);
       break;
     case 'brag': {
@@ -600,10 +615,17 @@ function requestSkin(username, v) {
   const have = skins.get(username);
   if (have && have.v === v) return;
   const key = username + ':' + v;
-  if (skinWanted.has(key)) return;
-  skinWanted.add(key);
+  if (Date.now() - (skinWanted.get(key) || 0) < 10_000) return;
+  skinWanted.set(key, Date.now());
   wsSend({ type: 'skin-get', username });
 }
+// 그림이 아직 안 왔거나 예전 것이면 다시 요청 (요청이 막혔거나 끊겼을 때 대비)
+function refreshSkins() {
+  if (!session) return;
+  requestSkin(session.user.username, session.user.skin?.v);
+  for (const p of peers.values()) requestSkin(p.username, p.skin?.v);
+}
+setInterval(refreshSkins, 15_000).unref?.();
 function pushSkins() {
   const obj = Object.fromEntries(skins);
   overlay?.webContents.send('skins', obj);
@@ -626,7 +648,7 @@ function homeState() {
 function homes() { return [home, mini].filter((w) => w && !w.isDestroyed()); }
 function pushHome() { const st = homeState(); for (const w of homes()) w.webContents.send('home-state', st); }
 function addChat(entry) {
-  chatLog.push({ ts: Date.now(), ...entry });
+  chatLog.push({ ts: serverTime(), ...entry });
   if (chatLog.length > 200) chatLog.shift();
   for (const w of homes()) w.webContents.send('chat', chatLog[chatLog.length - 1]);
 }
@@ -991,12 +1013,13 @@ function registerIpc() {
   // 게임 기능 요청은 정해진 종류만 서버로 전달
   const SRV_TYPES = new Set(['checkin', 'acc-equip', 'buy', 'feed', 'pet-out', 'pet-rename', 'pet-pat',
     'fish-cast', 'fish-reel', 'fish-sell', 'fish-gift', 'fish-view', 'trade-offer', 'trade-answer', 'trade-cancel',
-    'tank-put', 'tank-take', 'tank-feed', 'aqua-put', 'aqua-take', 'aqua-view', 'block', 'unblock', 'password-change',
-    'fish-here', 'share-snack', 'mg-invite', 'mg-answer', 'mg-move', 'mg-quit']);
+    'tank-put', 'tank-take', 'tank-feed', 'aqua-put', 'aqua-take', 'aqua-view', 'block', 'unblock', 'password-change', 'username-change',
+    'fish-here', 'share-snack', 'mg-invite', 'mg-answer', 'mg-move', 'mg-quit', 'rod-equip', 'pet-sell',
+    'board-get', 'board-add', 'board-del', 'board-clear']);
   ipcMain.on('srv', (_e, m) => {
     if (!m || typeof m !== 'object' || !SRV_TYPES.has(m.type)) return;
     const json = JSON.stringify(m);
-    if (json.length > 4000) return;
+    if (json.length > (m.type === 'board-add' ? 60_000 : 4000)) return;   // 화이트보드 그림만 크게 허용
     wsSend(JSON.parse(json));
   });
   ipcMain.handle('get-update', () => ({ ...updateState, current: app.getVersion() }));

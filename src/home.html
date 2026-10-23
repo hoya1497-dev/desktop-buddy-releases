@@ -129,6 +129,33 @@
             </div>
           </div>
 
+          <!-- 화이트보드 (흔적 남기기) -->
+          <div id="boardModal" class="modal" hidden>
+            <div class="modal-card board-card">
+              <div class="row between"><h2 id="boardTitle">📝 화이트보드</h2><button id="boardClose" class="link">닫기</button></div>
+              <div class="row board-tools">
+                <div class="subtabs" id="boardModes">
+                  <button data-mode="view" class="active">👆 보기</button>
+                  <button data-mode="note">📝 메모 붙이기</button>
+                  <button data-mode="draw">🖊 그림 그리기</button>
+                </div>
+                <span id="noteColors" class="swatches"></span>
+                <span id="penColors" class="swatches" hidden></span>
+                <select id="penSize" hidden><option value="3">가늘게</option><option value="6" selected>보통</option><option value="12">굵게</option></select>
+                <button id="drawUndo" class="ghost small" hidden>↶ 되돌리기</button>
+                <button id="drawPost" class="primary small" hidden>그림 붙이기</button>
+              </div>
+              <div class="board-area" id="boardArea">
+                <div id="boardItems"></div>
+                <canvas id="boardDraw" width="800" height="500"></canvas>
+                <div id="noteInputBox" class="note-input" hidden>
+                  <textarea id="noteInput" maxlength="80" rows="3" placeholder="메모 (80자까지) · Enter로 붙이기"></textarea>
+                </div>
+              </div>
+              <p class="note" id="boardStatus">메모나 그림에 마우스를 올리면 누가 언제 남겼는지 보여요.</p>
+            </div>
+          </div>
+
           <!-- 미니게임 -->
           <div id="mgModal" class="modal" hidden>
             <div class="modal-card mg-card">
@@ -228,6 +255,7 @@
         <button data-tab="pets">🐾 펫</button>
         <button data-tab="timer">⏱️ 타이머</button>
         <button data-tab="games">🎮 미니게임</button>
+        <button data-tab="board">📝 흔적</button>
       </nav>
       <div class="pane active" id="pane-chat">
         <div id="chatLog"></div>
@@ -249,6 +277,7 @@
           <button data-shop="pet">펫</button>
           <button data-shop="acc">액세서리</button>
           <button data-shop="wall">벽지</button>
+          <button data-shop="rod">🎣 낚싯대</button>
         </div>
         <div class="shop-sec" data-sec="furniture">
           <h3>가구 · 인형</h3><ul id="shopItems" class="shop"></ul>
@@ -264,6 +293,9 @@
         </div>
         <div class="shop-sec" data-sec="acc" hidden>
           <h3>액세서리 <span class="note-inline">출석 7일째에만 나오는 것도 있어요</span></h3><ul id="shopAcc" class="shop"></ul>
+        </div>
+        <div class="shop-sec" data-sec="rod" hidden>
+          <h3>낚싯대 <span class="note-inline">좋은 낚싯대일수록 희귀한 물고기가 잘 걸리고 꽝 · 쓰레기가 줄어요</span></h3><ul id="shopRods" class="shop"></ul>
         </div>
         <div class="shop-sec" data-sec="wall" hidden>
           <h3>벽지 · 바닥 <span class="note-inline">1층과 2층에 따로 발라요</span></h3><ul id="shopWalls" class="shop"></ul>
@@ -297,11 +329,16 @@
       </div>
       <div class="pane" id="pane-fishing">
         <p class="note">🎣 왼쪽 큰 화면이 낚시터예요. 같은 집에 있는 친구가 낚시 탭을 열면 옆자리에 앉아요. 창을 닫아도 낚시터에 있는 걸로 돼서, 미니맵을 켜 두면 낚시터가 작게 보여요.</p>
+        <div class="row rod-row">
+          <span>🎣 낚싯대</span>
+          <select id="rodPick"></select>
+          <span id="rodInfo" class="note-inline"></span>
+        </div>
         <div class="fish-ctl">
           <button id="castBtn" class="primary">🎣 던지기</button>
           <span id="castInfo" class="note-inline"></span>
         </div>
-        <p class="note" id="fishHint">찌가 쑥 들어가면 재빨리 <b>당기기</b>! 너무 빠르거나 늦으면 놓쳐요.</p>
+        <p class="note" id="fishHint">느낌표(<b>!</b>)가 뜨면 물고기가 걸린 거예요. 천천히 <b>당기기</b>를 눌러도 안 놓쳐요! 단, ! 뜨기 전에 당기면 도망가요.</p>
         <h3>최근에 낚은 것</h3>
         <ul id="recentList" class="fishrow small-row"></ul>
       </div>
@@ -378,6 +415,14 @@
           <button id="timerTestBtn" type="button" class="ghost small">🔊 들어보기</button>
         </div>
       </div>
+      <div class="pane" id="pane-board">
+        <h3 id="boardWhere" style="margin-top:0">📝 흔적 남기기</h3>
+        <p class="note" id="boardHint"></p>
+        <button id="boardOpenBtn" class="primary wide">🖊 화이트보드 열기</button>
+        <h3>남겨진 흔적 <span class="note-inline" id="boardCount"></span></h3>
+        <ul id="boardList" class="shop board-list"></ul>
+        <button id="boardClearBtn" class="danger small" hidden>🧹 우리 집 흔적 모두 지우기</button>
+      </div>
       <div class="pane" id="pane-games">
         <p class="note">친구한테 대결을 신청하거나, 🤖 AI랑 연습해 봐요.</p>
         <div class="subtabs" id="gameTabs">
@@ -406,5 +451,6 @@
   <script src="home.js"></script>
   <script src="home-game.js"></script>
   <script src="minigame.js"></script>
+  <script src="board.js"></script>
 </body>
 </html>
