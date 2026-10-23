@@ -2,7 +2,7 @@
 // 오버레이(바탕화면 캐릭터) · 집 · 로그인 · 설정 창, 트레이, 창 목록, 자동 상태, 서버 연결
 
 const {
-  app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut, safeStorage, shell, Notification,
+  app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut, safeStorage, shell, Notification, session: electronSession, net,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -168,6 +168,29 @@ function sendInit() {
   pushPeers();
 }
 
+// 🎵 유튜브 영상 넣기: 앱 화면은 file:// 이라 유튜브가 '어디서 틀었는지(Referer)'를 몰라서 막히는 경우가 있어요.
+// 유튜브 요청에만 Referer 를 붙여 줘요.
+function setupYoutube() {
+  try {
+    electronSession.defaultSession.webRequest.onBeforeSendHeaders(
+      { urls: ['https://www.youtube-nocookie.com/*', 'https://www.youtube.com/*'] },
+      (d, cb) => {
+        const h = d.requestHeaders;
+        if (!h.Referer && !h.referer) h.Referer = 'https://desktop-buddy.app/';
+        cb({ requestHeaders: h });
+      });
+  } catch (e) { console.error('youtube setup', e); }
+}
+async function ytInfo(vid) {
+  if (!/^[A-Za-z0-9_-]{11}$/.test(String(vid))) return null;
+  try {
+    const r = await net.fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=' + vid)}`);
+    if (!r.ok) return { ok: false, status: r.status };
+    const j = await r.json();
+    return { ok: true, title: String(j.title || '').slice(0, 100), author: String(j.author_name || '').slice(0, 40) };
+  } catch { return null; }
+}
+
 function makeWindow(file, opts) {
   const win = new BrowserWindow({ show: false, autoHideMenuBar: true, webPreferences: webPreferences(), ...opts });
   secure(win);
@@ -185,7 +208,8 @@ function showControl() {
 function showHome(focusChat = false, dmWith = null) {
   if (!session) { showLogin(); return; }
   if (!home || home.isDestroyed()) {
-    home = makeWindow('home.html', { width: 1220, height: 720, minWidth: 720, minHeight: 560, title: `${BETA_TAG}🏠 Desktop Buddy 집` });
+    // 레코드 플레이어 노래가 누르지 않아도 바로 나오게 (autoplay)
+    home = makeWindow('home.html', { width: 1220, height: 720, minWidth: 720, minHeight: 560, title: `${BETA_TAG}🏠 Desktop Buddy 집`, webPreferences: webPreferences({ autoplayPolicy: 'no-user-gesture-required', backgroundThrottling: false }) });
     for (const ev of ['show', 'hide', 'minimize', 'restore']) home.on(ev, () => setTimeout(updateWidgets, 50));
   }
   const go = () => { showWin(home); pushHome(); pushTimers(); if (focusChat) home.webContents.send('focus-chat'); if (dmWith) home.webContents.send('open-dm', dmWith); updateWidgets(); };
@@ -532,6 +556,9 @@ function handleServer(m, sock) {
     case 'notices':   // 📢 공지 패널
       home?.webContents.send('srv', m);
       if (m.fresh && m.list?.[0] && !m.canEdit) notify('📢 새 공지', m.list[0].title);
+      break;
+    case 'music':   // 🎵 레코드 플레이어
+      home?.webContents.send('srv', m);
       break;
     case 'dm-history':
       home?.webContents.send('srv', m);
@@ -1053,12 +1080,14 @@ function registerIpc() {
     if (on) overlay.focus(); else overlay.blur();
   });
   ipcMain.handle('get-theme', () => config.theme);
+  ipcMain.handle('yt-info', (_e, vid) => ytInfo(vid));
   // 게임 기능 요청은 정해진 종류만 서버로 전달
   const SRV_TYPES = new Set(['checkin', 'acc-equip', 'buy', 'feed', 'pet-out', 'pet-rename', 'pet-pat',
     'fish-cast', 'fish-reel', 'fish-sell', 'fish-gift', 'fish-view', 'trade-offer', 'trade-answer', 'trade-cancel',
     'tank-put', 'tank-take', 'tank-feed', 'aqua-put', 'aqua-take', 'aqua-view', 'block', 'unblock', 'password-change', 'username-change',
     'fish-here', 'share-snack', 'mg-invite', 'mg-answer', 'mg-move', 'mg-quit', 'rod-equip', 'pet-sell', 'pet-private',
-    'board-get', 'board-add', 'board-del', 'board-clear', 'dm-send', 'dm-get', 'dm-read', 'notices-get', 'notice-post', 'notice-edit', 'notice-del', 'invite']);
+    'board-get', 'board-add', 'board-del', 'board-clear', 'dm-send', 'dm-get', 'dm-read', 'notices-get', 'notice-post', 'notice-edit', 'notice-del', 'invite',
+    'music-get', 'music-add', 'music-request', 'music-answer', 'music-skip', 'music-remove', 'music-duration', 'music-error']);
   ipcMain.on('srv', (_e, m) => {
     if (!m || typeof m !== 'object' || !SRV_TYPES.has(m.type)) return;
     const json = JSON.stringify(m);
@@ -1112,6 +1141,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(async () => {
     loadConfig();
+    setupYoutube();
     if (process.platform === 'darwin' && app.dock) app.dock.hide();
     registerIpc();
     await loadGetWindows();

@@ -536,6 +536,27 @@ window.Furniture = (() => {
     '...oYYYYo...',
     '...oooooo...',
   ];
+  ART.record = [
+    'oooooooooooooooooo',
+    'oNNNNNNNNNNNNNNNNo',
+    'oNNkkkkkkkkkNNNSNo',
+    'oNkkkkkkkkkkkNNsNo',
+    'oNkkkkkkkkkkkNsNNo',
+    'oNkkkkkrrkkkksNNNo',
+    'oNkkkkrxRkkksNNNNo',
+    'oNkkkkkrrkkkkNNNNo',
+    'oNkkkkkkkkkkkNNNNo',
+    'oNNkkkkkkkkkNNyNmo',
+    'oooooooooooooooooo',
+    'owwwwwwwwwwwwwwwwo',
+    'owVVVbbbrrrppyyyWo',
+    'owVVVbbbrrrppyyyWo',
+    'owVVVbbbrrrppyyyWo',
+    'owwwwwwwwwwwwwwwwo',
+    'oooooooooooooooooo',
+    '.oW............Wo.',
+    '.oo............oo.',
+  ];
   ART.speaker = [
     'oooooooooo',
     'okkkkkkkko',

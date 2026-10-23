@@ -412,7 +412,7 @@
     }
     if (e.target === canvas && fishingMode()) { canvas.style.cursor = 'pointer'; return; }
     if (e.target === canvas) {
-      const hov = decorating ? itemAt(p) : (petAt(p) || itemAt(p)?.item === 'computer');
+      const hov = decorating ? itemAt(p) : (petAt(p) || ['computer', 'record'].includes(itemAt(p)?.item));
       canvas.style.cursor = hov ? (decorating ? 'move' : 'pointer') : 'default';
     }
   });
@@ -440,6 +440,7 @@
       if (window.HomeGame && HomeGame.onClick(p)) return;   // 동물 쓰다듬기
       const it = itemAt(p);
       if (it && it.item === 'computer') { goDesk(); return; }
+      if (it && it.item === 'record' && window.Music) { Music.open(); return; }
       if (it && catalog.items[it.item]?.tank && window.HomeGame) { HomeGame.openTank(it.uid); return; }
       const me = pets.get('me');
       const f = floorOf(p.y);

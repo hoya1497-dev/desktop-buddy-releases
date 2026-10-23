@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://i.ytimg.com; frame-src https://www.youtube-nocookie.com https://www.youtube.com">
   <title>Desktop Buddy 집</title>
   <link rel="stylesheet" href="control.css">
   <link rel="stylesheet" href="home.css">
@@ -39,6 +39,36 @@
     <span id="noticeNew" class="new" hidden>NEW</span>
     <span class="more">전체 보기 ›</span>
   </div>
+  <!-- 🎵 레코드 플레이어: 닫아도 노래가 계속 나오게 화면 밖으로만 옮겨요 -->
+  <div id="musicModal" class="music-modal closed">
+    <div class="music-card">
+      <div class="row between"><h2>🎵 레코드 플레이어 <span id="musicWhere" class="note-inline"></span></h2><button id="musicClose" class="link">닫기 (노래는 계속)</button></div>
+      <div class="music-main">
+        <div class="music-left">
+          <div class="yt-box"><iframe id="ytFrame" title="YouTube" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" src="about:blank"></iframe><div id="ytIdle" class="yt-idle">🎶 아직 트는 노래가 없어요</div></div>
+          <div id="nowPlaying" class="now-playing"></div>
+          <div class="row music-volume">
+            <button id="musicMute" class="ghost small" title="나만 소리 끄기 / 켜기">🔊</button>
+            <input id="musicVol" type="range" min="0" max="100" step="1" title="내 볼륨 (나한테만 적용)">
+            <span id="musicVolText" class="note-inline"></span>
+            <button id="musicSkip" class="ghost small" hidden>⏭ 다음 곡</button>
+          </div>
+          <form id="musicForm" class="row">
+            <input id="musicUrl" placeholder="유튜브 링크 붙여넣기 (예: https://youtu.be/...)" autocomplete="off">
+            <button id="musicAddBtn" class="primary small">넣기</button>
+          </form>
+          <p id="musicHint" class="note"></p>
+        </div>
+        <div class="music-right">
+          <h3>⏳ 대기열</h3>
+          <ol id="musicQueue" class="music-list"></ol>
+          <h3 id="pendingTitle">📮 신청</h3>
+          <ul id="musicPending" class="music-list"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="noticeModal" class="notice-modal" hidden>
     <div class="notice-card">
       <div class="row between"><h2>📢 공지 · 업데이트 소식</h2><button id="noticeClose" class="link">닫기</button></div>
@@ -273,6 +303,7 @@
         <button id="deskBtn" class="ghost">🖥️ 컴퓨터</button>
         <button id="decoBtn" class="ghost">✏️ 꾸미기</button>
         <button id="lightBtn" class="ghost">💡 불 끄기</button>
+        <button id="musicBtn" class="ghost" hidden title="레코드 플레이어 (다 같이 노래 듣기)">🎵 레코드</button>
         <button id="leaveFishBtn" class="primary">🏠 낚시터에서 나가기</button>
         <button id="panelBtn" class="ghost panel-btn" title="오른쪽 패널 접기/펴기 (Ctrl+B)">패널 닫기 ▶</button>
         <span class="pet-stats">
@@ -501,5 +532,6 @@
   <script src="board.js"></script>
   <script src="dm.js"></script>
   <script src="notice.js"></script>
+  <script src="music.js"></script>
 </body>
 </html>

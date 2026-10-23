@@ -339,3 +339,32 @@ body.mini .notice-bar, body.mini .notice-modal { display: none !important; }
 /* 친구 창은 방 그림 칸이 아니라 앱 전체 위에 넓게 */
 #friends { position: fixed; inset: 0; z-index: 55; border-radius: 0; }
 #friends .modal-card { width: min(780px, 94vw); max-height: 88vh; }
+
+/* 🎵 레코드 플레이어 */
+.music-modal { position: fixed; inset: 0; z-index: 58; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.35); }
+.music-modal.closed { left: -20000px; right: auto; width: 900px; height: 600px; background: none; pointer-events: none; }
+.music-card { width: min(940px, 96vw); max-height: 92vh; overflow-y: auto; background: var(--card); border-radius: 14px; padding: 14px 18px; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
+.music-main { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr); gap: 16px; margin-top: 8px; }
+@media (max-width: 760px) { .music-main { grid-template-columns: 1fr; } }
+.yt-box { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #111; border-radius: 10px; overflow: hidden; }
+.yt-box iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.yt-idle { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #ddd; font-size: 14px; }
+.now-playing { margin: 8px 0 4px; font-size: 14px; font-weight: 600; min-height: 20px; }
+.now-playing small { display: block; font-weight: normal; color: var(--muted); font-size: 11px; }
+.music-volume { gap: 8px; align-items: center; margin: 4px 0 8px; }
+.music-volume input[type=range] { flex: 1; }
+#musicForm input { flex: 1; }
+.music-right h3 { margin: 4px 0 6px; font-size: 13px; }
+.music-list { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+ol.music-list { counter-reset: q; }
+.music-list li { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 8px; background: var(--bg, #f6f1ea); font-size: 12px; }
+ol.music-list li::before { counter-increment: q; content: counter(q); color: var(--muted); font-size: 11px; min-width: 14px; }
+.music-list .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.music-list .t small { display: block; color: var(--muted); font-size: 10px; }
+.music-list .own { color: var(--accent); font-size: 10px; font-weight: 700; }
+.music-bar { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 6px; max-width: min(520px, 60vw); padding: 4px 6px 4px 12px; border-radius: 20px; background: var(--card); border: 1px solid var(--accent); box-shadow: 0 4px 14px rgba(0,0,0,.15); font-size: 12px; }
+.music-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+body.mini .music-modal, body.mini .music-bar { display: none !important; }
+#musicBtn { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#musicBtn.playing { border-color: var(--accent); color: var(--accent); }
+.yt-idle[hidden] { display: none; }
