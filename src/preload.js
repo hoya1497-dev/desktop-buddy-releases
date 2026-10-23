@@ -11,7 +11,7 @@ const SEND = [
   // 집
   'join-room', 'open-my-room', 'leave-room', 'send-chat', 'emote',
   'buy', 'place', 'wall', 'feed', 'pat', 'lock', 'kick',
-  'friend-add', 'friend-accept', 'friend-decline', 'friend-remove', 'visit', 'knock', 'knock-answer',
+  'friend-add', 'friend-accept', 'friend-decline', 'friend-remove', 'visit', 'knock', 'knock-answer', 'invite-answer',
   'skin-set', 'light', 'gift', 'overlay-focus', 'set-theme',
   'update-install', 'update-open', 'update-check', 'srv',
   // 캐릭터 메뉴 · 타이머 · 미니맵

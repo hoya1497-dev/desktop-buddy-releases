@@ -327,6 +327,7 @@ let clockSkew = 0;   // 서버 시계 - 내 컴퓨터 시계 (채팅 시간을 �
 const serverTime = () => Date.now() + clockSkew;
 let friends = { friends: [], incoming: [], outgoing: [] };
 let knocks = [];             // 내 방 문을 두드린 친구들
+let invites = [];            // 나를 자기 집으로 초대한 친구들
 const skins = new Map();     // username -> { v, faces, stand, sit, walk }
 const skinWanted = new Map(); // 'username:v' -> 요청한 시각 (응답이 없으면 10초 뒤 다시 요청)
 
@@ -434,7 +435,7 @@ function handleServer(m, sock) {
     case 'welcome':
       wantRoom = null;
       myPeerId = m.id;
-      room = { code: m.room, owner: m.owner, isOwner: m.isOwner, locked: m.locked, home: m.home };
+      room = { code: m.room, owner: m.owner, isOwner: m.isOwner, locked: m.locked, max: m.max, home: m.home };
       peers = new Map(m.peers.map((p) => [p.id, p.profile]));
       // 이미 방에 있던 사람들 그림도 받아 오기 (예전엔 빠져서 집주인이 기본 고양이로 보였음)
       for (const p of peers.values()) requestSkin(p.username, p.skin?.v);
@@ -487,6 +488,12 @@ function handleServer(m, sock) {
       pushHome();
       overlay?.webContents.send('chat', { id: 'me', text: `똑똑! ${m.from.nickname}(@${m.from.username})님이 문을 두드려요` });
       notify('똑똑! 🚪', `${m.from.nickname}(@${m.from.username})님이 문을 두드려요. 눌러서 열어 주세요.`);
+      break;
+    case 'invite':
+      invites = invites.filter((k) => k.username !== m.from.username).concat([{ ...m.from, count: m.count, max: m.max, at: Date.now() }]).slice(-5);
+      pushHome();
+      overlay?.webContents.send('chat', { id: 'me', text: `📨 ${m.from.nickname}님이 집으로 초대했어요!` });
+      notify('📨 초대장', `${m.from.nickname}(@${m.from.username})님이 집으로 초대했어요. 눌러서 놀러 가세요!`);
       break;
     case 'knock-result':
       if (m.accept) {
@@ -656,7 +663,7 @@ function pushPeers() {
 }
 function homeState() {
   return {
-    net: netState, session, room, myPeerId, peers: peerList(), self: selfProfile(), friends, knocks, fishing: fishingView,
+    net: netState, session, room, myPeerId, peers: peerList(), self: selfProfile(), friends, knocks, invites: invites.filter((k) => Date.now() - k.at < 5 * 60_000), fishing: fishingView,
     view: { showAllPets: !!config.showAllPets },
   };
 }
@@ -1051,7 +1058,7 @@ function registerIpc() {
     'fish-cast', 'fish-reel', 'fish-sell', 'fish-gift', 'fish-view', 'trade-offer', 'trade-answer', 'trade-cancel',
     'tank-put', 'tank-take', 'tank-feed', 'aqua-put', 'aqua-take', 'aqua-view', 'block', 'unblock', 'password-change', 'username-change',
     'fish-here', 'share-snack', 'mg-invite', 'mg-answer', 'mg-move', 'mg-quit', 'rod-equip', 'pet-sell', 'pet-private',
-    'board-get', 'board-add', 'board-del', 'board-clear', 'dm-send', 'dm-get', 'dm-read', 'notices-get', 'notice-post', 'notice-edit', 'notice-del']);
+    'board-get', 'board-add', 'board-del', 'board-clear', 'dm-send', 'dm-get', 'dm-read', 'notices-get', 'notice-post', 'notice-edit', 'notice-del', 'invite']);
   ipcMain.on('srv', (_e, m) => {
     if (!m || typeof m !== 'object' || !SRV_TYPES.has(m.type)) return;
     const json = JSON.stringify(m);
@@ -1078,6 +1085,12 @@ function registerIpc() {
   ipcMain.on('friend-remove', (_e, u) => wsSend({ type: 'friend-remove', username: String(u) }));
   ipcMain.on('visit', (_e, u) => wsSend({ type: 'visit', username: String(u) }));
   ipcMain.on('knock', (_e, u) => wsSend({ type: 'knock', username: String(u) }));
+  ipcMain.on('invite-answer', (_e, { username, accept }) => {
+    invites = invites.filter((k) => k.username !== username);
+    if (accept) wsSend({ type: 'visit', username: String(username) });
+    else wsSend({ type: 'invite-answer', username: String(username), accept: false });
+    pushHome();
+  });
   ipcMain.on('knock-answer', (_e, { username, accept }) => {
     knocks = knocks.filter((k) => k.username !== username);
     wsSend({ type: 'knock-answer', username: String(username), accept: !!accept });

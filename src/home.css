@@ -327,3 +327,15 @@ body.fishing-mode #deskBtn, body.fishing-mode #decoBtn, body.fishing-mode #light
 .notice-item .body { white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.55; }
 .notice-item .acts { margin-top: 6px; display: flex; gap: 6px; }
 body.mini .notice-bar, body.mini .notice-modal { display: none !important; }
+
+/* 친구 창: 넓게, 아이디가 겹치지 않게 */
+#friends .modal-card { width: min(720px, 97%); }
+#friendList li { flex-wrap: wrap; row-gap: 4px; }
+#friendList .who { flex: 1 1 130px; min-width: 110px; }
+#friendList .who b, #friendList .who small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; max-width: 100%; }
+#friendList .state { margin-left: 0; flex: 0 1 auto; }
+#friendList .acts { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-left: auto; justify-content: flex-end; }
+#inviteBox.stacked { bottom: 110px; }
+/* 친구 창은 방 그림 칸이 아니라 앱 전체 위에 넓게 */
+#friends { position: fixed; inset: 0; z-index: 55; border-radius: 0; }
+#friends .modal-card { width: min(780px, 94vw); max-height: 88vh; }

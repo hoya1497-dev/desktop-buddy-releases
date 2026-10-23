@@ -587,19 +587,30 @@
     for (const f of F.friends) {
       fl.append(personRow(f, (li) => {
         const st = document.createElement('span'); st.className = 'state';
+        const acts = document.createElement('span'); acts.className = 'acts';
         let action;
-        if (here === f.username) { st.textContent = '같이 있어요'; st.classList.add('open'); }
+        const max = f.max || catalog?.roomMax;
+        const cnt = max ? `${f.count}/${max}` : `${f.count}명`;
+        const full = max && f.count >= max;
+        if (here === f.username) { st.textContent = `같이 있어요 · 👥 ${cnt}`; st.classList.add('open'); }
         else if (!f.online) st.textContent = '오프라인';
         else if (!f.hosting) st.textContent = '집 비움';
-        else if (f.open) { st.textContent = `🚪 문 열림 · ${f.count}명`; st.classList.add('open'); action = btn('놀러가기', 'primary small', () => buddy.send('visit', f.username)); }
-        else { st.textContent = `🔒 문 닫힘 · ${f.count}명`; action = btn('똑똑', 'ghost small', () => buddy.send('knock', f.username)); }
-        li.append(st);
-        if (action) li.append(action);
-        li.append(btn(f.unread ? `✉️ ${f.unread}` : '✉️', f.unread ? 'primary small' : 'ghost small', () => window.DM && DM.open(f.username, f.nickname), false, '개인 채팅'));
-        li.append(btn('🎁', 'ghost small', () => { giftOpen = giftOpen === f.username ? null : f.username; renderFriends(); }, false, '코인 선물'));
-        li.append(btn('🐋', 'ghost small', () => window.HomeGame && HomeGame.openAquarium(f.username), false, '아쿠아리움 구경'));
-        li.append(btn('✕', 'x', () => { if (confirm(`${f.nickname}(@${f.username})님을 친구에서 삭제할까요?`)) buddy.send('friend-remove', f.username); }, false, '친구 삭제'));
-        li.append(btn('🚫', 'x', () => { if (confirm(`${f.nickname}(@${f.username})님을 차단할까요?\n채팅이 안 보이고, 내 집에 못 오고, 친구에서도 빠져요.`)) buddy.send('srv', { type: 'block', username: f.username }); }, false, '차단'));
+        else if (full) st.textContent = `🈵 가득 참 · 👥 ${cnt}`;
+        else if (f.open) { st.textContent = `🚪 문 열림 · 👥 ${cnt}`; st.classList.add('open'); action = btn('놀러가기', 'primary small', () => buddy.send('visit', f.username)); }
+        else { st.textContent = `🔒 문 닫힘 · 👥 ${cnt}`; action = btn('똑똑', 'ghost small', () => buddy.send('knock', f.username)); }
+        li.append(st, acts);
+        if (action) acts.append(action);
+        // 내 집에 있을 때: 온라인 친구를 바로 초대
+        if (S.room?.isOwner && f.online && here !== f.username) {
+          const inHere = (S.peers || []).some((p) => p.username === f.username);
+          if (!inHere) acts.append(btn('📨 초대', 'ghost small', () => buddy.send('srv', { type: 'invite', username: f.username }), false, '내 집으로 초대하기 (문이 닫혀 있어도 들어올 수 있어요)'));
+        }
+        const li2 = { append: (...x) => acts.append(...x) };
+        li2.append(btn(f.unread ? `✉️ ${f.unread}` : '✉️', f.unread ? 'primary small' : 'ghost small', () => window.DM && DM.open(f.username, f.nickname), false, '개인 채팅'));
+        li2.append(btn('🎁', 'ghost small', () => { giftOpen = giftOpen === f.username ? null : f.username; renderFriends(); }, false, '코인 선물'));
+        li2.append(btn('🐋', 'ghost small', () => window.HomeGame && HomeGame.openAquarium(f.username), false, '아쿠아리움 구경'));
+        li2.append(btn('✕', 'x', () => { if (confirm(`${f.nickname}(@${f.username})님을 친구에서 삭제할까요?`)) buddy.send('friend-remove', f.username); }, false, '친구 삭제'));
+        li2.append(btn('🚫', 'x', () => { if (confirm(`${f.nickname}(@${f.username})님을 차단할까요?\n채팅이 안 보이고, 내 집에 못 오고, 친구에서도 빠져요.`)) buddy.send('srv', { type: 'block', username: f.username }); }, false, '차단'));
       }));
       if (giftOpen === f.username) {
         const row = document.createElement('li'); row.className = 'gift-row';
@@ -638,7 +649,14 @@
     const k = S && S.knocks && S.knocks[0];
     $('knockBox').hidden = !k;
     if (k) $('knockText').textContent = `${k.nickname}(@${k.username})님이 문을 두드려요`;
+    // 초대장: 문 두드림 알림과 겹치지 않게 위쪽에
+    const inv = S && S.invites && S.invites[S.invites.length - 1];
+    $('inviteBox').hidden = !inv;
+    $('inviteBox').classList.toggle('stacked', !!k);
+    if (inv) $('inviteText').textContent = `${inv.nickname}(@${inv.username})님이 자기 집으로 초대했어요${inv.max ? ` (지금 ${inv.count}/${inv.max}명)` : ''}`;
   }
+  $('inviteYes').onclick = () => { const k = S.invites?.[S.invites.length - 1]; if (k) buddy.send('invite-answer', { username: k.username, accept: true }); };
+  $('inviteNo').onclick = () => { const k = S.invites?.[S.invites.length - 1]; if (k) buddy.send('invite-answer', { username: k.username, accept: false }); };
   $('knockYes').onclick = () => { const k = S.knocks[0]; if (k) buddy.send('knock-answer', { username: k.username, accept: true }); };
   $('knockNo').onclick = () => { const k = S.knocks[0]; if (k) buddy.send('knock-answer', { username: k.username, accept: false }); };
 
@@ -724,7 +742,7 @@
       $('friendAquaBtn').onclick = () => window.HomeGame && HomeGame.openAquarium(S.room.owner.username);
     }
     const badge = $('roomBadge');
-    if (S.room) { badge.className = 'badge on'; badge.textContent = `${S.peers.length + 1}명${S.room.locked ? ' · 🔒' : ' · 🚪 열림'}`; }
+    if (S.room) { badge.className = 'badge on'; const max = S.room.max || catalog.roomMax; badge.textContent = `👥 ${S.peers.length + 1}${max ? '/' + max : '명'}${S.room.locked ? ' · 🔒' : ' · 🚪 열림'}`; badge.title = max ? `이 방에 ${S.peers.length + 1}명이 있어요 (최대 ${max}명)` : ''; }
     else { badge.className = 'badge off'; badge.textContent = '혼자 놀기'; }
     const lightOn = v.home.light !== false;
     $('lightBtn').textContent = lightOn ? '💡 불 끄기' : '💡 불 켜기';
