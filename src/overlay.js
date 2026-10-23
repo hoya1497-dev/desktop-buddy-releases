@@ -290,9 +290,9 @@
       return { legs, eyes, bob, tail };
     }
 
-    hit(px, py) {
-      const pad = 4;
-      const hw = (this.dw || this.w) / 2;
+    hit(px, py, pad = 4) {
+      // 직접 올린 그림은 폭이 좁을 수 있어서, 최소한 기본 고양이만큼은 잡히게
+      const hw = Math.max(this.dw || 0, this.w) / 2;
       const h = this.dw ? this.h * 1.15 : this.h;
       return px >= this.x - hw - pad && px <= this.x + hw + pad &&
         py >= this.y - h - pad && py <= this.y + pad;
@@ -482,9 +482,13 @@
   function visiblePets() {
     return [...pets.values()].filter((p) => p.isMe || !cfg.hideOthers);
   }
-  function hitPet(x, y) {
+  // 마우스를 잡을 수 있는 범위는 캐릭터보다 조금 넓게 (창이 클릭을 받을 준비를 미리 해 두도록)
+  const GRAB_PAD = 12;
+  function hitPet(x, y, pad = GRAB_PAD) {
     const list = visiblePets();
-    for (let i = list.length - 1; i >= 0; i--) if (list[i].hit(x, y)) return list[i];
+    const me = pets.get('me');
+    if (me && list.includes(me) && me.hit(x, y, pad)) return me;   // 내 캐릭터가 맨 앞
+    for (let i = list.length - 1; i >= 0; i--) if (list[i].hit(x, y, pad)) return list[i];
     return null;
   }
   function refreshHover() {
@@ -580,8 +584,9 @@
     if (!chatOpen || !me) return;
     const w = chatBox.offsetWidth || 240, h = chatBox.offsetHeight || 44;
     const top = (me.dw ? me.y - me.h * 1.15 : me.y - me.h) - h - 14;
-    chatBox.style.left = Math.round(clamp(me.x - w / 2, 6, W - w - 6)) + 'px';
-    chatBox.style.top = Math.round(Math.max(6, top)) + 'px';
+    const x = Number.isFinite(me.x) ? me.x : W / 2, y = Number.isFinite(top) ? top : H / 2;
+    chatBox.style.left = Math.round(clamp(x - w / 2, 6, W - w - 6)) + 'px';
+    chatBox.style.top = Math.round(clamp(y, 6, H - h - 6)) + 'px';
   }
   function chatHit(x, y) {
     if (!chatOpen) return false;
@@ -690,22 +695,34 @@
     if (me) { me.emote('⏰'); me.hop(420); }
   });
 
+  // ------------------------------------------------------------ 오류 기록 (같은 오류는 한 번만)
+  const reported = new Set();
+  function report(e) {
+    const msg = String((e && e.stack) || e).slice(0, 1500);
+    console.error(msg);
+    if (reported.has(msg) || reported.size > 20) return;
+    reported.add(msg);
+    try { buddy.send('overlay-error', msg); } catch {}
+  }
+  addEventListener('error', (e) => report(e.error || e.message));
+
   // ------------------------------------------------------------ 루프
   let last = performance.now();
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    for (const p of pets.values()) p.update(dt);
-    updateFollowers(dt);
+    // 캐릭터 하나에서 오류가 나도 화면 전체가 멈추지 않게 (멈추면 끌기 · 말풍선 입력이 안 됨)
+    for (const p of pets.values()) { try { p.update(dt); } catch (e) { report(e); } }
+    try { updateFollowers(dt); } catch (e) { report(e); }
     refreshHover();
-    placeChat();
+    try { placeChat(); } catch (e) { report(e); }
 
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.clearRect(0, 0, W, H);
     ctx.imageSmoothingEnabled = false;
-    for (const p of visiblePets()) if (!p.isMe) { drawFollowers(p); p.draw(p === hovered); }
+    for (const p of visiblePets()) if (!p.isMe) { try { drawFollowers(p); p.draw(p === hovered); } catch (e) { report(e); } }
     const me = pets.get('me');
-    if (me) { drawFollowers(me); me.draw(me === hovered); } // 내 캐릭터는 항상 맨 앞
+    if (me) { try { drawFollowers(me); me.draw(me === hovered); } catch (e) { report(e); } } // 내 캐릭터는 항상 맨 앞
     requestAnimationFrame(loop);
   }
   resize();

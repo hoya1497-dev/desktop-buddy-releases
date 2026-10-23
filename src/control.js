@@ -121,12 +121,18 @@
     for (const pose of [...REQUIRED, ...OPTIONAL]) drawSkinPreview(pose, finalOf(pose));
     for (const pose of OPTIONAL) document.querySelector(`[data-clear=${pose}]`).hidden = !finalOf(pose);
   }
+  const facesNow = () => document.querySelector('input[name=faces]:checked').value;
   function syncApply() {
-    const changed = Object.keys(picked).length > 0;
+    // 그림을 새로 고르지 않고 보는 방향만 바꿔도 적용할 수 있게
+    const changed = Object.keys(picked).length > 0 || (!!currentSkin && facesNow() !== (currentSkin.faces || 'right'));
     const ready = REQUIRED.every((p) => finalOf(p));
     $('skinApply').disabled = !(changed && ready);
     if (changed && !ready) $('skinMsg').textContent = '서 있기 · 앉기 · 걷기 3장은 꼭 있어야 적용할 수 있어요.';
   }
+  document.querySelectorAll('input[name=faces]').forEach((r) => r.addEventListener('change', () => {
+    syncApply();
+    if (!$('skinApply').disabled) $('skinMsg').textContent = '보는 방향을 바꿨어요. [적용하기]를 누르면 반영돼요.';
+  }));
   document.querySelectorAll('[data-clear]').forEach((b) => {
     b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); picked[b.dataset.clear] = null; showCurrent(); syncApply(); };
   });

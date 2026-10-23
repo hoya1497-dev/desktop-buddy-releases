@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const SEND = [
   // 오버레이
-  'set-ignore', 'pet-menu', 'open-control', 'poke',
+  'set-ignore', 'pet-menu', 'open-control', 'poke', 'overlay-error',
   // 로그인
   'auth', 'offline-mode',
   // 설정

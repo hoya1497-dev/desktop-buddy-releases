@@ -32,6 +32,33 @@
     </div>
   </header>
 
+  <!-- 📢 공지: 맨 위 한 줄에 최신 공지, 누르면 전체 공지 -->
+  <div id="noticeBar" class="notice-bar" hidden role="button" tabindex="0" title="공지 전체 보기">
+    <span class="tag">📢 공지</span>
+    <span id="noticeBarText" class="text"></span>
+    <span id="noticeNew" class="new" hidden>NEW</span>
+    <span class="more">전체 보기 ›</span>
+  </div>
+  <div id="noticeModal" class="notice-modal" hidden>
+    <div class="notice-card">
+      <div class="row between"><h2>📢 공지 · 업데이트 소식</h2><button id="noticeClose" class="link">닫기</button></div>
+      <div id="noticeTools" class="row" hidden>
+        <button id="noticeWrite" class="primary small">✏️ 새 공지 쓰기</button>
+        <span class="note-inline">공지는 운영자만 쓰고 고칠 수 있어요. 다른 사람에게는 이 버튼이 안 보여요.</span>
+      </div>
+      <form id="noticeForm" class="notice-form" hidden>
+        <input id="noticeTitle" maxlength="60" placeholder="제목 (예: 0.10.1 업데이트)" autocomplete="off">
+        <textarea id="noticeBody" maxlength="3000" rows="8" placeholder="내용 (줄바꿈 그대로 보여요)&#10;- 개인 채팅이 생겼어요&#10;- 펫 나만 보기"></textarea>
+        <div class="row">
+          <button id="noticeSave" class="primary small" type="submit">올리기</button>
+          <button id="noticeCancel" class="ghost small" type="button">취소</button>
+          <span id="noticeFormNote" class="note-inline"></span>
+        </div>
+      </form>
+      <div id="noticeList" class="notice-list"></div>
+    </div>
+  </div>
+
   <div id="updateBar" class="update-bar" hidden>
     <span id="updateText"></span>
     <button id="updateBtn" class="primary small"></button>
@@ -466,5 +493,6 @@
   <script src="minigame.js"></script>
   <script src="board.js"></script>
   <script src="dm.js"></script>
+  <script src="notice.js"></script>
 </body>
 </html>

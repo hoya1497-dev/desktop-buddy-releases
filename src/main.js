@@ -522,6 +522,10 @@ function handleServer(m, sock) {
         overlay?.webContents.send('emote', { from: 'me', kind: 'gift' });
       }
       break;
+    case 'notices':   // 📢 공지 패널
+      home?.webContents.send('srv', m);
+      if (m.fresh && m.list?.[0] && !m.canEdit) notify('📢 새 공지', m.list[0].title);
+      break;
     case 'dm-history':
       home?.webContents.send('srv', m);
       break;
@@ -942,6 +946,14 @@ function updateWidgets() {
 function registerIpc() {
   // 오버레이
   ipcMain.on('set-ignore', (_e, v) => overlay?.setIgnoreMouseEvents(!!v, { forward: true }));
+  // 바탕화면 캐릭터 화면에서 난 오류를 파일로 남김 (버그 찾을 때 씀)
+  ipcMain.on('overlay-error', (_e, msg) => {
+    try {
+      const f = userFile('overlay-errors.log');
+      if (fs.existsSync(f) && fs.statSync(f).size > 200_000) fs.renameSync(f, f + '.old');
+      fs.appendFileSync(f, `[${new Date().toISOString()}] v${app.getVersion()}\n${String(msg).slice(0, 2000)}\n\n`);
+    } catch {}
+  });
   ipcMain.on('pet-menu', (_e, d) => petMenu(d || { id: 'me' }));
   ipcMain.on('char-menu', (_e, d) => { if (d && typeof d.id === 'string') petMenu({ id: d.id }, BrowserWindow.fromWebContents(_e.sender) || home); });
   ipcMain.on('open-home', () => showHome());
@@ -1039,11 +1051,11 @@ function registerIpc() {
     'fish-cast', 'fish-reel', 'fish-sell', 'fish-gift', 'fish-view', 'trade-offer', 'trade-answer', 'trade-cancel',
     'tank-put', 'tank-take', 'tank-feed', 'aqua-put', 'aqua-take', 'aqua-view', 'block', 'unblock', 'password-change', 'username-change',
     'fish-here', 'share-snack', 'mg-invite', 'mg-answer', 'mg-move', 'mg-quit', 'rod-equip', 'pet-sell', 'pet-private',
-    'board-get', 'board-add', 'board-del', 'board-clear', 'dm-send', 'dm-get', 'dm-read']);
+    'board-get', 'board-add', 'board-del', 'board-clear', 'dm-send', 'dm-get', 'dm-read', 'notices-get', 'notice-post', 'notice-edit', 'notice-del']);
   ipcMain.on('srv', (_e, m) => {
     if (!m || typeof m !== 'object' || !SRV_TYPES.has(m.type)) return;
     const json = JSON.stringify(m);
-    if (json.length > (m.type === 'board-add' ? 60_000 : 4000)) return;   // 화이트보드 그림만 크게 허용
+    if (json.length > (m.type === 'board-add' ? 60_000 : /^notice-(post|edit)$/.test(m.type) ? 16_000 : 4000)) return;   // 화이트보드 그림만 크게 허용
     wsSend(JSON.parse(json));
   });
   ipcMain.handle('get-update', () => ({ ...updateState, current: app.getVersion() }));
