@@ -160,7 +160,8 @@
       <div class="stage" id="stage">
         <div class="canvas-box" id="canvasBox">
           <canvas id="room"></canvas>
-          <div id="decoHint" class="deco-hint" hidden>가구를 눌러 고르고, 끌어서 옮기기 · 휠로 돌리기</div>
+          <div id="decoHint" class="deco-hint" hidden><span>가구를 눌러 고르고, 끌어서 옮기기 · 휠로 돌리기 · 방향키로 한 칸씩</span>
+            <span class="grid-pick" id="gridPick" title="꾸미기 격자: 가구가 이 간격에 맞춰 놓여요"><b>격자</b><button data-grid="4">4px</button><button data-grid="2">2px</button><button data-grid="1">1px</button><button data-grid="0">없음</button></span></div>
           <div id="toasts"></div>
 
           <!-- 어항 크게 보기 -->

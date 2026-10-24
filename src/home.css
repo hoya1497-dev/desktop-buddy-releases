@@ -21,7 +21,12 @@ main { flex: 1; display: flex; min-height: 0; }
 .selbar input[type=range] { flex: 1; min-width: 80px; }
 #selName { min-width: 70px; }
 
-.deco-hint { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.65); color: #fff; font-size: 12px; padding: 4px 12px; border-radius: 99px; pointer-events: none; white-space: nowrap; }
+.deco-hint { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.65); color: #fff; font-size: 12px; padding: 4px 6px 4px 12px; border-radius: 99px; pointer-events: none; white-space: nowrap; display: flex; align-items: center; gap: 10px; }
+.deco-hint[hidden] { display: none; }
+.grid-pick { pointer-events: auto; display: inline-flex; align-items: center; gap: 2px; background: rgba(255,255,255,.12); border-radius: 99px; padding: 2px; }
+.grid-pick b { font-weight: 600; padding: 0 6px; opacity: .8; }
+.grid-pick button { border: 0; background: none; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 99px; cursor: pointer; min-height: 0; }
+.grid-pick button.on { background: #fff; color: #333; font-weight: 700; }
 #toasts { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; pointer-events: none; }
 .toast { background: rgba(30,28,36,.88); color: #fff; padding: 6px 12px; border-radius: 10px; font-size: 13px; animation: pop .25s ease-out; max-width: 280px; }
 .toast.gain { background: rgba(214,140,40,.95); }

@@ -33,6 +33,10 @@
   let S = null, catalog = null;
   let layout = [];
   let decorating = false, selected = null, mouse = null;
+  // 꾸미기 격자 (방 좌표 4 = 가구 그림 한 칸). 0 이면 격자 없음
+  let gridStep = 4;
+  try { const g = Number(localStorage.getItem('decoGrid')); if ([0, 1, 2, 4].includes(g) && localStorage.getItem('decoGrid') !== null) gridStep = g; } catch {}
+  const snap = (v) => (gridStep ? Math.round(v / gridStep) * gridStep : Math.round(v));
   const pets = new Map();
   let foodDrop = null;
   let K = 1;
@@ -309,6 +313,8 @@
     rail(holeB, bot, '#a8703f', '#7a4b28');
   }
 
+  // 러그처럼 바닥에 까는 것: 맨 먼저 그리고 그림자 없음
+  const isFlat = (id) => /^rug|Rug$/.test(id);
   // 가구 크기 · 회전 중심
   function geom(it) {
     const sz = Furniture.size(it.item, itemScale(it.item));
@@ -317,7 +323,7 @@
   function drawItem(it) {
     const g = geom(it);
     const def = catalog.items[it.item] || {};
-    if (!def.wall && it.item !== 'rug') {
+    if (!def.wall && !isFlat(it.item)) {
       ctx.fillStyle = 'rgba(0,0,0,0.12)';
       ctx.fillRect(Math.round(it.x - g.w * 0.42), Math.round(it.y - 3), Math.round(g.w * 0.84), 4);
     }
@@ -369,6 +375,41 @@
     ctx.drawImage(dc, 0, 0, RW, RH);
   }
 
+  // 꾸미기 격자: 화면에서 너무 촘촘하면 몇 칸마다 한 줄씩, 8칸마다 진한 줄
+  function drawGrid() {
+    if (!decorating || !gridStep) return;
+    const every = Math.max(1, Math.ceil(6 / (gridStep * K)));   // 화면에서 6px 보다 촘촘하면 건너뜀
+    const d = gridStep * every, major = d * Math.max(1, Math.round(32 / d));
+    ctx.save();
+    for (let x = 0; x <= RW; x += d) { ctx.fillStyle = x % major === 0 ? 'rgba(40,30,70,0.28)' : 'rgba(40,30,70,0.11)'; ctx.fillRect(x, 0, 1 / K, RH); }
+    for (let y = 0; y <= RH; y += d) { ctx.fillStyle = y % major === 0 ? 'rgba(40,30,70,0.28)' : 'rgba(40,30,70,0.11)'; ctx.fillRect(0, y, RW, 1 / K); }
+    if (selected) {   // 고른 가구의 발 위치 표시
+      ctx.fillStyle = 'rgba(255,214,90,0.9)';
+      ctx.fillRect(selected.x - 6, selected.y, 12, 1.5); ctx.fillRect(selected.x - 0.75, selected.y - 6, 1.5, 12);
+    }
+    ctx.restore();
+  }
+  function renderGridPick() {
+    for (const b of document.querySelectorAll('#gridPick button')) b.classList.toggle('on', Number(b.dataset.grid) === gridStep);
+  }
+  for (const b of document.querySelectorAll('#gridPick button')) b.onclick = () => {
+    gridStep = Number(b.dataset.grid);
+    try { localStorage.setItem('decoGrid', String(gridStep)); } catch {}
+    renderGridPick();
+  };
+  renderGridPick();
+  // 방향키로 고른 가구를 한 칸씩 (격자 없음이면 1, Shift 는 4칸)
+  addEventListener('keydown', (e) => {
+    if (!decorating || !selected || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) return;
+    const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!dir) return;
+    e.preventDefault();
+    const st = (gridStep || 1) * (e.shiftKey ? 4 : 1);
+    selected.x = clamp(snap(selected.x + dir[0] * st), 10, RW - 10);
+    selected.y = clamp(snap(selected.y + dir[1] * st), 40, RH - 4);
+    saveLayout();
+  });
+
   // 낚시터에 있으면 집 그림 자리에 큰 낚시터를 그림 (미니맵도 같음)
   const fishingMode = () => !!(window.HomeGame && HomeGame.fishingActive());
   function render() {
@@ -378,14 +419,15 @@
     if (!catalog) return;
     if (fishingMode()) { HomeGame.drawFishing(ctx, RW, RH, MINI); return; }
     drawHouse();
-    const flat = layout.filter((it) => it.item === 'rug');
+    const flat = layout.filter((it) => isFlat(it.item));
     flat.forEach(drawItem);
-    const things = layout.filter((it) => it.item !== 'rug').map((it) => ({ y: it.y, draw: () => drawItem(it) }));
+    const things = layout.filter((it) => !isFlat(it.item)).map((it) => ({ y: it.y, draw: () => drawItem(it) }));
     for (const p of pets.values()) things.push({ y: p.sortY(), draw: () => p.draw() });
     if (foodDrop) things.push({ y: foodDrop.y, draw: () => { ctx.font = `26px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.fillText(foodDrop.icon, foodDrop.x, foodDrop.y); } });
     if (window.HomeGame) HomeGame.addThings(ctx, things);   // 키우는 동물
     things.sort((a, b) => a.y - b.y).forEach((t) => t.draw());
     drawDarkness();
+    drawGrid();
     for (const p of pets.values()) p.drawLabels();
   }
 
@@ -432,8 +474,8 @@
   addEventListener('mousemove', (e) => {
     const p = toRoom(e);
     if (mouse && mouse.kind === 'item') {
-      mouse.item.x = Math.round(clamp(p.x - mouse.ox, 10, RW - 10));
-      mouse.item.y = Math.round(clamp(p.y - mouse.oy, 40, RH - 4));
+      mouse.item.x = clamp(snap(p.x - mouse.ox), 10, RW - 10);
+      mouse.item.y = clamp(snap(p.y - mouse.oy), 40, RH - 4);
       mouse.moved = true;
       return;
     }

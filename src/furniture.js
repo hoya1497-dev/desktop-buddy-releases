@@ -342,21 +342,34 @@ window.Furniture = (() => {
   };
 
   // 그림을 코드로 만드는 것들 (창문 · 트리)
+  // 창문 (0.13.6 다듬음): 흰 나무 틀 + 아래·오른쪽 그늘, 유리에 비스듬한 반사, 아래 창턱
+  // '@' 는 시간에 따라 바뀌는 하늘색, h 는 유리 반사, S/s 는 틀 그늘
   function windowArt(panes, paneW, paneH, rows) {
     const inner = panes * paneW + (panes + 1);
     const w = inner + 2;
-    const out = ['o'.repeat(w)];
-    const bar = 'o' + 'x'.repeat(inner) + 'o';
-    out.push(bar);
+    const out = ['.' + 'o'.repeat(w) + '.'];
+    const bar = (shade) => '.o' + (shade ? 'x' + 'S'.repeat(inner - 1) : 'x'.repeat(inner)) + 'o.';
+    out.push(bar(false));
     for (let r = 0; r < rows; r++) {
       for (let i = 0; i < paneH; i++) {
-        let line = 'ox';
-        for (let p = 0; p < panes; p++) line += '@'.repeat(paneW) + 'x';
-        out.push(line + 'o');
+        let line = '.ox';
+        for (let p = 0; p < panes; p++) {
+          let pane = '';
+          for (let k = 0; k < paneW; k++) {
+            const glare = k + i === 1 || (k + i === 3 && k > 0);   // 왼쪽 위 두 줄 반사
+            pane += glare ? 'h' : '@';
+          }
+          line += pane + (p === panes - 1 ? 'S' : 'x');
+        }
+        out.push(line + 'o.');
       }
-      out.push(bar);
+      out.push(r === rows - 1 ? bar(true) : bar(false));
     }
-    out.push('o'.repeat(w));
+    // 창턱: 양쪽으로 한 칸씩 튀어나옴
+    out.push('o'.repeat(w + 2));
+    out.push('o' + 'x'.repeat(w) + 'o');
+    out.push('o' + 's'.repeat(w) + 'o');
+    out.push('o'.repeat(w + 2));
     return out;
   }
   function roundWindow(d) {
@@ -368,8 +381,10 @@ window.Furniture = (() => {
         const r = Math.hypot(x - c, y - c);
         if (r > c + 0.5) line += '.';
         else if (r > c - 0.6) line += 'o';
-        else if (r > c - 1.6) line += 'x';
+        else if (r > c - 1.6) line += x + y > 2 * c + 1 ? 'S' : 'x';
+        else if (r > c - 2.4 && x + y > 2 * c + 2) line += 'S';
         else if (Math.abs(x - c) < 0.6 || Math.abs(y - c) < 0.6) line += 'x';
+        else if (x < c && y < c && (x + y === Math.round(c) - 1 || x + y === Math.round(c) + 1)) line += 'h';
         else line += '@';
       }
       out.push(line);
@@ -405,7 +420,26 @@ window.Furniture = (() => {
   ART.windowBig = windowArt(3, 5, 5, 2);
   ART.windowRound = roundWindow(15);
   ART.tree = treeArt();
-  ART.curtainWindow = ART.window.map((row, i, all) => (i === all.length - 1 ? '..' + row + '..' : 'pp' + row + 'pp'));
+  ART.curtainWindow = (() => {
+    // 위는 넓게 드리우고 끈으로 묶은 뒤 아래로 살짝 퍼지는 커튼
+    const win = ART.window, n = win.length, w = win[0].length;
+    const tie = Math.floor(n * 0.6), sill = n - 4;
+    const rows = ['o' + 'Y'.repeat(w + 2) + 'o'];
+    for (let i = 0; i < n; i++) {
+      let mid = win[i].slice(1, -1);
+      if (i >= sill) { rows.push('...' + mid + '...'); continue; }
+      // 유리 위로 겹치는 폭: 꼭대기 3칸 → 끈 0칸 → 아래 1칸
+      const ov = i < tie ? Math.round(3 * (1 - i / tie)) : (i === tie ? 0 : 1);
+      const f = (k) => ((k + (i < tie ? 0 : 1)) % 2 ? 'P' : 'p');
+      const drapeL = Array.from({ length: ov }, (_, k) => f(k + 1)).join('');
+      const drapeR = Array.from({ length: ov }, (_, k) => f(ov - k)).join('');
+      if (ov) mid = drapeL + 'o' + mid.slice(ov + 1, mid.length - ov - 1) + 'o' + drapeR;
+      const l = i === tie ? 'oRR' : 'o' + f(0) + 'p';
+      const r = i === tie ? 'RRo' : 'p' + f(0) + 'o';
+      rows.push(l + mid + r);
+    }
+    return rows;
+  })();
 
   const GLOW_EXTRA = {};
   // ---------------------------------------------------------------- 새 가구 (0.8)
@@ -1217,6 +1251,599 @@ window.Furniture = (() => {
       '..oooooooooo..',
     ],
   });
+  // ---- HD BEGIN
+  // 기본 가구 다시 그림 (0.13.6): 크기는 그대로, 음영 · 결 · 손잡이 같은 디테일을 더함. 그림마다 자기 색표(pal)를 씀
+  Object.assign(ART, {
+    computer: { pal: { a: '#3b2a25', b: '#1f1b24', c: '#86dcec', d: '#d4f6fc', e: '#45aac2', f: '#2a6f88', g: '#b4e894', h: '#2f2a36', i: '#d3d8de', j: '#a9b0b8', k: '#ef6a5e', l: '#c2443f', m: '#eef1f4', n: '#ecc28a', p: '#cf9558', q: '#a8703f', r: '#7f4f2b', s: '#f6d34f', t: '#d9a530' }, rows: [
+      '......aaaaaaaaaaaa......',
+      '......abbbbbbbbbba......',
+      '......abccccccccba......',
+      '......abcddeeeeeba......',
+      '......abcdecccceba......',
+      '......abceeffffeba......',
+      '......abbbbbbbbbga......',
+      '......aaaahhhhaaaa.aaa..',
+      '..........aija.....akla.',
+      '.amimia.aaiiiiaa...aka..',
+      'annnnnnannnnnnnnaaannnaa',
+      'appppppppqpppqqppppppppa',
+      'arrraaaaaaaaaarrrrrrrrra',
+      '.apa..........apppppppa.',
+      '.aqa..........aqqqssqqa.',
+      '.aqa..........arrrrrrra.',
+      '.aqa..........aqqqttqqa.',
+      '.aaa..........aaaaaaaaa.',
+    ] },
+    bed: { pal: { a: '#3b2a25', b: '#ecc28a', c: '#cf9558', d: '#a8703f', e: '#7f4f2b', f: '#f1f3f7', g: '#ffffff', h: '#ffe3ea', i: '#f6aac0', j: '#dc7896', k: '#cdd4de', l: '#a9506e' }, rows: [
+      '.aa.....................',
+      'abba....................',
+      'acdeaaaaaaaaaaaaaaaaaaa.',
+      'acdfgggggghiiijhiijhiija',
+      'acdfgggggghiiijiiijiibba',
+      'acdfkkkkkkhiiijiiijiibca',
+      'acdfffffffhjjjjjjjjjjbca',
+      'acdkkkkkkklllllllllllbca',
+      'acdccccccccccccccccccbca',
+      'acceaaaaaaaaaaaaaaaaaeea',
+      'aaaa.................aa.',
+    ] },
+    bedBlue: { pal: { a: '#3b2a25', b: '#ffffff', c: '#eef1f4', d: '#d3d8de', e: '#a9b0b8', f: '#f1f3f7', g: '#cfe6ff', h: '#94c2f2', i: '#6aa2e8', j: '#cdd4de', k: '#4572b4' }, rows: [
+      '.aa.....................',
+      'abba....................',
+      'acdeaaaaaaaaaaaaaaaaaaa.',
+      'acdfbbbbbbghhhighhighhia',
+      'acdfbbbbbbghhhihhhihhbba',
+      'acdfjjjjjjghhhihhhihhbca',
+      'acdfffffffgiiiiiiiiiibca',
+      'acdjjjjjjjkkkkkkkkkkkbca',
+      'acdccccccccccccccccccbca',
+      'acceaaaaaaaaaaaaaaaaaeea',
+      'aaaa.................aa.',
+    ] },
+    bedCanopy: { pal: { a: '#3b2a25', b: '#f6aac0', c: '#dc7896', d: '#ffe3ea', e: '#ef6a5e', f: '#f1f3f7', g: '#ffffff', h: '#ecd8b2', i: '#cdb38a', j: '#cdd4de', k: '#fbf1dc', l: '#a9506e', m: '#7f4f2b' }, rows: [
+      'aaaaaaaaaaaaaaaaaaaaaaaa',
+      'abbbbbbbbbbbbbbbbbbbbbba',
+      'acccccaccaccaccaccacccca',
+      'abdbaa.aa.aa.aa.aa.abdba',
+      'abda................adba',
+      'abda................adba',
+      'abdbaaaaaaaaaaaaaaaabdba',
+      'abefggggggdbbbcdbbcdbeba',
+      'abbfggggggdbbbcbbbcbbbba',
+      'ahifjjjjjjdbbbcbbbcbbkka',
+      'ahifffffffdcccccccccckka',
+      'ahijjjjjjjlllllllllllkka',
+      'ahihhhhhhhhhhhhhhhhhhkka',
+      'ahhmaaaaaaaaaaaaaaaaamka',
+      'aaaa.................aaa',
+    ] },
+    bedBunk: { pal: { a: '#3b2a25', b: '#7f4f2b', c: '#f1f3f7', d: '#ffffff', e: '#cfe6ff', f: '#ecc28a', g: '#cdd4de', h: '#6aa2e8', i: '#4572b4', j: '#cf9558', k: '#a8703f', l: '#ffb1a6', m: '#ef6a5e', n: '#c2443f' }, rows: [
+      'aaaaaaaaaaa...........aa',
+      'abcdddddeeeaaaaaaaaaaafa',
+      'abcgggggehhhihhhihhhhcfa',
+      'abggggggeiiiiiiiiiiiigfa',
+      'abjjjjjjjjjjjjjjjjjjjjfa',
+      'abaaaaaaaaaaaaaaabbbbafa',
+      'aa...............kjjk.aa',
+      'aa...............k..k.aa',
+      'aa...............kjjk.aa',
+      'abaaaaaaaaaaaaaaallllafa',
+      'abcggggglmmmnmmmnmmmmcfa',
+      'abgggggglnnnnnnnnnnnngfa',
+      'abjjjjjjjjjjjjjjjjjjjjfa',
+      'abaaaaaaaaaaaaaaaaaaaafa',
+      'aa....................aa',
+    ] },
+    desk: { pal: { a: '#3b2a25', b: '#6aa2e8', c: '#ef6a5e', d: '#f6d34f', e: '#86dcec', f: '#b4e894', g: '#d9a530', h: '#ecc28a', i: '#cf9558', j: '#a8703f', k: '#7f4f2b', l: '#5a3720' }, rows: [
+      '..aab.........aaaa..c.d.',
+      '..acbaa.......aeea..aaa.',
+      '..acbfa.......agga..aba.',
+      'aahhhhhaaaaaaahhhhaahhha',
+      'aiiiiiiiiijjiiiiiijiiiia',
+      'akkkkkkkkkkkkkkkkkkkkkka',
+      'aiiiiiiilllllllllliiiiia',
+      'ajjddjja..........akkkka',
+      'alllllla..........akllka',
+      'ajjddjja..........akllka',
+      'ajjjjjja..........akkkka',
+      'aaaaaaaa..........aaaaaa',
+    ] },
+    wardrobe: { pal: { a: '#3b2a25', b: '#7f4f2b', c: '#cf9558', d: '#5a3720', e: '#a8703f', f: '#fff2a8', g: '#d9a530', h: '#f6d34f' }, rows: [
+      'aaaaaaaaaaaaaaaa',
+      'abbbbbbbbbbbbbba',
+      'acccccccdcccccca',
+      'acbbbbbbdbbbbbba',
+      'acbcccbbdbcccbba',
+      'acbeeebbdbeeebba',
+      'aceeeefbdfeeeeba',
+      'acbbbbgbdgbbbbba',
+      'acbcccbbdbcccbba',
+      'acbeeebbdbeeebba',
+      'abbbbbbbdbbbbbba',
+      'acccccccccccccca',
+      'aceeeehgggeeeeba',
+      'abbbbbbbbbbbbbba',
+      'abbbaaaaaaaabbba',
+      '.aaa........aaa.',
+    ] },
+    fridge: { pal: { a: '#3b2a25', b: '#eef1f4', c: '#ef6a5e', d: '#fff2a8', e: '#a9b0b8', f: '#d9a530', g: '#7d848c', h: '#6aa2e8', i: '#d4f6fc', j: '#f6d34f', k: '#73c45a', l: '#f6aac0' }, rows: [
+      'aaaaaaaaaaaa',
+      'abbbbbbbbbba',
+      'abcddbbbbeba',
+      'abdffbbbbgba',
+      'abdddbbbbgba',
+      'aeeeeeeeeeea',
+      'aeeeeeeeeeea',
+      'abbbbbbbbbba',
+      'abhijibbbeba',
+      'abiiiibbbgba',
+      'abkkkkbbbgba',
+      'abbbbbbbbgba',
+      'abbbbbcbbbba',
+      'abblbbbbbbba',
+      'abbbbbbbbbba',
+      'aaaaaaaaaaaa',
+    ] },
+    arcade: { pal: { a: '#3b2a25', b: '#9677d4', c: '#f6d34f', d: '#ef6a5e', e: '#94c2f2', f: '#73c45a', g: '#654a9e', h: '#1f1b24', i: '#45aac2', j: '#2a6f88', k: '#ffffff', l: '#b4e894', m: '#fff2a8', n: '#43913e', p: '#c0a6f0', q: '#ffb1a6', r: '#e4d6ff', s: '#2f2a36' }, rows: [
+      '.aaaaaaaaaaaa.',
+      '.abcbdbebfbca.',
+      '.agggggggggga.',
+      'ahhhhhhhhhhhha',
+      'ahiiiiiiiiiiha',
+      'ahjkjjjjjjljha',
+      'ahjjjjcmjjjjha',
+      'ahjjejjjjdjjha',
+      'ahjjjfjjfjjjha',
+      'ahnnnnnnnnnnha',
+      'ahhdhhhhhhhhha',
+      'apphppppfpqppa',
+      'abbbbbbdbebcba',
+      'agggggggggggga',
+      '.arrrrrrrrrra.',
+      '.apppscmspppa.',
+      '.apppsssspppa.',
+      '.aaaaaaaaaaaa.',
+    ] },
+    beanbag: { pal: { a: '#3b2a25', b: '#f8c27e', c: '#f0a050', d: '#cf6f45', e: '#9c4b2b' }, rows: [
+      '....aaaaaaaa....',
+      '...abbcccccca...',
+      '..abccccccccca..',
+      '.aaccccccccccaa.',
+      'abbaccccccccabca',
+      'abcddddddddddcda',
+      'accdbbbbbbbbdcda',
+      'acdccccccccccdda',
+      'addccccccccccdda',
+      '.adeeeeeeeeeeda.',
+      '..aaaaaaaaaaaa..',
+    ] },
+    globe: { pal: { a: '#3b2a25', b: '#ffffff', c: '#94c2f2', d: '#6aa2e8', e: '#cfe6ff', f: '#73c45a', g: '#43913e', h: '#f6d34f', i: '#d9a530', j: '#ecc28a', k: '#cf9558' }, rows: [
+      '....aaaa....',
+      '...abcdda...',
+      '..aeffcdfa..',
+      '..afffcdda..',
+      '.accgccffda.',
+      '.adcccdffda.',
+      '..affddfga..',
+      '..aaffddda..',
+      '....agdaa...',
+      '.....hi.....',
+      '.....hi.....',
+      '...aajjaaa..',
+      '...akkkkka..',
+      '...aaaaaaa..',
+    ] },
+    speaker: { pal: { a: '#3b2a25', b: '#2f2a36', c: '#b4e894', d: '#1f1b24', e: '#c6c9cf', f: '#6e727a', g: '#9a9ea6' }, rows: [
+      'aaaaaaaaaa',
+      'abbbbbbbca',
+      'abbddddbba',
+      'abbdefdbba',
+      'abbdffdbba',
+      'abbddddbba',
+      'abbbddbbba',
+      'abddffddba',
+      'abdeegfdba',
+      'adfgddgfda',
+      'adfgddgfda',
+      'abdfggfdba',
+      'abddffddba',
+      'abbbddbbba',
+      'aaaaaaaaaa',
+    ] },
+    mirror: { pal: { a: '#3b2a25', b: '#a8703f', c: '#86dcec', d: '#d4f6fc', e: '#ffffff', f: '#45aac2', g: '#ecc28a' }, rows: [
+      '...aaaaaa...',
+      '..abccccba..',
+      '.acccccccca.',
+      '.acdddcccca.',
+      '.aceddcccca.',
+      '.acdddeccca.',
+      '.acddecccca.',
+      '.acdedccfca.',
+      '.aceddccfca.',
+      '.acdddccfca.',
+      '.acdddccfca.',
+      '.acccccffca.',
+      '.acccccccca.',
+      'agggggggggga',
+      'aaaaaaaaaaaa',
+    ] },
+    cattower: { pal: { a: '#3b2a25', b: '#c0a6f0', c: '#9677d4', d: '#a9b0b8', e: '#fbf1dc', f: '#cdb38a', g: '#ef6a5e', h: '#e4d6ff' }, rows: [
+      '.aaaaaaaaaa.....',
+      '.abbbbbbbba.....',
+      '.acaccccaaa.....',
+      '..d.aeea........',
+      '..d.affa........',
+      '..d.aeea........',
+      '..g.affa.aaaaaaa',
+      '....aeea.aacccaa',
+      '....affa...aea..',
+      '....aeea...aea..',
+      '....affa...aea..',
+      '....aeea...aea..',
+      'aaaahhhhaaahhhaa',
+      'abbbbbbbbbbbbbba',
+      'abbbbbbbbbbbbbba',
+      'aaaaaaaaaaaaaaaa',
+    ] },
+    sofa: { pal: { a: '#3b2a25', b: '#6aa2e8', c: '#4572b4', d: '#cfe6ff', e: '#94c2f2', f: '#2c4c84' }, rows: [
+      '.aaaaaaaaaaaaaaaaaaaaaa.',
+      '.abbbbbbbbbbcbbbbbbbbba.',
+      '.abbbbcbbbbbcbbbbcbbbba.',
+      'addebbbbbbbbcbbbbbbbedda',
+      'abbcddddddddddddddddebba',
+      'abbceeeeeeecdeeeeeeeebba',
+      'abbceeeeeeecdeeeeeeeebba',
+      'abbcccccccccccccccccebba',
+      'abbbbbbbbbbbbbbbbbbbbbba',
+      'aaffaaaaaaaaaaaaaaaaffaa',
+      '..aa................aa..',
+    ] },
+    chair: { pal: { a: '#3b2a25', b: '#cf9558', c: '#7f4f2b', d: '#ef6a5e', e: '#ecc28a', f: '#a8703f' }, rows: [
+      'aaa.........',
+      'aba.........',
+      'aca.........',
+      'aba.........',
+      'aca.........',
+      'abdaaaaaaaa.',
+      'abdddddddda.',
+      'aeeeeeeeeeea',
+      'accaaaaaacca',
+      'aba......aba',
+      'abcaaaaaabfa',
+      'aba......afa',
+      'aaa......aaa',
+    ] },
+    table: { pal: { a: '#3b2a25', b: '#a8703f', c: '#cf9558', d: '#7f4f2b', e: '#5a3720' }, rows: [
+      '..................',
+      'aaaaaaaaaaaaaaaaaa',
+      'abbbbbbbbbbbbbbbba',
+      '.accddddddddddcca.',
+      '.abdeeeeeeeeeecba.',
+      '.aba..........aba.',
+      '.aba..........aba.',
+      '.aba..........aba.',
+      '.aaa..........aaa.',
+    ] },
+    rug: { pal: { a: '#3b2a25', b: '#ecd8b2', c: '#c2443f', d: '#ef6a5e', e: '#ffb1a6', f: '#fff2a8' }, rows: [
+      '.aaaaaaaaaaaaaaaaaaaaaa.',
+      'bcddddddddddddddddddddcb',
+      '.adefeeeefeeeefeeeefeda.',
+      'bcddddddddddddddddddddcb',
+      '.aaaaaaaaaaaaaaaaaaaaaa.',
+    ] },
+    cushion: { pal: { a: '#3b2a25', b: '#e4d6ff', c: '#c0a6f0', d: '#9677d4', e: '#654a9e' }, rows: [
+      'aaaaaaaaaa',
+      'abbbbbbbba',
+      'acccdeccca',
+      'adddddddda',
+      'aaaaaaaaaa',
+    ] },
+    plant: { pal: { a: '#3b2a25', b: '#73c45a', c: '#b4e894', d: '#43913e', e: '#2b6431', f: '#f3a878', g: '#55321a', h: '#9a4a28', i: '#d0723f' }, rows: [
+      '.....aa.....',
+      '....abca....',
+      '..aabcbbaa..',
+      '.abcbbdbbca.',
+      'abcbdbdbdbca',
+      '.abbedddeba.',
+      'acbdbbdbbdba',
+      '.affggggffa.',
+      '..ahhhhhha..',
+      '...aiiiia...',
+      '...aiiiia...',
+      '...aaaaaa...',
+    ] },
+    cactus: { pal: { a: '#3b2a25', b: '#f6aac0', c: '#dc7896', d: '#b4e894', e: '#73c45a', f: '#fbf1dc', g: '#43913e', h: '#55321a', i: '#d0723f' }, rows: [
+      '...abca...',
+      'aa.adea.aa',
+      'af.adea.fa',
+      'aa.afegaea',
+      'aeaedegaa.',
+      '.aaedfa...',
+      '...aeea...',
+      '..ahhhha..',
+      '..aiiiia..',
+      '..aiiiia..',
+      '..aaaaaa..',
+    ] },
+    lamp: { pal: { a: '#3b2a25', b: '#fff2a8', c: '#f6d34f', d: '#d9a530', e: '#9a9ea6', f: '#d3d8de', g: '#7d848c', h: '#eef1f4' }, rows: [
+      '...aaaa...',
+      '..abbbca..',
+      '..abccca..',
+      '.abbbbcca.',
+      '.acccccca.',
+      'aaaaddadaa',
+      '....bb.e..',
+      '....fg.e..',
+      '....hg.e..',
+      '....fg.e..',
+      '....fg.d..',
+      '....fg....',
+      '....fg....',
+      '....fg....',
+      '....fg....',
+      '..aaggaa..',
+      '.affffffa.',
+      '.aaaaaaaa.',
+    ] },
+    books: { pal: { a: '#3b2a25', b: '#5a3720', c: '#c0a6f0', d: '#73c45a', e: '#43913e', f: '#d0723f', g: '#e8dcc8', h: '#cdb38a', i: '#9a4a28', j: '#9677d4', k: '#fff2a8', l: '#cf9558', m: '#7aa5a0', n: '#6aa2e8', p: '#4572b4', q: '#ef6a5e', r: '#b4e894', s: '#c2443f', t: '#4f7a76', u: '#e9c46a', v: '#d9a530' }, rows: [
+      'aaaaaaaaaaaaaaaa',
+      'abbbbbcbbdebbcca',
+      'afcghdcgbdecbcca',
+      'aijkkejhbkkjbjja',
+      'afcghdcgbdecbcca',
+      'alllllllllllllla',
+      'abbmncdbnpqbbbba',
+      'aqbmncddnpqbdrba',
+      'asbtpjeekksbffba',
+      'aqbmncddnpqbffba',
+      'alllllllllllllla',
+      'aubbgdebqsbbfiba',
+      'avkkhkkskkkkkkta',
+      'auqsgdeqqsqsfima',
+      'alllllllllllllla',
+      'aaaaaaaaaaaaaaaa',
+    ] },
+    tv: { pal: { a: '#3b2a25', b: '#46404f', c: '#1f1b24', d: '#86dcec', e: '#ffffff', f: '#d4f6fc', g: '#45aac2', h: '#f6d34f', i: '#fff2a8', j: '#2a6f88', k: '#ef6a5e' }, rows: [
+      '......a....a......',
+      '.......a..a.......',
+      'aaaaaaabaabaaaaaaa',
+      'acccccccccccccccca',
+      'acddddddddddddddca',
+      'acdefggggggghiggca',
+      'acdfggggggggggggca',
+      'acdgggggggjjjjggca',
+      'acdgggggjjjjjjjjca',
+      'acccccccccccccccka',
+      'aaacccaaaaaacccaaa',
+      '...aaa......aaa...',
+    ] },
+    guitar: { pal: { a: '#3b2a25', b: '#7c4c28', c: '#a46c3e', d: '#a9b0b8', e: '#de7f2c', f: '#f6a54e', g: '#eef1f4', h: '#ffd08a', i: '#1f1b24', j: '#55321a', k: '#a65520' }, rows: [
+      '..aaaaa..',
+      '..abbba..',
+      '...aca...',
+      '...ada...',
+      '...aca...',
+      '...ada...',
+      '...aca...',
+      '...ada...',
+      '...aea...',
+      '..afgea..',
+      '.ahfgeea.',
+      '.affgeea.',
+      '.afigiea.',
+      'afhfgfeea',
+      'aeffgfeea',
+      'aeejjjeka',
+      '.aeeeeka.',
+      '..aaaaa..',
+    ] },
+    piano: { pal: { a: '#3b2a25', b: '#2f2a36', c: '#fff2a8', d: '#d9a530', e: '#fbf1dc', f: '#ffffff', g: '#46404f', h: '#1f1b24', i: '#a9b0b8', j: '#d3d8de' }, rows: [
+      'aaaaaaaaaaaaaaaaaaaaaa',
+      'abcbbbbbbbbbbbbbbbbcba',
+      'abdbbbbeffffffebbbbdba',
+      'abbbbbbeggegggebbbbbba',
+      'abbbbbbeeeeeeeebbbbbba',
+      'abbbbbbbbbbbbbbbbbbbba',
+      'ahhhhhhhhhhhhhhhhhhhha',
+      'afhhfhhffifhhfhhfhhffa',
+      'ajjijjijjijjijjijjijja',
+      'agggggggggggggggggggga',
+      '.abbhhhhhhhhhhhhhhbba.',
+      '.abbhgggggggggggghbba.',
+      '.abbhhhhhhhhhhhhhhbba.',
+      '.abbbbbbbbbbbbbbbbbba.',
+      '.aaaaaaaaaaaaaaaaaaaa.',
+    ] },
+    teddy: { pal: { a: '#3b2a25', b: '#c9925e', c: '#a46c3e', d: '#1f1b24', e: '#ecd8b2', f: '#ffb1a6', g: '#ef6a5e', h: '#c2443f', i: '#7c4c28' }, rows: [
+      '..a......a..',
+      '.abaaaaaaba.',
+      '.abbbbbccba.',
+      '..abbbbcca..',
+      '..acdeecda..',
+      '..aceedeca..',
+      '...acccca...',
+      '..acfghgfa..',
+      '.accbbbbcca.',
+      'aiicbbbbciia',
+      'aiacbbbbcaia',
+      '.a.aaaaaa.a.',
+    ] },
+    bunny: { pal: { a: '#3b2a25', b: '#f6aac0', c: '#eef1f4', d: '#ffffff', e: '#1f1b24', f: '#ffe3ea', g: '#dc7896', h: '#d3d8de' }, rows: [
+      '.aaa..aaa.',
+      '.aba..aba.',
+      '.aba..aba.',
+      '.aba..aba.',
+      '.acdaacca.',
+      '..adddca..',
+      '.acedceca.',
+      '..fcggcf..',
+      '..acccca..',
+      '.achhhhca.',
+      '.achhhhca.',
+      '..aaaaaa..',
+    ] },
+    catdoll: { pal: { a: '#3b2a25', b: '#f6aac0', c: '#f6a54e', d: '#ffd08a', e: '#de7f2c', f: '#1f1b24', g: '#ffe3ea', h: '#fbf1dc', i: '#dc7896' }, rows: [
+      '.aaa....aaa.',
+      '.abcaaaacba.',
+      '.acddeeecca.',
+      '.acdddcccca.',
+      '.acfdcccfca.',
+      '.agchiihcga.',
+      '..acchhcca..',
+      '..acccccca..',
+      '.acchhhhca..',
+      '.aachhhhcaa.',
+      '...aaaaaa...',
+    ] },
+    duck: { pal: { a: '#3b2a25', b: '#fff2a8', c: '#1f1b24', d: '#f6d34f', e: '#f6aac0', f: '#d9a530' }, rows: [
+      '...aa.....',
+      '..abba....',
+      '.abbcda...',
+      '.adeddaaaa',
+      '..adda.aa.',
+      '..abbdaa..',
+      '.abbbbbda.',
+      'adbbbffffa',
+      '.adddfffa.',
+      '.affffffa.',
+      '..aaaaaa..',
+    ] },
+    frame: { pal: { a: '#3b2a25', b: '#fff2a8', c: '#d4f6fc', d: '#d9a530', e: '#ffffff', f: '#86dcec', g: '#f6d34f', h: '#73c45a', i: '#b4e894', j: '#43913e' }, rows: [
+      'aaaaaaaaaaaaaa',
+      'abbbbbbbbbbbba',
+      'abccccccccccda',
+      'abcceecccebcda',
+      'abfffffffgffda',
+      'abffhiffffffda',
+      'abfhihhfjjjfda',
+      'abhhhhhhhhhhda',
+      'abjjjjjjjjjjda',
+      'abddddddddddda',
+      'aaaaaaaaaaaaaa',
+    ] },
+    clock: { pal: { a: '#3b2a25', b: '#eef1f4', c: '#9a9ea6', d: '#ffffff', e: '#1f1b24', f: '#ef6a5e' }, rows: [
+      '....aaaa....',
+      '..aabbcbaa..',
+      '.abdddedbba.',
+      'abddddeddbba',
+      'abddddeddbba',
+      'abcdddfeebca',
+      'abddddddbbba',
+      'abbbddbbbbba',
+      '.abbbbbbbba.',
+      '..aabbcbaa..',
+      '....aaaa....',
+    ] },
+    poster: { pal: { a: '#3b2a25', b: '#654a9e', c: '#9677d4', d: '#ffffff', e: '#f6d34f', f: '#fff2a8', g: '#43913e', h: '#73c45a', i: '#2b6431', j: '#fbf1dc', k: '#2f2a36', l: '#9a9ea6' }, rows: [
+      'aaaaaaaaaaaa',
+      'abbbbbbbbbba',
+      'acdcceeccdca',
+      'acccefeedcca',
+      'accceeeeccda',
+      'accdceecccca',
+      'aghhhgghhhga',
+      'aggggiggggga',
+      'ajjjjjjjjjja',
+      'ajkkkkkkkkja',
+      'ajjlllllljja',
+      'aaaaaaaaaaaa',
+    ] },
+    shelf: { pal: { a: '#3b2a25', b: '#ef6a5e', c: '#fff2a8', d: '#73c45a', e: '#94c2f2', f: '#6aa2e8', g: '#f6d34f', h: '#d0723f', i: '#86dcec', j: '#d9a530', k: '#ecc28a', l: '#7f4f2b' }, rows: [
+      '..aa..aa...aaaa.....',
+      '..abaaca...adda.aaa.',
+      '..abefcga..ahha.aia.',
+      '..abefcga..ahha.aja.',
+      'aakkkkkkkaakkkkakkka',
+      'aallaaaaaaaaaaaallaa',
+      '..aa............aa..',
+      '..aa............aa..',
+      '..a.............a...',
+    ] },
+    neon: { pal: { a: '#3b2a25', b: '#f6aac0', c: '#dc7896', d: '#ffffff', e: '#ffe3ea' }, rows: [
+      '..aaa..aaa..',
+      '.abbcaacbba.',
+      'abdebccbebba',
+      'abebbbbbbbba',
+      '.abbbbbbbba.',
+      '..acbbbbca..',
+      '...acbbca...',
+      '....acca....',
+      '.....aa.....',
+      '............',
+    ] },
+    tankS: { pal: { a: '#3b2a25', b: '#d4f6fc', c: '#ffffff', d: '#86dcec', e: '#73c45a', f: '#43913e', g: '#f6d34f', h: '#fff2a8', i: '#46404f' }, rows: [
+      '...aaaaaaaa...',
+      '..abbbbbbbba..',
+      '.abbbbbbbbbba.',
+      'abcddddddddbba',
+      'abcdddddddddba',
+      'abcdeddddeddba',
+      'abddeddddefdba',
+      '.agghggghggga.',
+      '..agggggggga..',
+      '...aiiiiiia...',
+      '...aaaaaaaa...',
+    ] },
+    tankM: { pal: { a: '#3b2a25', b: '#ffffff', c: '#d4f6fc', d: '#86dcec', e: '#45aac2', f: '#73c45a', g: '#43913e', h: '#f6d34f', i: '#fff2a8', j: '#46404f' }, rows: [
+      'aaaaaaaaaaaaaaaa',
+      'abccccccccccccca',
+      'abccccccccccccca',
+      'abddddddddddddea',
+      'abddddddddddddea',
+      'abddddddddddddea',
+      'abddddddddddddea',
+      'abfddddfddddfdea',
+      'abfgdddfgdddfgea',
+      'abhhihhihhihhiha',
+      'ahhhhhhhhhhhhhha',
+      'ajjjjjjjjjjjjjja',
+      'aaaaaaaaaaaaaaaa',
+    ] },
+    tankL: { pal: { a: '#3b2a25', b: '#ffffff', c: '#d4f6fc', d: '#86dcec', e: '#45aac2', f: '#73c45a', g: '#43913e', h: '#f6d34f', i: '#fff2a8', j: '#46404f' }, rows: [
+      'aaaaaaaaaaaaaaaaaaaaaaaa',
+      'abccccccccccccccccccccca',
+      'abccccccccccccccccccccca',
+      'abccccccccccccccccccccca',
+      'abddddddddddddddddddddea',
+      'abddddddddddddddddddddea',
+      'abddddddddddddddddddddea',
+      'abddddddddddddddddddddea',
+      'abddddddddddddddddddddea',
+      'abfddddfddddfddddfddddea',
+      'abfgdddfgdddfgdddfgdddea',
+      'abhhihhihhihhihhihhihhia',
+      'abhhhhhhhhhhhhhhhhhhhhha',
+      'ahhhhhhhhhhhhhhhhhhhhhha',
+      'ajjjjjjjjjjjjjjjjjjjjjja',
+      'aaaaaaaaaaaaaaaaaaaaaaaa',
+    ] },
+    rugRound: { pal: { a: '#3b2a25', b: '#fbf1dc', c: '#f6aac0', d: '#dc7896' }, rows: [
+      '.....aaaaaaaaaaaa.....',
+      '.aaaabbbbccccbbbbaaaa.',
+      'adbbcccbbbccbbbcccbbda',
+      'adbbcccbbbccbbbcccbbda',
+      '.aaaabbbbccccbbbbaaaa.',
+      '.....aaaaaaaaaaaa.....',
+    ] },
+    rugStripe: { pal: { a: '#ecd8b2', b: '#3b2a25', c: '#fbf1dc', d: '#6aa2e8', e: '#2c4c84', f: '#f6d34f' }, rows: [
+      'abbbbbbbbbbbbbbbbbbbbbba',
+      '.bccddeeccffccddeeccffb.',
+      'aeccddeeccffccddeeccffea',
+      '.bccddeeccffccddeeccffb.',
+      'abbbbbbbbbbbbbbbbbbbbbba',
+    ] },
+    tvStand: { pal: { a: '#3b2a25', b: '#7f4f2b', c: '#cf9558', d: '#5a3720', e: '#a8703f', f: '#ef6a5e', g: '#6aa2e8', h: '#f6d34f', i: '#2f2a36', j: '#b4e894' }, rows: [
+      'aaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'abbbbbbbbbbbbbbbbbbbbbbbba',
+      'accccccccddddddddcccccccca',
+      'aceeeeeebddddddfgceeeeeeba',
+      'aceeeeehbdijiidfgcheeeeeba',
+      'aceeeeeebdiiiidfgceeeeeeba',
+      'abbaaaaaaabbbbbbaaaaaaabba',
+      '.aa....................aa.',
+    ] },
+  });
+  // ---- HD END
   Object.assign(GLOW_EXTRA, {
     arcade: [0.5, 0.4, 20], neon: [0.5, 0.45, 24], fridge: [0.5, 0.3, 6],
     hwPumpkinLamp: [0.5, 0.45, 18], xmasTree2: [0.5, 0.4, 22], xmasFireplace: [0.5, 0.55, 20],
@@ -1244,15 +1871,17 @@ window.Furniture = (() => {
     const key = id + skyColor;
     let c = cache.get(key);
     if (c) return c;
-    const w = Math.max(...art.map((r) => r.length)), h = art.length;
+    // 글자 격자만 있거나, { pal: 이 그림만의 색, rows: 격자 } (0.13.6 다시 그린 기본 가구)
+    const rows = Array.isArray(art) ? art : art.rows, pal = Array.isArray(art) ? PAL : art.pal;
+    const w = Math.max(...rows.map((r) => r.length)), h = rows.length;
     c = document.createElement('canvas');
     c.width = w; c.height = h;
     const g = c.getContext('2d');
     for (let y = 0; y < h; y++) {
-      for (let x = 0; x < art[y].length; x++) {
-        const ch = art[y][x];
+      for (let x = 0; x < rows[y].length; x++) {
+        const ch = rows[y][x];
         if (ch === '.' || ch === ' ') continue;
-        g.fillStyle = ch === '@' ? skyColor : (PAL[ch] || '#f0f');
+        g.fillStyle = ch === '@' && pal === PAL ? skyColor : (pal[ch] || '#f0f');
         g.fillRect(x, y, 1, 1);
       }
     }

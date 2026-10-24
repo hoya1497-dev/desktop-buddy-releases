@@ -304,17 +304,20 @@
     const bag = $('bagItems'); bag.textContent = '';
     const placed = {};
     for (const it of u.home.items) placed[it.item] = (placed[it.item] || 0) + 1;
+    // 방에 다 놓은 가구는 가방에서 숨김 (꾸미기에서 다시 가방에 넣으면 돌아옴)
     let any = false;
     for (const [id, n] of Object.entries(u.owned)) {
       const def = c.items[id];
       if (!def || def.required) continue;
-      const left = n - (placed[id] || 0);
       any = true;
-      bag.append(H.shopRow(Furniture.thumb(id), def.name, `${left}개 남음 · 방에 ${placed[id] || 0}개`, [
-        ['2층에', left <= 0 || !v.editable, () => H.placeNew(id, 2), 'ghost small'],
-        ['1층에', left <= 0 || !v.editable, () => H.placeNew(id, 1), 'ghost small'],
+      const left = n - (placed[id] || 0);
+      if (left <= 0) continue;
+      bag.append(H.shopRow(Furniture.thumb(id), def.name, `${left}개 남음${placed[id] ? ` · 방에 ${placed[id]}개` : ''}`, [
+        ['2층에', !v.editable, () => H.placeNew(id, 2), 'ghost small'],
+        ['1층에', !v.editable, () => H.placeNew(id, 1), 'ghost small'],
       ]));
     }
+    if (any && !bag.children.length) bag.append(el('li', { class: 'note', text: '가방에 남은 가구가 없어요. 전부 방에 놓았어요!' }));
     $('bagNote').textContent = !any ? '아직 가구가 없어요. 상점에서 사 보세요!' : v.editable ? '놓을 층을 고르세요' : '내 집에서만 놓을 수 있어요';
   }
   $('sellTrashBtn').onclick = () => {
