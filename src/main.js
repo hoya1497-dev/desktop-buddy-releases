@@ -134,6 +134,8 @@ let overlay = null, control = null, home = null, login = null, tray = null;
 let mini = null, timerWin = null, stickyWin = null;   // 미니맵 · 화면 고정 타이머 · 붙이는 메모
 let quitting = false;
 
+const liveWindows = new Set();
+
 function secure(win) {
   // 외부 페이지로 이동하거나 새 창을 여는 것을 막음
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -141,7 +143,31 @@ function secure(win) {
     return { action: 'deny' };
   });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
+
+  // 화면이 깜빡이다 가구 · 물고기 그림이 투명해지는 문제: GPU 프로세스가 죽거나 다시 시작되면
+  // 캔버스에 미리 그려 캐시해 둔 그림(가구 · 물고기 · 펫 비트맵)의 내용이 사라져서, 캐시를 그대로
+  // 쓰는 코드는 빈 그림만 계속 그리게 됨. 창 자체가 죽는 경우도 있음 (render-process-gone).
+  // 두 경우 모두 그 창을 다시 불러오면 캐시가 전부 새로 만들어져서 복구됨.
+  liveWindows.add(win);
+  win.on('closed', () => liveWindows.delete(win));
+  win.webContents.on('render-process-gone', (e, details) => {
+    console.error('render-process-gone', details.reason, win.getTitle?.());
+    if (details.reason === 'clean-exit') return;
+    if (win.isDestroyed()) return;
+    win.webContents.reload();
+  });
 }
+
+// GPU 프로세스가 죽으면(그래픽 드라이버 문제 등) 모든 창의 화면이 한꺼번에 깜빡이고,
+// 캔버스로 미리 그려 둔 가구 · 물고기 · 펫 그림이 전부 투명하게 변함(캐시된 캔버스의
+// GPU 쪽 내용이 날아가기 때문). 창을 다시 불러오면 캐시가 새로 만들어져서 정상으로 돌아옴.
+app.on('child-process-gone', (e, details) => {
+  if (details.type !== 'GPU') return;
+  console.error('GPU process gone:', details.reason);
+  for (const w of liveWindows) {
+    if (!w.isDestroyed()) w.webContents.reload();
+  }
+});
 const webPreferences = (extra = {}) => ({
   preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false, ...extra,
 });

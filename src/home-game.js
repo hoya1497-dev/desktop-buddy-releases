@@ -146,7 +146,7 @@
       const sub = `${r.code} · 전설 1종당 ${r.legend}% · 꽝 ${r.nothing}%` + (own ? '' : r.price ? ` · 🪙 ${r.price.toLocaleString()}` : '');
       const btns = own ? [[on ? '장착 중' : '장착', on, () => srv({ type: 'rod-equip', id }), on ? 'ghost small' : 'primary small']]
         : [['사기', u.coins < r.price, () => { if (confirm(`${r.name}을(를) 🪙${r.price.toLocaleString()}에 살까요? 사면 바로 장착돼요.`)) srv({ type: 'buy', item: id }); }]];
-      rodsUl.append(row(rodThumb(r.color), r.name, sub, btns));
+      rodsUl.append(row(RodArt.thumb(id, 34), r.name, sub, btns));
     }
     const pets = $('shopPets'); pets.textContent = '';
     const full = u.pets.length >= c.limits.petsMax;
@@ -185,17 +185,6 @@
       const wr = row(H.wallThumb(id), w.name, sub, buttons);
       if (w.event) evLists[w.event]?.walls.append(wr); else walls.append(wr);
     }
-  }
-  function rodThumb(color) {
-    const cv = el('canvas', { width: 34, height: 34 });
-    const g = cv.getContext('2d');
-    g.lineCap = 'round';
-    g.strokeStyle = '#3b2a25'; g.lineWidth = 5; g.beginPath(); g.moveTo(6, 30); g.lineTo(28, 5); g.stroke();
-    g.strokeStyle = color; g.lineWidth = 3; g.beginPath(); g.moveTo(6, 30); g.lineTo(28, 5); g.stroke();
-    g.fillStyle = '#5c3a26'; g.fillRect(7, 22, 6, 6);                       // 릴
-    g.strokeStyle = 'rgba(80,80,80,.7)'; g.lineWidth = 1; g.beginPath(); g.moveTo(28, 5); g.lineTo(30, 26); g.stroke();
-    g.fillStyle = '#e04a3a'; g.fillRect(28, 25, 4, 3); g.fillStyle = '#fff'; g.fillRect(28, 28, 4, 2);
-    return cv;
   }
   function renderRodPick() {
     const u = U(), c = C();
@@ -765,14 +754,8 @@
   function drawFisher(g, i, who, st, t, mini) {
     const x = SLOT_X(i), y = DECK_Y;
     const fs = mini ? 19 : 13;
-    // 낚싯대 (종류마다 색이 다름)
-    const tip = { x: x + 62, y: y - 78 };
-    const rodColor = (C()?.rods?.[who.rod] || {}).color || '#c9a45c';
-    g.lineCap = 'round';
-    g.strokeStyle = '#3b2a25'; g.lineWidth = 6; g.beginPath(); g.moveTo(x + 14, y - 16); g.lineTo(tip.x, tip.y); g.stroke();
-    g.strokeStyle = rodColor; g.lineWidth = 3.5; g.beginPath(); g.moveTo(x + 14, y - 16); g.lineTo(tip.x, tip.y); g.stroke();
-    if (who.rod === 'rod7') { g.fillStyle = `rgba(255,220,120,${0.5 + 0.5 * Math.sin(t * 6)})`; g.fillRect(tip.x - 3, tip.y - 3, 6, 6); }   // 전설의 낚싯대는 반짝
-    g.lineCap = 'butt';
+    // 낚싯대 끝 (그림은 캐릭터 · 이름표 위에 맨 나중에 그림)
+    const tip = { x: x + 84, y: y - 96 };
     // 찌
     const rest = { x: x + 80, y: 452 + (i % 2) * 26 };
     let bob = null;
@@ -818,6 +801,9 @@
     // 이름표 + 결과 말풍선
     const crown = showCrownDock(who.username) ? '👑 ' : '';
     let top = namePill(g, crown + (who.mine ? `나 · ${who.nickname}` : who.nickname), x + 4, y - 62, who.mine, fs, who);
+    // 낚싯대 (종류마다 그림이 다름) — 캐릭터보다 위, 3배 크기라 줄여 보여도 덜 뭉개짐
+    RodArt.drawAt(g, C()?.rods?.[who.rod] ? who.rod : 'rod1', tip.x, tip.y, 75);
+    if (who.rod === 'rod7') { g.fillStyle = `rgba(255,220,120,${0.5 + 0.5 * Math.sin(t * 6)})`; g.fillRect(tip.x - 4, tip.y - 4, 8, 8); }   // 전설의 낚싯대는 반짝
     // ✨ 자랑: 물고기를 머리 위로 번쩍
     const sh = st.show && (performance.now() - st.show.at) / 1000 < SHOW_SEC ? st.show : null;
     const sf = sh && FISH()[sh.code];
