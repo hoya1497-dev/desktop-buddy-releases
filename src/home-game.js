@@ -669,10 +669,8 @@
     roundRect(g, cx - w / 2, bottom - h, w, h, h / 2);
     g.textAlign = 'center'; g.textBaseline = 'middle';
     const t = performance.now() / 1000;
-    const restore = profile && window.NickFX ? NickFX.applyCanvasGlow(g, profile, t) : () => {};
-    g.fillStyle = profile && window.NickFX ? NickFX.canvasColor(profile, t, '#fff') : '#fff';
-    g.fillText(text, cx, bottom - h / 2 + 0.5);
-    restore();
+    if (profile && window.NickFX) NickFX.fillName(g, text, cx, bottom - h / 2 + 0.5, undefined, profile, t);
+    else { g.fillStyle = '#fff'; g.fillText(text, cx, bottom - h / 2 + 0.5); }
     g.textBaseline = 'alphabetic';
     return bottom - h;
   }

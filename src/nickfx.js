@@ -10,7 +10,7 @@ window.NickFX = (() => {
       const i = Math.floor((t * 2) % RAINBOW.length);
       return RAINBOW[i];
     }
-    if (eff === 'neon') return (profile.nameColor || '#6cf0ff');
+    if (eff === 'neon') return '#ffffff';   // 네온: 글자는 흰색, 고른 색은 빛(glow)으로
     return (profile && profile.nameColor) || fallback || '#fff';
   }
   // 캔버스 텍스트에 효과를 적용하고(그려야 할 ctx 설정), 원상복구용 함수를 돌려줌
@@ -29,13 +29,32 @@ window.NickFX = (() => {
     }
     return () => {};
   }
+  // 네온 간판처럼: 고른 색 빛을 넓게 → 좁게 겹쳐 그린 뒤 흰 글자를 맨 위에. 네온이 아니면 한 번만 그림
+  const neonGlow = (profile) => profile.nameColor || '#6cf0ff';
+  function fillName(ctx, text, x, y, maxW, profile, t) {
+    if (profile && profile.nameEffect === 'neon') {
+      const pulse = 0.75 + 0.25 * Math.sin(t * 5);
+      ctx.save();
+      ctx.shadowColor = neonGlow(profile);
+      ctx.fillStyle = neonGlow(profile);
+      for (const blur of [16, 8, 3]) { ctx.shadowBlur = blur * pulse; ctx.fillText(text, x, y, maxW); }
+      ctx.shadowBlur = 2; ctx.fillStyle = '#ffffff';
+      ctx.fillText(text, x, y, maxW);
+      ctx.restore();
+      return;
+    }
+    const restore = profile ? applyCanvasGlow(ctx, profile, t) : () => {};
+    ctx.fillStyle = profile ? canvasColor(profile, t, '#fff') : '#fff';
+    ctx.fillText(text, x, y, maxW);
+    restore();
+  }
   // DOM(채팅창 · 친구 목록 등)에 쓸 class + 인라인 색
   function domClass(profile) {
     const eff = profile && profile.nameEffect;
     return eff === 'neon' ? 'nick-neon' : eff === 'rainbow' ? 'nick-rainbow' : '';
   }
   function domStyle(profile, fallback) {
-    if (profile && profile.nameEffect === 'neon') return `color:${profile.nameColor || '#6cf0ff'};--nick-glow:${profile.nameColor || '#6cf0ff'}`;
+    if (profile && profile.nameEffect === 'neon') return `color:#fff;--nick-glow:${neonGlow(profile)}`;
     if (profile && profile.nameEffect === 'rainbow') return '';
     return `color:${(profile && profile.nameColor) || fallback || 'inherit'}`;
   }
@@ -47,14 +66,11 @@ window.NickFX = (() => {
     ctx.textAlign = 'left';
     let x = cx - (nw + tw) * k / 2;
     if (name) {
-      const restore = profile ? applyCanvasGlow(ctx, profile, t) : () => {};
-      ctx.fillStyle = profile ? canvasColor(profile, t, '#fff') : '#fff';
-      ctx.fillText(name, x, cy, nw * k);
-      restore();
+      fillName(ctx, name, x, cy, nw * k, profile, t);
       x += nw * k;
     }
     if (tail) { ctx.fillStyle = '#fff'; ctx.fillText(tail, x, cy, tw * k); }
     ctx.textAlign = align;
   }
-  return { canvasColor, applyCanvasGlow, drawNameLine, domClass, domStyle, RAINBOW };
+  return { canvasColor, applyCanvasGlow, fillName, drawNameLine, domClass, domStyle, RAINBOW };
 })();
