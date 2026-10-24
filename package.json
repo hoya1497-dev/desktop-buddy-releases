@@ -1,7 +1,7 @@
 {
   "name": "desktop-buddy",
   "productName": "Desktop Buddy",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "화면 위를 돌아다니는 작은 캐릭터 + 집 꾸미기 + 데스크톱 코드로 친구와 함께하는 데스크톱 펫",
   "main": "src/main.js",
   "scripts": {
