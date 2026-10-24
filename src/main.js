@@ -517,14 +517,24 @@ function handleServer(m, sock) {
       if (m.popup) { notify('Desktop Buddy', m.message); overlay?.webContents.send('emote', { from: 'me', kind: 'mail' }); }
       break;
     case 'knock':
-      knocks = knocks.filter((k) => k.username !== m.from.username).concat([{ ...m.from, at: Date.now() }]);
+      knocks = knocks.filter((k) => k.username !== m.from.username).concat([{ ...m.from, via: m.via || null, at: Date.now() }]);
       pushHome();
+      if (m.via) {   // 👥 친구의 친구가 들어오고 싶어해요
+        overlay?.webContents.send('chat', { id: 'me', text: `${m.via.nickname}님의 친구 ${m.from.nickname}님이 놀러 오고 싶어해요` });
+        notify('👥 들어가도 될까요?', `${m.via.nickname}님이 초대한 ${m.from.nickname}(@${m.from.username})님이 들어오고 싶어해요. 눌러서 허락해 주세요.`);
+        break;
+      }
       overlay?.webContents.send('chat', { id: 'me', text: `똑똑! ${m.from.nickname}(@${m.from.username})님이 문을 두드려요` });
       notify('똑똑! 🚪', `${m.from.nickname}(@${m.from.username})님이 문을 두드려요. 눌러서 열어 주세요.`);
       break;
     case 'invite':
-      invites = invites.filter((k) => k.username !== m.from.username).concat([{ ...m.from, count: m.count, max: m.max, at: Date.now() }]).slice(-5);
+      invites = invites.filter((k) => k.username !== m.from.username).concat([{ ...m.from, via: m.via || null, count: m.count, max: m.max, at: Date.now() }]).slice(-5);
       pushHome();
+      if (m.via) {
+        overlay?.webContents.send('chat', { id: 'me', text: `📨 ${m.via.nickname}님이 ${m.from.nickname}님 집으로 초대했어요!` });
+        notify('📨 초대장', `${m.via.nickname}님이 ${m.from.nickname}(@${m.from.username})님 집으로 초대했어요. 수락하면 ${m.from.nickname}님이 허락해야 들어가요.`);
+        break;
+      }
       overlay?.webContents.send('chat', { id: 'me', text: `📨 ${m.from.nickname}님이 집으로 초대했어요!` });
       notify('📨 초대장', `${m.from.nickname}(@${m.from.username})님이 집으로 초대했어요. 눌러서 놀러 가세요!`);
       break;
@@ -553,6 +563,7 @@ function handleServer(m, sock) {
       for (const w of homes()) w.webContents.send('emote', { from: m.id, kind: m.kind, target: m.target ? (m.target === myPeerId ? 'me' : m.target) : null });
       break;
     case 'fish-peer':   // 미니맵에도 같이 낚시하는 친구가 보이게
+    case 'fish-show':   // 🐟 잡은 물고기 자랑
       for (const w of homes()) w.webContents.send('srv', m);
       break;
     case 'dm':   // 개인 채팅
@@ -811,6 +822,8 @@ function petMenu({ id }, win = overlay) {
       { label: '🍪 간식 나눠먹기', enabled: !!(room && p), submenu: snackMenu(id) },
       ...EMOTES.slice(0, 3).map(([k, l]) => ({ label: l + ' 보내기', click: () => sendEmote(k, id) })),
       { label: '💬 채팅하기', click: () => showHome(true) },
+      ...(p && !friends.friends?.some((f) => f.username === p.username) && p.username !== session?.user.username
+        ? [{ label: friends.outgoing?.some((f) => f.username === p.username) ? '👋 친구 신청 보냄' : '👋 친구 신청', enabled: !friends.outgoing?.some((f) => f.username === p.username), click: () => wsSend({ type: 'friend-add-peer', id }) }] : []),
       { label: '✉️ 개인 채팅', enabled: !!(p && friends.friends?.some((f) => f.username === p.username)), click: () => showHome(false, p.username) },
       { label: '🎮 미니게임 대결 신청', enabled: !!p, submenu: [['ttt', '⭕ 틱택토'], ['rps', '✊ 가위바위보'], ['basket', '🧺 바구니 받기']].map(([g, l]) => ({ label: l, click: () => wsSend({ type: 'mg-invite', game: g, to: p.username }) })) },
     ];
@@ -1106,11 +1119,20 @@ function registerIpc() {
   ipcMain.on('open-my-room', () => session && joinRoom(session.user.code));
   ipcMain.on('leave-room', () => leaveRoom());
   ipcMain.on('send-chat', (_e, t) => sendChat(t));
+  // confirm/alert 뒤 입력칸 먹통 고치기: 창 포커스를 한 번 놓았다가 다시 잡아요
+  ipcMain.on('refocus', (e) => {
+    const w = BrowserWindow.fromWebContents(e.sender);
+    if (!w || w.isDestroyed()) return;
+    w.blur(); w.focus(); e.sender.focus();
+  });
   ipcMain.on('emote', (_e, { kind, target }) => sendEmote(kind, target));
   ipcMain.on('buy', (_e, item) => wsSend({ type: 'buy', item: String(item) }));
   ipcMain.on('place', (_e, items) => wsSend({ type: 'place', items }));
   ipcMain.on('wall', (_e, d) => wsSend({ type: 'wall', item: String(d && d.item), floor: d && d.floor === 2 ? 2 : 1 }));
-  ipcMain.on('light', (_e, on) => wsSend({ type: 'light', on: !!on }));
+  ipcMain.on('light', (_e, v) => {   // true/false 또는 { on, floor: 1|2 } (층마다 따로)
+    if (v && typeof v === 'object') wsSend({ type: 'light', on: !!v.on, ...(v.floor === 1 || v.floor === 2 ? { floor: v.floor } : {}) });
+    else wsSend({ type: 'light', on: !!v });
+  });
   ipcMain.on('gift', (_e, d) => wsSend({ type: 'gift', username: String(d && d.username), amount: Math.floor(Number(d && d.amount)) }));
   // 바탕화면 말풍선에 글자를 입력하는 동안만 오버레이가 키보드를 받음
   ipcMain.on('overlay-focus', (_e, on) => {
@@ -1125,7 +1147,7 @@ function registerIpc() {
     'fish-cast', 'fish-reel', 'fish-sell', 'fish-gift', 'fish-view', 'trade-offer', 'trade-answer', 'trade-cancel',
     'tank-put', 'tank-take', 'tank-feed', 'aqua-put', 'aqua-take', 'aqua-view', 'block', 'unblock', 'password-change', 'username-change',
     'fish-here', 'share-snack', 'mg-invite', 'mg-answer', 'mg-move', 'mg-quit', 'rod-equip', 'pet-sell', 'pet-private',
-    'board-get', 'board-add', 'board-del', 'board-clear', 'board-edit', 'board-style', 'dm-send', 'dm-get', 'dm-read', 'mail-get', 'mail-send', 'mail-reply', 'mail-read', 'mail-del', 'notices-get', 'notice-post', 'notice-edit', 'notice-del', 'invite',
+    'board-get', 'board-add', 'board-del', 'board-clear', 'board-edit', 'board-style', 'dm-send', 'dm-get', 'dm-read', 'mail-get', 'mail-send', 'mail-reply', 'mail-read', 'mail-del', 'fish-sell-many', 'fish-show', 'invite-fof', 'friend-add-peer', 'notices-get', 'notice-post', 'notice-edit', 'notice-del', 'invite',
     'home-expand', 'music-get', 'music-add', 'music-request', 'music-answer', 'music-skip', 'music-remove', 'music-duration', 'music-error']);
   ipcMain.on('srv', (_e, m) => {
     if (!m || typeof m !== 'object' || !SRV_TYPES.has(m.type)) return;
@@ -1162,8 +1184,10 @@ function registerIpc() {
   ipcMain.on('visit', (_e, u) => wsSend({ type: 'visit', username: String(u) }));
   ipcMain.on('knock', (_e, u) => wsSend({ type: 'knock', username: String(u) }));
   ipcMain.on('invite-answer', (_e, { username, accept }) => {
+    const inv = invites.find((k) => k.username === username);
     invites = invites.filter((k) => k.username !== username);
-    if (accept) wsSend({ type: 'visit', username: String(username) });
+    if (accept && inv?.via) { wsSend({ type: 'fof-accept', username: String(username) }); home?.webContents.send('toast', `${inv.nickname}님에게 들어가도 되는지 물어봤어요. 허락하면 바로 들어가요.`); }
+    else if (accept) wsSend({ type: 'visit', username: String(username) });
     else wsSend({ type: 'invite-answer', username: String(username), accept: false });
     pushHome();
   });

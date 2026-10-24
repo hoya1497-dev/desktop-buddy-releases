@@ -280,7 +280,7 @@ body.mini #room { border-radius: 8px; cursor: pointer !important; }
 /* ---------------- 낚시터 모드 */
 #leaveFishBtn { display: none; }
 body.fishing-mode #leaveFishBtn { display: inline-block; }
-body.fishing-mode #deskBtn, body.fishing-mode #decoBtn, body.fishing-mode #lightBtn { display: none; }
+body.fishing-mode #deskBtn, body.fishing-mode #decoBtn, body.fishing-mode #lightBtn { display: none !important; }
 #castBtn.bite { animation: bitePulse .35s infinite alternate; background: var(--danger); border-color: var(--danger); color: #fff; }
 @keyframes bitePulse { from { transform: scale(1); } to { transform: scale(1.08); } }
 
@@ -447,3 +447,30 @@ body.mini .music-modal, body.mini .music-bar { display: none !important; }
 }
 .nick-rainbow { background: linear-gradient(90deg, #ff5a5a, #ff9a3c, #ffd23c, #5adf6b, #4ab8ff, #8a6bff, #ff6bd0, #ff5a5a); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: nick-rainbow-move 3s linear infinite; }
 @keyframes nick-rainbow-move { to { background-position: 300% 0; } }
+
+/* 0.14 낚시터: 배경 고르기 · 낚시하면서 채팅 */
+.scene-row select { max-width: 120px; }
+#fishChatLog { height: 140px; overflow-y: auto; background: var(--input); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; margin-bottom: 6px; font-size: 12px; }
+#fishChatForm input { flex: 1; min-width: 0; }
+#recentList li { cursor: pointer; position: relative; }
+#recentList li .dex-mini { position: absolute; top: 2px; right: 2px; font-size: 10px; opacity: .55; border: 0; background: none; padding: 0; cursor: pointer; }
+#recentList li .dex-mini:hover { opacity: 1; }
+#recentList li.showing { outline: 2px solid #f5c542; border-radius: 8px; }
+/* 0.14 골라서 팔기 */
+.sell-bar { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 7px 9px; margin-bottom: 8px; border-radius: 10px; background: var(--card, var(--input)); border: 1.5px solid var(--accent); box-shadow: 0 4px 14px rgba(0,0,0,.12); font-size: 12px; }
+.sell-bar .grow { flex: 1; }
+.sell-bar #sellGoBtn.armed { background: #e0573f; border-color: #e0573f; }
+.fishgrid.selecting li { cursor: pointer; }
+.fishgrid.selecting li:not(.sel) { opacity: .62; }
+.fishgrid li.sel { outline: 2.5px solid var(--accent); outline-offset: -2px; opacity: 1; }
+.fishgrid li.sel::after { content: '✓'; position: absolute; top: 3px; left: 4px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; line-height: 16px; text-align: center; font-weight: 700; }
+.fishgrid li .step { display: flex; align-items: center; justify-content: center; gap: 3px; margin-top: 2px; }
+.fishgrid li .step button { width: 20px; height: 20px; padding: 0; border-radius: 6px; font-size: 13px; line-height: 1; }
+.fishgrid li .step b { min-width: 30px; text-align: center; font-size: 11px; }
+/* 0.14 층마다 불 켜고 끄기 */
+.light-group { display: inline-flex; }
+.light-group button { border-radius: 0; padding-left: 9px; padding-right: 9px; }
+.light-group button:first-child { border-radius: 8px 0 0 8px; }
+.light-group button:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+.light-group button.dark { background: #2b2d48; color: #c9cbe8; border-color: #2b2d48; }
+.light-group.off button { opacity: .55; }

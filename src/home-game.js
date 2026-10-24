@@ -226,6 +226,7 @@
   }
 
   // ------------------------------------------------------------ 가방
+  let sellSel = null, sellArmed = 0, sellArmT = null;   // ☑️ 골라서 팔기: code -> 개수
   function renderBag() {
     const u = U(), c = C();
     if (!u || !c) return;
@@ -253,8 +254,24 @@
       const f = FISH()[code]; if (!f) continue;
       const n = u.fishInv[code];
       total += n; if (f.cat === 'T') trash += n; else if (n > 1) dups += n - 1;
-      grid.append(fishCell(f, n, false, () => openFish(code)));
+      if (!sellSel) { grid.append(fishCell(f, n, false, () => openFish(code))); continue; }
+      // ☑️ 골라서 팔기: 누르면 그 종류를 전부 고르고, −/+로 개수 조절
+      const k = Math.min(sellSel.get(code) || 0, n);
+      if (k) sellSel.set(code, k); else sellSel.delete(code);
+      const li = fishCell(f, n, false, () => { if (sellSel.has(code)) sellSel.delete(code); else sellSel.set(code, n); renderBag(); });
+      if (k) {
+        li.classList.add('sel');
+        const stop = (fn) => (e) => { e.stopPropagation(); fn(); renderBag(); };
+        li.append(el('div', { class: 'step' },
+          el('button', { class: 'ghost', text: '−', title: '하나 빼기', onclick: stop(() => { if (k > 1) sellSel.set(code, k - 1); else sellSel.delete(code); }) }),
+          el('b', { text: `${k}/${n}` }),
+          el('button', { class: 'ghost', text: '+', title: '하나 더', disabled: k >= n, onclick: stop(() => sellSel.set(code, Math.min(n, k + 1))) })));
+      }
+      grid.append(li);
     }
+    for (const code of [...(sellSel?.keys() || [])]) if (!u.fishInv[code]) sellSel.delete(code);
+    grid.classList.toggle('selecting', !!sellSel);
+    renderSellBar();
     $('bagFishNote').textContent = codes.length ? `물고기 ${total}마리 · 누르면 팔기 · 어항에 풀기 · 선물 · 교환을 할 수 있어요` : '아직 잡은 게 없어요. 🎣 낚시 탭에서 낚아 보세요!';
     $('sellTrashBtn').disabled = !trash;
     $('sellTrashBtn').textContent = `🗑️ 쓰레기 재활용 (${trash})`;
@@ -305,16 +322,51 @@
     for (const [code, k] of Object.entries(u.fishInv)) if (FISH()[code]?.cat === 'T' && k > 0) { srv({ type: 'fish-sell', code, n: k }); n += k; coins += k * FISH()[code].price; }
     if (n) H.toast(`🗑️ 쓰레기 ${n}개를 재활용했어요 (+🪙${coins})`, true);
   };
+  // 중복만 팔기 = 골라서 팔기에 중복을 미리 골라 둔 상태로 열기 (확인창 없이 아래 막대에서 팔아요)
   $('sellDupBtn').onclick = () => {
-    const u = U(); let n = 0, coins = 0;
-    const sells = [];
-    for (const [code, k] of Object.entries(u.fishInv)) {
-      const f = FISH()[code];
-      if (f && f.cat !== 'T' && k > 1) { sells.push({ code, n: k - 1 }); n += k - 1; coins += (k - 1) * f.price; }
+    const u = U(); if (!u) return;
+    sellSel = new Map();
+    for (const [code, k] of Object.entries(u.fishInv)) { const f = FISH()[code]; if (f && f.cat !== 'T' && k > 1) sellSel.set(code, k - 1); }
+    sellArmed = 0; renderBag();
+    if (sellSel.size) H.toast('종류마다 1마리씩 남기고 골라 뒀어요. 아래에서 확인하고 팔아요.');
+  };
+  // ☑️ 골라서 팔기
+  function sellTotals() {
+    let n = 0, coins = 0;
+    for (const [code, k] of sellSel || []) { n += k; coins += k * (FISH()[code]?.price || 0); }
+    return { n, coins };
+  }
+  function renderSellBar() {
+    $('sellBar').hidden = !sellSel;
+    $('selectSellBtn').textContent = sellSel ? '☑️ 고르는 중…' : '☑️ 골라서 팔기';
+    $('selectSellBtn').disabled = !!sellSel;
+    if (!sellSel) return;
+    const { n, coins } = sellTotals();
+    $('sellSum').textContent = n ? `${sellSel.size}종류 · ${n}마리 고름 · +🪙${coins}` : '팔 물고기를 눌러서 골라요';
+    const go = $('sellGoBtn');
+    go.disabled = !n;
+    go.classList.toggle('armed', !!sellArmed && !!n);
+    go.textContent = sellArmed && n ? `정말 팔기 (+🪙${coins})` : '팔기';
+  }
+  const endSell = () => { sellSel = null; sellArmed = 0; clearTimeout(sellArmT); renderBag(); };
+  $('selectSellBtn').onclick = () => { sellSel = new Map(); sellArmed = 0; renderBag(); };
+  $('sellCancelBtn').onclick = endSell;
+  $('sellAllBtn').onclick = () => {
+    const u = U(); if (!u || !sellSel) return;
+    const all = Object.entries(u.fishInv).filter(([c, k]) => k > 0 && FISH()[c]);
+    if (all.every(([c, k]) => sellSel.get(c) === k)) sellSel.clear(); else for (const [c, k] of all) sellSel.set(c, k);
+    sellArmed = 0; renderBag();
+  };
+  $('sellGoBtn').onclick = () => {
+    const { n } = sellTotals();
+    if (!n) return;
+    if (!sellArmed) {   // 실수 방지: 한 번 더 눌러야 팔려요 (확인창을 안 써서 입력칸이 안 멈춰요)
+      sellArmed = 1; renderSellBar();
+      clearTimeout(sellArmT); sellArmT = setTimeout(() => { sellArmed = 0; renderSellBar(); }, 4000);
+      return;
     }
-    if (!n || !confirm(`중복된 물고기 ${n}마리를 팔까요? (+🪙${coins})\n종류마다 1마리씩은 남겨 둬요.`)) return;
-    for (const x of sells) srv({ type: 'fish-sell', code: x.code, n: x.n });
-    H.toast(`🪙 중복 물고기 ${n}마리를 팔았어요 (+🪙${coins})`, true);
+    srv({ type: 'fish-sell-many', items: [...sellSel].map(([code, k]) => ({ code, n: k })) });
+    endSell();
   };
 
   function fishCell(f, n, unknown, onclick) {
@@ -565,6 +617,38 @@
       if (p && f && !H.isMini && $('pane-fishing').classList.contains('active')) H.toast(`🎣 ${p.nickname}님이 ${f.name}${m.size ? `(${m.size}cm)` : ''}을(를) 낚았어요!`);
     }
   }
+  // 🎨 낚시터 배경 (시간 × 계절): 각자 고르고, 나한테만 보임
+  let scene = { time: 'auto', season: 'auto' };
+  try { const v = JSON.parse(localStorage.getItem('fishScene') || 'null'); if (v && typeof v === 'object') scene = { time: String(v.time || 'auto'), season: String(v.season || 'auto') }; } catch {}
+  if (!H.isMini) {
+    $('sceneTime').value = scene.time; $('sceneSeason').value = scene.season;
+    if (!$('sceneTime').value) $('sceneTime').value = 'auto';
+    if (!$('sceneSeason').value) $('sceneSeason').value = 'auto';
+    const saveScene = () => {
+      scene = { time: $('sceneTime').value, season: $('sceneSeason').value };
+      try { localStorage.setItem('fishScene', JSON.stringify(scene)); } catch {}
+    };
+    $('sceneTime').onchange = saveScene; $('sceneSeason').onchange = saveScene;
+  }
+  addEventListener('storage', (e) => {   // 큰 창에서 바꾸면 미니맵도 같이
+    if (e.key !== 'fishScene') return;
+    try { const v = JSON.parse(e.newValue || 'null'); if (v) scene = { time: String(v.time || 'auto'), season: String(v.season || 'auto') }; } catch {}
+  });
+  // 낚시터 말풍선: 낚시하면서 친 채팅이 머리 위에 잠깐 보임
+  const fishSay = new Map();   // pid('me' 또는 peerId) -> { text, t }
+  buddy.on('chat', (m) => { if (m.pid && !m.system) fishSay.set(m.pid, { text: String(m.text || ''), t: performance.now() }); });
+  // ✨ 잡은 물고기 자랑: 머리 위로 들어 올림
+  const SHOW_SEC = 4.5;
+  function showOff(r) {
+    if (!FISH()[r.code]) return;
+    fishing.show = { code: r.code, size: r.size, at: performance.now() };
+    srv({ type: 'fish-show', code: r.code, size: r.size || 0 });
+  }
+  function onFishShow(m) {
+    if (!FISH()[m.code]) return;
+    if (!fishPeers.has(m.id)) fishPeers.set(m.id, { here: true, state: 'idle', t: performance.now(), t0: performance.now() });
+    fishPeers.get(m.id).show = { code: m.code, size: m.size, at: performance.now() };
+  }
   const recent = [];
   $('castBtn').onclick = () => {
     if (fishing.state === 'idle' || fishing.state === 'result') {
@@ -639,7 +723,8 @@
     for (const r of recent) {
       const f = FISH()[r.code];
       if (!f) continue;
-      ul.append(el('li', { onclick: () => openFish(r.code), title: f.name }, FishArt.thumb(f, 40), el('span', { text: f.name }), r.size ? el('span', { class: 'note-inline', text: r.size + 'cm' }) : null));
+      const dex = el('button', { class: 'dex-mini', text: '📖', title: '도감에서 보기', onclick: (e) => { e.stopPropagation(); openFish(r.code); } });
+      ul.append(el('li', { onclick: () => showOff(r), title: `${f.name} 자랑하기` }, dex, FishArt.thumb(f, 40), el('span', { text: f.name }), r.size ? el('span', { class: 'note-inline', text: r.size + 'cm' }) : null));
     }
     if (!recent.length) ul.append(el('li', { class: 'note', style: 'width:auto;border:0', text: '아직 없어요' }));
   }
@@ -730,6 +815,46 @@
     // 이름표 + 결과 말풍선
     const crown = showCrownDock(who.username) ? '👑 ' : '';
     let top = namePill(g, crown + (who.mine ? `나 · ${who.nickname}` : who.nickname), x + 4, y - 62, who.mine, fs, who);
+    // ✨ 자랑: 물고기를 머리 위로 번쩍
+    const sh = st.show && (performance.now() - st.show.at) / 1000 < SHOW_SEC ? st.show : null;
+    const sf = sh && FISH()[sh.code];
+    if (sf) {
+      const age = (performance.now() - sh.at) / 1000;
+      const bm = FishArt.bitmap(sf);
+      const sc = Math.max(2, Math.min(4, Math.floor(64 / Math.max(bm.width, bm.height))));
+      const lift = Math.min(1, age / 0.35);
+      const fw = bm.width * sc, fh = bm.height * sc;
+      const fy = top - 8 - fh - lift * 6 + Math.sin(t * 5) * 2 - (i % 2) * 34;   // 옆자리와 안 겹치게 번갈아 높이
+      // 반짝이
+      g.fillStyle = `rgba(255,230,140,${0.35 + 0.25 * Math.sin(t * 8)})`;
+      g.beginPath(); g.ellipse(x + 4, fy + fh / 2, fw / 2 + 12, fh / 2 + 10, 0, 0, Math.PI * 2); g.fill();
+      g.imageSmoothingEnabled = false;
+      g.drawImage(bm, x + 4 - fw / 2, fy, fw, fh);
+      g.fillStyle = '#fff6b0';
+      for (let k = 0; k < 4; k++) { const a = t * 2 + k * 1.57; g.fillRect(Math.round(x + 4 + Math.cos(a) * (fw / 2 + 10)) - 2, Math.round(fy + fh / 2 + Math.sin(a) * (fh / 2 + 8)) - 2, 4, 4); }
+      const txt = `✨ ${sf.name}${sh.size ? ` ${sh.size}cm` : ''}`;
+      g.font = `bold ${fs}px ${FONT}`;
+      const w = g.measureText(txt).width + fs, h = fs * 1.8;
+      g.fillStyle = rar(sf).color;
+      roundRect(g, x + 4 - w / 2, fy - h - 6, w, h, 8);
+      g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(txt, x + 4, fy - h / 2 - 6); g.textBaseline = 'alphabetic';
+      top = fy - h - 6;
+    }
+    // 💬 채팅 말풍선
+    const say = fishSay.get(who.mine ? 'me' : who.id);
+    if (say && !sf && (performance.now() - say.t) / 1000 < 5) {
+      g.font = `${fs}px ${FONT}`;
+      let txt = say.text;
+      while (txt.length > 1 && g.measureText(txt).width > 170) txt = txt.slice(0, -2) + '…';
+      const w = g.measureText(txt).width + fs * 1.2, h = fs * 1.8, by = top - h - 10 - (i % 2) * (h + 6);   // 옆자리 말풍선과 번갈아
+      g.fillStyle = 'rgba(255,255,255,0.96)'; roundRect(g, x + 4 - w / 2, by, w, h, 9);
+      g.beginPath(); g.moveTo(x - 2, by + h); g.lineTo(x + 10, by + h); g.lineTo(x + 4, by + h + 6); g.fill();
+      g.fillStyle = '#333'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(txt, x + 4, by + h / 2 + 0.5); g.textBaseline = 'alphabetic';
+      return;
+    }
+    if (sf) return;
     if (s === 'result' && st.t < 3.5 && !who.mine) {
       const f = st.kind === 'catch' ? FISH()[st.code] : null;
       const txt = f ? `🎣 ${f.name}!` : { early: '너무 빨랐다!', late: '놓쳤다…', nothing: '꽝!' }[st.kind] || '';
@@ -745,33 +870,9 @@
   }
   function drawFishing(g, W, Hh, mini) {
     const t = performance.now() / 1000;
-    const h = new Date().getHours();
-    const night = h < 6 || h >= 20, dusk = h >= 17 && h < 20;
     g.imageSmoothingEnabled = false;
-    // 하늘
-    const sky = g.createLinearGradient(0, 0, 0, WATER_Y);
-    if (night) { sky.addColorStop(0, '#0f1436'); sky.addColorStop(1, '#2a3a6a'); }
-    else if (dusk) { sky.addColorStop(0, '#e9826e'); sky.addColorStop(1, '#f8d3a8'); }
-    else { sky.addColorStop(0, '#7cc5f2'); sky.addColorStop(1, '#d8f1ff'); }
-    g.fillStyle = sky; g.fillRect(0, 0, W, WATER_Y);
-    if (night) { g.fillStyle = '#fff'; for (let i = 0; i < 40; i++) { const sx = (i * 137) % W, sy = (i * 53) % 220; g.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t + i)); g.fillRect(sx, sy, 2, 2); } g.globalAlpha = 1; }
-    g.fillStyle = night ? '#fff6c8' : dusk ? '#ffd27a' : '#fff1a0';
-    g.fillRect(W - 120, 60, 36, 36);
-    if (!night) {
-      g.fillStyle = 'rgba(255,255,255,0.9)';
-      for (let i = 0; i < 4; i++) { const cx = ((i * 190 + t * (6 + i * 2)) % (W + 160)) - 80, cy = 50 + i * 38; g.fillRect(cx, cy, 70, 14); g.fillRect(cx + 14, cy - 10, 40, 12); }
-    }
-    // 건너편 언덕
-    g.fillStyle = night ? '#1d3a2a' : '#6fb85c';
-    for (let x = 0; x < W; x += 8) { const hh = 34 + Math.round(18 * Math.sin((x + 30) / 60) + 8 * Math.sin(x / 23)); g.fillRect(x, WATER_Y - hh, 8, hh); }
-    g.fillStyle = night ? '#16301f' : '#4f9a45';
-    for (let i = 0; i < 9; i++) { const tx = 30 + i * 70 + (i % 3) * 9, th = 30 + (i % 4) * 8; g.fillRect(tx, WATER_Y - 40 - th, 14, th); g.fillRect(tx - 8, WATER_Y - 40 - th + 6, 30, th - 12); }
-    // 물
-    const water = g.createLinearGradient(0, WATER_Y, 0, Hh);
-    water.addColorStop(0, night ? '#1f4a7a' : '#4a9ad6'); water.addColorStop(1, night ? '#0b1f3c' : '#1d5d8a');
-    g.fillStyle = water; g.fillRect(0, WATER_Y, W, Hh - WATER_Y);
-    g.fillStyle = night ? 'rgba(160,190,255,0.25)' : 'rgba(255,255,255,0.35)';
-    for (let i = 0; i < 18; i++) { const x = ((i * 83 + t * (10 + (i % 3) * 6)) % (W + 60)) - 30; g.fillRect(Math.round(x), WATER_Y + 12 + (i * 37) % (Hh - WATER_Y - 20), 24, 3); }
+    // 하늘 · 건너편 · 물 (고른 시간 · 계절)
+    FishScene.back(g, W, Hh, scene, t);
     // 부두 (기둥 → 바닥판)
     g.fillStyle = '#4a2e1e';
     for (let x = 30; x < W - 40; x += 120) { g.fillRect(x, DECK_Y + 10, 14, Hh - DECK_Y); g.fillStyle = 'rgba(0,0,0,0.15)'; g.fillRect(x, DECK_Y + 10, 14, 8); g.fillStyle = '#4a2e1e'; }
@@ -781,7 +882,7 @@
     // 낚시하는 사람들: 나는 맨 왼쪽, 같이 들어온 친구들은 옆으로
     const u = U();
     const self = H.S?.self || {};
-    const meSt = mini ? { state: 'idle', t: 9 } : { ...fishing, kind: fishing.kind, pop: fishing.pop };
+    const meSt = mini ? { state: 'idle', t: 9 } : { ...fishing, kind: fishing.kind, pop: fishing.pop, show: fishing.show };
     drawFisher(g, 0, { mine: true, nickname: u?.nickname || '나', username: u?.username, skin: self.skin, species: u?.species, color: u?.color, acc: u?.acc?.eq, rod: u?.rod }, meSt, t, mini);
     const list = fishersHere();
     list.forEach((p, i) => {
@@ -789,8 +890,10 @@
       const age = (performance.now() - (st.t0 || st.t || 0)) / 1000;
       const view = { state: st.state === 'waiting' && age > 15 ? 'idle' : st.state, t: age, kind: st.kind, code: st.code,
         pop: st.state === 'result' && st.kind === 'catch' && age < 1.6 ? { code: st.code, t: 1.6 - age } : null };
+      view.show = st.show;
       drawFisher(g, i + 1, { ...p, rod: st.rod || p.rod }, view, t, mini);
     });
+    FishScene.front(g, W, Hh, scene, t);   // 눈 · 꽃잎 · 낙엽 · 반딧불
     // 내 낚시 결과 · 물보라
     if (!mini && fishing.splash > 0) {
       g.fillStyle = `rgba(255,255,255,${fishing.splash})`;
@@ -1226,6 +1329,7 @@
 
   buddy.on('srv', (m) => {
     if (m.type === 'fish-peer') onFishPeer(m);
+    else if (m.type === 'fish-show') onFishShow(m);
     else if (m.type === 'fish-cast') onFishCast(m);
     else if (m.type === 'fish-result') onFishResult(m);
     else if (m.type === 'fish-view') showTradePick(m);
@@ -1242,6 +1346,8 @@
       if (r.acc) H.toast(`🎁 출석 ${r.day}일째! 액세서리 '${c.accessories[r.acc]?.name}'을(를) 받았어요`, true);
       else H.toast(`📅 출석 ${r.day}일째! +🪙${r.amount}`, true);
       H.me()?.emote(r.acc ? '🎁' : '📅');
+    } else if (r.reason === 'fish-sell-many') {
+      H.toast(`🪙 물고기 ${r.n}마리를 팔았어요 (+🪙${r.amount})`, true);
     } else if (r.reason === 'fish-sell' || r.reason === 'recycle') {
       if (r.n === 1) H.toast(`${r.reason === 'recycle' ? '♻️' : '🪙'} ${F[r.code]?.name} +🪙${r.amount}`, true);
     } else if (r.reason === 'fish-gift-sent') H.toast(`🎁 ${r.to}님에게 ${eul(F[r.code]?.name || '물고기')} 선물했어요`);

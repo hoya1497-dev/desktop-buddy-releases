@@ -323,9 +323,11 @@
 
   // 불 끄기: 실내 테마 층만 어둡게, 빛나는 가구와 창문 주변은 밝게
   const darkCanvas = document.createElement('canvas');
+  // 층마다 따로 (light1 · light2), 예전 집은 light 하나로
+  const lightOn = (home, f) => (home['light' + f] !== undefined ? home['light' + f] !== false : home.light !== false);
   function drawDarkness() {
     const v = viewing();
-    if (!v || v.home.light !== false) return;
+    if (!v || ![1, 2].some((f) => !lightOn(v.home, f))) return;
     const dc = darkCanvas;
     if (dc.width !== RW) { dc.width = RW; dc.height = RH; }
     const g = dc.getContext('2d');
@@ -333,12 +335,13 @@
     g.globalCompositeOperation = 'source-over';
     for (const f of [1, 2]) {
       const theme = Furniture.THEMES[v.home['wall' + f]] || Furniture.THEMES.basic;
-      if (theme.kind !== 'room') continue;
+      if (theme.kind !== 'room' || lightOn(v.home, f)) continue;
       g.fillStyle = 'rgba(10,12,32,0.62)';
       g.fillRect(0, FLOORS[f].top, RW, FLOORS[f].bottom - FLOORS[f].top);
     }
     g.globalCompositeOperation = 'destination-out';
     for (const it of layout) {
+      if (lightOn(v.home, floorOf(it.y))) continue;
       const glow = Furniture.GLOW[it.item];
       const isWindow = /window/i.test(it.item);
       if (!glow && !isWindow) continue;
@@ -606,6 +609,21 @@
         li.append(box);
       }));
     }
+    // 같은 방에 있는 사람 중 친구가 아닌 사람: 바로 친구 신청
+    const isFriend = (name) => F.friends.some((f) => f.username === name);
+    const strangers = (S.peers || []).filter((p) => p.username && p.username !== u.username && !isFriend(p.username));
+    $('roomPeopleBox').hidden = !strangers.length;
+    const rp = $('roomPeopleList'); rp.textContent = '';
+    for (const p of strangers) {
+      rp.append(personRow(p, (li) => {
+        const box = document.createElement('span'); box.style.marginLeft = 'auto'; box.className = 'row';
+        const sent = F.outgoing.some((o) => o.username === p.username);
+        const asked = F.incoming.some((o) => o.username === p.username);
+        box.append(asked ? btn('수락', 'primary small', () => buddy.send('friend-accept', p.username))
+          : btn(sent ? '신청 보냄' : '👋 친구 신청', sent ? 'ghost small' : 'primary small', () => buddy.send('srv', { type: 'friend-add-peer', id: p.id }), sent));
+        li.append(box);
+      }));
+    }
     const fl = $('friendList'); fl.textContent = '';
     if (!F.friends.length) {
       const li = document.createElement('li'); li.className = 'note';
@@ -633,6 +651,11 @@
         if (S.room?.isOwner && f.online && here !== f.username) {
           const inHere = (S.peers || []).some((p) => p.username === f.username);
           if (!inHere) acts.append(btn('📨 초대', 'ghost small', () => buddy.send('srv', { type: 'invite', username: f.username }), false, '내 집으로 초대하기 (문이 닫혀 있어도 들어올 수 있어요)'));
+        }
+        // 친구 집에 놀러 와 있을 때: 내 친구를 이 집으로 초대 (집주인이 허락해야 들어와요)
+        if (S.room && !S.room.isOwner && f.online && here !== f.username) {
+          const inHere = (S.peers || []).some((p) => p.username === f.username);
+          if (!inHere) acts.append(btn('📨 이 집으로', 'ghost small', () => buddy.send('srv', { type: 'invite-fof', username: f.username }), false, `${S.room.owner.nickname}님 집으로 초대하기 (${S.room.owner.nickname}님이 허락하면 들어와요)`));
         }
         const li2 = { append: (...x) => acts.append(...x) };
         li2.append(btn(f.unread ? `✉️ ${f.unread}` : '✉️', f.unread ? 'primary small' : 'ghost small', () => window.DM && DM.open(f.username, f.nickname), false, '개인 채팅'));
@@ -677,12 +700,14 @@
   function renderKnock() {
     const k = S && S.knocks && S.knocks[0];
     $('knockBox').hidden = !k;
-    if (k) $('knockText').textContent = `${k.nickname}(@${k.username})님이 문을 두드려요`;
+    if (k) $('knockText').textContent = k.via ? `${k.via.nickname}님의 친구 ${k.nickname}(@${k.username})님이 들어오고 싶어해요` : `${k.nickname}(@${k.username})님이 문을 두드려요`;
     // 초대장: 문 두드림 알림과 겹치지 않게 위쪽에
     const inv = S && S.invites && S.invites[S.invites.length - 1];
     $('inviteBox').hidden = !inv;
     $('inviteBox').classList.toggle('stacked', !!k);
-    if (inv) $('inviteText').textContent = `${inv.nickname}(@${inv.username})님이 자기 집으로 초대했어요${inv.max ? ` (지금 ${inv.count}/${inv.max}명)` : ''}`;
+    if (inv) $('inviteText').textContent = inv.via
+      ? `${inv.via.nickname}님이 ${inv.nickname}(@${inv.username})님 집으로 초대했어요 · 수락하면 ${inv.nickname}님이 허락해야 들어가요`
+      : `${inv.nickname}(@${inv.username})님이 자기 집으로 초대했어요${inv.max ? ` (지금 ${inv.count}/${inv.max}명)` : ''}`;
   }
   $('inviteYes').onclick = () => { const k = S.invites?.[S.invites.length - 1]; if (k) buddy.send('invite-answer', { username: k.username, accept: true }); };
   $('inviteNo').onclick = () => { const k = S.invites?.[S.invites.length - 1]; if (k) buddy.send('invite-answer', { username: k.username, accept: false }); };
@@ -701,10 +726,11 @@
     if (decorating) { closeComputer(); $('friends').hidden = true; }
     renderSel();
   };
-  $('lightBtn').onclick = () => {
+  for (const b of $('lightBtn').querySelectorAll('button')) b.onclick = () => {
     const v = viewing();
     if (!v || !v.editable) { toast('불은 집주인만 켜고 끌 수 있어요'); return; }
-    buddy.send('light', v.home.light === false);
+    const floor = Number(b.dataset.floor);
+    buddy.send('light', { floor, on: !lightOn(v.home, floor) });
   };
   // 화면 모드 고르기 (컴퓨터 설정 · 화이트 · 다크 · 오로라 · 사용자 지정)
   const THEME_ICON = { system: '🖥️', light: '☀️', dark: '🌙', aurora: '🌈', custom: '🎨' };
@@ -820,8 +846,12 @@
     const badge = $('roomBadge');
     if (S.room) { badge.className = 'badge on'; const max = S.room.max || catalog.roomMax; badge.textContent = `👥 ${S.peers.length + 1}${max ? '/' + max : '명'}${S.room.locked ? ' · 🔒' : ' · 🚪 열림'}`; badge.title = max ? `이 방에 ${S.peers.length + 1}명이 있어요 (최대 ${max}명)` : ''; }
     else { badge.className = 'badge off'; badge.textContent = '혼자 놀기'; }
-    const lightOn = v.home.light !== false;
-    $('lightBtn').textContent = lightOn ? '💡 불 끄기' : '💡 불 켜기';
+    for (const b of $('lightBtn').querySelectorAll('button')) {
+      const f = Number(b.dataset.floor), on = lightOn(v.home, f);
+      b.textContent = `${on ? '💡' : '🌙'} ${f}층`;
+      b.classList.toggle('dark', !on);
+      b.title = `${f}층 불 ${on ? '끄기' : '켜기'}`;
+    }
     $('lightBtn').classList.toggle('off', !v.editable);
 
     $('allPetsBox').checked = !!S.view?.showAllPets;
@@ -880,7 +910,14 @@
     }
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
     log.append(div);
-    if (atBottom) log.scrollTop = log.scrollHeight;
+    if (atBottom) log.scrollTop = log.scrollHeight;    // 낚시 탭에도 같은 채팅을 보여 줌
+    const flog = $('fishChatLog');
+    if (flog) {
+      const fb = flog.scrollHeight - flog.scrollTop - flog.clientHeight < 30;
+      flog.append(div.cloneNode(true));
+      while (flog.childElementCount > 120) flog.firstChild.remove();
+      if (fb) flog.scrollTop = flog.scrollHeight;
+    }
   }
   buddy.on('chat', (m) => { addMsg(m); if (m.pid) pets.get(m.pid)?.say(m.text); });
   $('chatForm').onsubmit = (e) => {
@@ -889,6 +926,15 @@
     if (t) buddy.send('send-chat', t);
     $('chatInput').value = '';
   };
+  if ($('fishChatForm')) {
+    $('fishChatInput').addEventListener('keydown', (e) => e.stopPropagation());
+    $('fishChatForm').onsubmit = (e) => {
+      e.preventDefault();
+      const t = $('fishChatInput').value.trim();
+      if (t) buddy.send('send-chat', t);
+      $('fishChatInput').value = '';
+    };
+  }
   document.querySelectorAll('[data-emote]').forEach((b) => { b.onclick = () => buddy.send('emote', { kind: b.dataset.emote }); });
   buddy.on('focus-chat', () => { document.querySelector('.tabs button[data-tab=chat]').click(); $('chatInput').focus(); });
 

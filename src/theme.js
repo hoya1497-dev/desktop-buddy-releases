@@ -1,5 +1,20 @@
 // 화면 모드: 컴퓨터 설정 · 화이트 · 다크 · 🌈 오로라 · 🎨 사용자 지정
 // 메인에서 { mode, custom } 을 받아서 모든 창에 같은 색을 입혀요.
+// Electron(특히 Windows)에선 confirm/alert 창을 닫은 뒤 입력칸에 글자가 안 쳐지는 문제가 있어서
+// 창이 끝나면 메인에 '창 포커스 다시 잡기'를 부탁해요. (물고기 팔기 뒤 채팅이 안 쳐지던 버그)
+(() => {
+  if (!window.buddy) return;
+  for (const name of ['confirm', 'alert']) {
+    const orig = window[name].bind(window);
+    window[name] = (...a) => {
+      const active = document.activeElement;
+      const r = orig(...a);
+      buddy.send('refocus');
+      setTimeout(() => { if (active && active.focus && document.contains(active) && /INPUT|TEXTAREA/.test(active.tagName)) active.focus(); }, 60);
+      return r;
+    };
+  }
+})();
 (() => {
   const root = document.documentElement;
   const VARS = ['--bg', '--card', '--ink', '--muted', '--line', '--input', '--accent', '--a1', '--a2', '--a3', '--a4'];

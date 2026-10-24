@@ -368,6 +368,10 @@
                 <h3>받은 친구 신청</h3>
                 <ul id="incomingList" class="people"></ul>
               </div>
+              <div id="roomPeopleBox" hidden>
+                <h3>🏠 같은 방에 있는 사람 <span class="note-inline">· 친구가 아니면 신청할 수 있어요</span></h3>
+                <ul id="roomPeopleList" class="people"></ul>
+              </div>
               <h3>친구 목록 <span class="note-inline" id="giftLeftNote"></span></h3>
               <ul id="friendList" class="people"></ul>
               <p class="note" id="outgoingNote"></p>
@@ -379,7 +383,7 @@
       <div class="toolbar">
         <button id="deskBtn" class="ghost">🖥️ 컴퓨터</button>
         <button id="decoBtn" class="ghost">✏️ 꾸미기</button>
-        <button id="lightBtn" class="ghost">💡 불 끄기</button>
+        <span id="lightBtn" class="light-group" title="층마다 불을 따로 켜고 꺼요"><button data-floor="2" class="ghost">💡 2층</button><button data-floor="1" class="ghost">💡 1층</button></span>
         <button id="musicBtn" class="ghost" hidden title="레코드 플레이어 (다 같이 노래 듣기)">🎵 레코드</button>
         <button id="leaveFishBtn" class="primary">🏠 낚시터에서 나가기</button>
         <button id="panelBtn" class="ghost panel-btn" title="오른쪽 패널 접기/펴기 (Ctrl+B)">패널 닫기 ▶</button>
@@ -477,6 +481,14 @@
           <div class="row" style="margin-bottom:6px">
             <button id="sellTrashBtn" class="ghost small">🗑️ 쓰레기 전부 재활용</button>
             <button id="sellDupBtn" class="ghost small">중복만 팔기</button>
+            <button id="selectSellBtn" class="ghost small">☑️ 골라서 팔기</button>
+          </div>
+          <div id="sellBar" class="sell-bar" hidden>
+            <span id="sellSum">물고기를 눌러서 골라요</span>
+            <span class="grow"></span>
+            <button id="sellAllBtn" class="ghost small">모두 선택</button>
+            <button id="sellCancelBtn" class="ghost small">취소</button>
+            <button id="sellGoBtn" class="primary small" disabled>팔기</button>
           </div>
           <ul id="bagFish" class="fishgrid"></ul>
         </div>
@@ -489,6 +501,12 @@
       </div>
       <div class="pane" id="pane-fishing">
         <p class="note">🎣 왼쪽 큰 화면이 낚시터예요. 같은 집에 있는 친구가 낚시 탭을 열면 옆자리에 앉아요. 창을 닫아도 낚시터에 있는 걸로 돼서, 미니맵을 켜 두면 낚시터가 작게 보여요.</p>
+        <div class="row rod-row scene-row">
+          <span>🎨 배경</span>
+          <select id="sceneTime" title="시간"><option value="auto">⏰ 시간 자동</option><option value="morning">🌅 아침</option><option value="day">☀️ 낮</option><option value="evening">🌇 저녁</option><option value="night">🌙 밤</option></select>
+          <select id="sceneSeason" title="계절"><option value="auto">📅 계절 자동</option><option value="spring">🌸 봄</option><option value="summer">🌿 여름</option><option value="autumn">🍁 가을</option><option value="winter">❄️ 겨울</option></select>
+          <span class="note-inline">나한테만 보여요</span>
+        </div>
         <div class="row rod-row">
           <span>🎣 낚싯대</span>
           <select id="rodPick"></select>
@@ -499,8 +517,14 @@
           <span id="castInfo" class="note-inline"></span>
         </div>
         <p class="note" id="fishHint">느낌표(<b>!</b>)가 뜨면 물고기가 걸린 거예요. 천천히 <b>당기기</b>를 눌러도 안 놓쳐요! 단, ! 뜨기 전에 당기면 도망가요.</p>
-        <h3>최근에 낚은 것</h3>
+        <h3>최근에 낚은 것 <span class="note-inline">· 누르면 머리 위로 들고 자랑해요 ✨</span></h3>
         <ul id="recentList" class="fishrow small-row"></ul>
+        <h3>💬 채팅</h3>
+        <div id="fishChatLog"></div>
+        <form id="fishChatForm" class="row">
+          <input id="fishChatInput" maxlength="200" placeholder="낚시하면서 채팅하기" autocomplete="off">
+          <button class="primary">보내기</button>
+        </form>
       </div>
       <div class="pane" id="pane-dex">
         <div class="row between">
@@ -611,6 +635,7 @@
   <script src="fishart.js"></script>
   <script src="petart.js"></script>
   <script src="home.js"></script>
+  <script src="fishscene.js"></script>
   <script src="home-game.js"></script>
   <script src="minigame.js"></script>
   <script src="board.js"></script>
