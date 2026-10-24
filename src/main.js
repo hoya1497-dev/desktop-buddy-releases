@@ -572,6 +572,10 @@ function handleServer(m, sock) {
     case 'dm-history':
       home?.webContents.send('srv', m);
       break;
+    case 'mail':   // ✉️ 운영자 쪽지
+      home?.webContents.send('srv', m);
+      if (m.fresh && !(home && home.isVisible() && home.isFocused?.())) notify(`✉️ ${m.fresh.from}님의 쪽지`, m.fresh.text);
+      break;
     case 'board':
     case 'board-upd':
     case 'board-style':

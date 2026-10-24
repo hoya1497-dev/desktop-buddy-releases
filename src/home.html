@@ -26,6 +26,7 @@
       <button id="aquaBtn" class="ghost small" title="내 아쿠아리움 보기">🐋 내 아쿠아리움</button>
       <button id="friendAquaBtn" class="ghost small" hidden>🐋 친구 아쿠아리움</button>
       <button id="friendsBtn" class="ghost small">👥 친구 <span id="friendDot" class="dot-badge" hidden></span></button>
+      <button id="mailBtn" class="ghost small" title="운영자에게 쪽지 보내기 · 답장 보기">✉️ 쪽지 <span id="mailDot" class="dot-badge" hidden></span></button>
       <button id="stickyBtn" class="ghost small" title="메모 · 할 일 · 체크리스트 · 다이어리를 화면에 띄우기">🗒 메모장</button>
       <button id="themeBtn" class="ghost small" title="화면 모드">🖥️ 화면</button>
       <button id="settingsBtn" class="ghost small" title="설정">⚙️ 설정</button>
@@ -117,6 +118,35 @@
         </div>
       </form>
       <div id="noticeList" class="notice-list"></div>
+    </div>
+  </div>
+
+  <!-- ✉️ 운영자에게 쪽지: 모두 보낼 수 있고, 운영자는 받은 쪽지함에서 읽고 답장 -->
+  <div id="mailModal" class="notice-modal" hidden>
+    <div class="notice-card mail-card">
+      <div class="row between"><h2>✉️ 운영자에게 쪽지</h2><button id="mailClose" class="link">닫기</button></div>
+      <div id="mailTabs" class="mail-tabs" hidden>
+        <button data-tab="write" class="on">✏️ 보내기 · 내 쪽지</button>
+        <button data-tab="inbox">📬 받은 쪽지 <span id="mailInboxCount" class="mail-count" hidden></span></button>
+      </div>
+      <section id="mailWrite">
+        <form id="mailForm" class="notice-form">
+          <textarea id="mailText" maxlength="500" rows="4" placeholder="버그 제보, 건의, 아이템 오류 등 운영자에게 하고 싶은 말을 써 주세요.&#10;(운영자만 볼 수 있어요)"></textarea>
+          <div class="row">
+            <button class="primary small" type="submit">보내기</button>
+            <span id="mailNote" class="note-inline"><span id="mailLen">0</span>/500 · 10분에 3개까지</span>
+          </div>
+        </form>
+        <h3 class="mail-h">📤 내가 보낸 쪽지</h3>
+        <div id="mailMine" class="mail-list"></div>
+      </section>
+      <section id="mailInbox" hidden>
+        <div class="row mail-filter">
+          <label class="check"><input type="checkbox" id="mailUnreadOnly"> 안 읽은 것만</label>
+          <span class="note-inline">운영자(공지 권한이 있는 사람)에게만 보이는 쪽지함이에요.</span>
+        </div>
+        <div id="mailInboxList" class="mail-list"></div>
+      </section>
     </div>
   </div>
 
@@ -586,6 +616,7 @@
   <script src="board.js"></script>
   <script src="dm.js"></script>
   <script src="notice.js"></script>
+  <script src="mail.js"></script>
   <script src="music.js"></script>
 </body>
 </html>

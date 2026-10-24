@@ -9,63 +9,6 @@ window.Furniture = (() => {
     a: '#e8e2da', A: '#bdb5aa',
   };
 
-  // ---------------------------------------------------------------- 시즌 이벤트 소품: 간단한 도형으로 빠르게 찍어내는 도우미
-  // circle(w,h,fill,outline,accent): 동그란 소품 (호박 · 금화 · 종 등) · accent 는 가운데 작은 점 장식
-  function circle(w, h, fill, out = 'o', accent = null) {
-    const rows = [];
-    const cx = (w - 1) / 2, cy = (h - 1) / 2, rx = w / 2, ry = h / 2;
-    for (let y = 0; y < h; y++) {
-      let row = '';
-      for (let x = 0; x < w; x++) {
-        const d = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2;
-        if (d > 1.08) row += '.';
-        else if (d > 0.72) row += out;
-        else if (accent && Math.abs(x - cx) < w * 0.14 && Math.abs(y - cy) < h * 0.14) row += accent;
-        else row += fill;
-      }
-      rows.push(row);
-    }
-    return rows;
-  }
-  // box(w,h,fill,outline): 네모난 소품 (상자 · 가판대 등), lidColor 가 있으면 위 2줄을 다른 색(상자 뚜껑)으로
-  function box(w, h, fill, out = 'o', lid = null) {
-    const rows = [];
-    for (let y = 0; y < h; y++) {
-      let row = '';
-      for (let x = 0; x < w; x++) {
-        const edge = x === 0 || x === w - 1 || y === 0 || y === h - 1;
-        row += edge ? out : (lid && y < Math.max(2, Math.round(h * 0.3)) ? lid : fill);
-      }
-      rows.push(row);
-    }
-    return rows;
-  }
-  // cone(w,h,fill,outline): 세모 소품 (트리 · 모자 등)
-  function cone(w, h, fill, out = 'o') {
-    const rows = [];
-    for (let y = 0; y < h; y++) {
-      const half = Math.round((y / (h - 1)) * (w / 2));
-      const l = Math.floor(w / 2) - half, r = Math.floor(w / 2) + half;
-      let row = '';
-      for (let x = 0; x < w; x++) {
-        if (x < l || x > r) row += '.';
-        else if (x === l || x === r || y === h - 1) row += out;
-        else row += fill;
-      }
-      rows.push(row);
-    }
-    return rows;
-  }
-  // wallFlat(w,h,fill,outline,accent): 벽에 거는 평평한 소품 (리스 · 거미줄 · 깃발 등)
-  function wallFlat(w, h, fill, out = 'o', accent = null) {
-    const rows = box(w, h, fill, out);
-    if (accent) {
-      const midY = Math.floor(h / 2);
-      rows[midY] = rows[midY].split('').map((c, x) => (x > 1 && x < w - 2 ? accent : c)).join('');
-    }
-    return rows;
-  }
-
   // ---------------------------------------------------------------- 그림 (글자 격자)
   const ART = {
     computer: [
@@ -705,40 +648,502 @@ window.Furniture = (() => {
     '.....pp.....',
   ];
   // ---------------------------------------------------------------- 🎉 시즌 이벤트 소품 30종 (할로윈 10 · 크리스마스 10 · 새해 10)
+  Object.assign(PAL, {'d': '#5a3a7a', 'D': '#2e2046', 'e': '#ffe9a8', 'E': '#f28a1e', 'f': '#b8f0c0', 'F': '#4fae63', 'h': '#f7fbff', 'H': '#bcdcf0', 'i': '#2f7a44', 'I': '#1d4f2c', 'j': '#7c1d2a', 'J': '#ffc4c4', 'u': '#e04ab0', 'U': '#ff9ad8', 'z': '#454552', 'Z': '#6f6f7e', 'K': '#9a9aa8', 'L': '#efe0bb', 'M': '#383744', 'C': '#ffd23f', 'X': '#a8740f'});
   Object.assign(ART, {
-    // 🎃 할로윈
-    hwPumpkinLamp: circle(14, 12, 'm', 'q', 'y'),
-    hwCauldron: box(14, 11, 'k', 'o', 'G'),
-    hwTombstone: box(12, 14, 's', 'o'),
-    hwGhostDoll: circle(11, 12, 'x', 'S', 'k'),
-    hwCandyBowl: box(14, 8, 'v', 'V'),
-    hwSkullJar: box(11, 13, 'x', 'o', 's'),
-    hwBlackCatDoll: circle(11, 11, 'k', 'o', 'y'),
-    hwSpiderWeb: wallFlat(14, 10, 'x', 'S', 's'),
-    hwBatGarland: wallFlat(16, 8, 'k', 'o', 'm'),
-    hwCobwebRug: box(18, 6, 'S', 's'),
-    // 🎄 크리스마스
-    xmasTree2: cone(14, 14, 'G', 'g'),
-    xmasFireplace: box(16, 13, 'q', 'Q', 'r'),
-    xmasGiftBox: box(12, 11, 'r', 'R', 'y'),
-    xmasSnowman: circle(12, 14, 'x', 'S', 'o'),
-    xmasCandyCane: box(6, 14, 'x', 'r'),
-    xmasSleigh: box(18, 10, 'R', 'r', 'y'),
-    xmasBell: circle(10, 11, 'y', 'Y', 'o'),
-    xmasStocking: wallFlat(10, 14, 'r', 'R', 'x'),
-    xmasWreath: circle(14, 14, 'G', 'g', 'r'),
-    xmasLightsGarland: wallFlat(18, 6, 'g', 'G', 'y'),
-    // 🧧 새해
-    nyFortuneBox: box(12, 12, 'r', 'y', 'Y'),
-    nyLanternStand: circle(11, 14, 'r', 'R', 'y'),
-    nyGoldCoinJar: box(12, 13, 'x', 's', 'Y'),
-    nyRiceCakeTable: box(16, 10, 'l', 'n'),
-    nyConfettiBalloon: circle(11, 13, 'p', 'P', 'y'),
-    nyDrumSet: box(13, 12, 'r', 'R', 'y'),
-    nyZodiacFlag: wallFlat(10, 16, 'y', 'Y', 'r'),
-    nyNewYearClock: circle(13, 13, 'x', 'Y', 'k'),
-    nyKiteDeco: wallFlat(14, 12, 't', 'T', 'y'),
-    nyFireworkFrame: wallFlat(14, 12, 'v', 'V', 'y'),
+    hwPumpkinLamp: [
+      '.......ooo......',
+      '.......oIo......',
+      '...ooooiIoooo...',
+      '..oEEqoEEoqEEo..',
+      '.oEEEqEEEEqEEEo.',
+      '.oEeeqEEEEqeeEo.',
+      'oEEeeEqEEqEeeEEo',
+      'oEEEEEqeeqEEEEEo',
+      'oEEqEEEEEEEEqEEo',
+      'oEEeEeeEEeeEeEEo',
+      'oEEeeeeeeeeeeEEo',
+      '.oEEqeeEEeeqEEo.',
+      '..oqqqqqqqqqqo..',
+      '...oooooooooo...',
+    ],
+    hwCauldron: [
+      '.....f....F.....',
+      '...F..fF.f..f...',
+      '......F...f.....',
+      '.oooooooooooooo.',
+      'oZKKKKKKKKKKKKZo',
+      '.ozfFffFfFffFzo.',
+      'ozZzzzzzzzzzzzzo',
+      'ozZzzzzzzzzzzzzo',
+      'ozZzzFzzzzFzzzzo',
+      '.ozZzzzzzzzzzzo.',
+      '..ozzzzzzzzzzo..',
+      '..ozo.eEe..ozo..',
+      '..ozoEEyEE.ozo..',
+      '..ooo.qQq..ooo..',
+    ],
+    hwTombstone: [
+      '...oooooo...',
+      '..oKKKKKKo..',
+      '.oKKKKKKKKo.',
+      'oKKKKzKKKKZo',
+      'oKKKzzzKKKZo',
+      'oKKKKzKKKKZo',
+      'oKKKKzKKKKZo',
+      'oKKKKKKKKKZo',
+      'oKzzKzzKzzZo',
+      'oKKKKKKKKKZo',
+      'oFKKKKKKKFZo',
+      'oFFKKKKKFFZo',
+      'gFgFFgFFgFFg',
+      'oooooooooooo',
+    ],
+    hwGhostDoll: [
+      '....oooo....',
+      '...ohhhho...',
+      '..ohhhhhho..',
+      '.ohhhhhhhho.',
+      '.ohkkhhkkho.',
+      '.ohkkhhkkho.',
+      'ohhJhhhhJhho',
+      'ohhhhkkhhhho',
+      'ohhhhkkhhhho',
+      'ohHhhhhhhHho',
+      'ohHHhhhhHHho',
+      'oHo.oHHo.oHo',
+      '.o...oo...o.',
+    ],
+    hwCandyBowl: [
+      '....ooo..ooo....',
+      '..oouuuooyyyoo..',
+      '.orroUuoyCyopPo.',
+      '.oddddddddddddo.',
+      '.oEEEEEEEEEEEEo.',
+      '.oEEkkEEEEkkEEo.',
+      '.oEEEEEEEEEEEEo.',
+      '..oEkEkEkEkEko..',
+      '..oqEEEEEEEEqo..',
+      '...oooooooooo...',
+    ],
+    hwSkullJar: [
+      '...oooooo...',
+      '...oqqqqo...',
+      '..oooooooo..',
+      '.oHHHHHHHHo.',
+      'oHHohhhhoHHo',
+      'oxHhhhhhhHHo',
+      'oxHhkkhkkhHo',
+      'oHHhkkhkkhHo',
+      'oHHhhhkhhhHo',
+      'oHHHhkhkhHHo',
+      'oHHHHhhhHHHo',
+      'ofFfFfFfFfFo',
+      '.oFFFFFFFFo.',
+      '..oooooooo..',
+    ],
+    hwBlackCatDoll: [
+      '.....oo.....',
+      '....odDo....',
+      '...odddDo...',
+      '..oEEEEEEo..',
+      'odddddddddDo',
+      '.kMMMMMMMMk.',
+      '.kMCCMMCCMk.',
+      '.kMMMJJMMMk.',
+      '..kMMMMMMk..',
+      '.kMMMMMMMMk.',
+      'kMMMMMMMMMMkk',
+      'kMMMMMMMMMMkMk',
+      '.kkkk..kkkk.k.',
+    ],
+    hwBatGarland: [
+      'EEE...............EEE',
+      '...EEE.........EEE...',
+      '...n..EEEEEEEEE..n...',
+      'k.kkk.kk.kkk.kk.kkk.k',
+      'kkeMekkkkeMekkkkeMekk',
+      '.k.k.k..k.k.k..k.k.k.',
+    ],
+    hwCobwebRug: [
+      '..oooooooooooooooooooo..',
+      '.oEEEEEEEEEEEEEEEEEEEEo.',
+      '.oEdSddSddSkkSddSddSdEo.',
+      '.oESdSdSdSdkkdSdSdSdSEo.',
+      '.oEEEEEEEEEEEEEEEEEEEEo.',
+      '..oooooooooooooooooooo..',
+    ],
+    hwSpiderWeb: [
+      '.S......S......S.',
+      '..SS..SSSSS..SS..',
+      '...SSS..S..SSS...',
+      '...SSSSSSSSSSS...',
+      '..SS.SSSSSSS.SS..',
+      '..S.S.SSSSS.S.S..',
+      'SSSSSSSSSSSSSSSSS',
+      '..S.S.SSSSS.SSS..',
+      '..SS.SSSSSSS.SS..',
+      '...SSSSSSSSSSS...',
+      '...SSS..S..kSS.k.',
+      '..SS..SSSSS.kkk..',
+      '.S......S..kerek.',
+      '........S...kkk..',
+      '........S..k...k.',
+    ],
+    xmasTree2: [
+      '.........C.........',
+      '........CeC........',
+      '.......CCCCC.......',
+      '........C.C........',
+      '........oio........',
+      '.......ohiio.......',
+      '......ohiriio......',
+      '.....ohiiiyiio.....',
+      '....ohhiiiiihho....',
+      '......oiiyiio......',
+      '.....oiriiyiio.....',
+      '....oiiiibiiiyo....',
+      '..ohhiiiiiiiiihho..',
+      '.....oiiiiyiio.....',
+      '....oiyiiriiiio....',
+      '...oiiiyiiiibiio...',
+      '..oriiiiiyiiiiCio..',
+      '.ohhhiiiiiiiiihhho.',
+      '.ooooooooooooooooo.',
+      '........oNo........',
+      '........oNo........',
+      '.....oRrrrrrRo.....',
+      '.....oyyyyyyyo.....',
+      '.....ooooooooo.....',
+    ],
+    xmasFireplace: [
+      'oooooooooooooooooooo',
+      'oWWWWWWWWWWWWWWWWWWo',
+      'oiGiGiGirRrGiGiGiGio',
+      'oooooooooooooooooooo',
+      '.oqQqqqQqqqqQqqqQqo.',
+      '.oqqooooooooooooqqo.',
+      '.oqQokkkkkkkkkkoQqo.',
+      '.oqqokkkkEkkkkkoqqo.',
+      '.oQqokkkEyEkEkkoqQo.',
+      '.oqqokkEyeyEyEkoqqo.',
+      '.oqQokEyeeyyeyEoQqo.',
+      '.oqqokNNNNNNNNkoqqo.',
+      '.oQqozzzzzzzzzzoqqo.',
+      '.oooooooooooooooooo.',
+      'oZZZZZZZZZZZZZZZZZZo',
+      'oooooooooooooooooooo',
+    ],
+    xmasGiftBox: [
+      '...oo....oo...',
+      '..oCCo..oCCo..',
+      '..oCCCooCCCo..',
+      '...ooCCCCoo...',
+      'oooooooooooooo',
+      'oRrrrrCCrrrrRo',
+      'oooooooooooooo',
+      '.orrxrCCrxrro.',
+      '.orrrrCCrrrro.',
+      '.oCCCCCCCCCCo.',
+      '.orrrrCCrrrro.',
+      '.oRrxrCCrrxRo.',
+      '.oRRRRCCRRRRo.',
+      '.oooooooooooo.',
+    ],
+    xmasSnowman: [
+      '...oooooo...',
+      '...okkkko...',
+      '...okkkko...',
+      '...orrrro...',
+      '.oooooooooo.',
+      '..ohhhhhho..',
+      '..ohkhhkho..',
+      '..ohhEEhho..',
+      '..ohhkkhho..',
+      '.orrrrrrrro.',
+      'n.ohhrhhho.n',
+      '.nohhhkhhhon',
+      'ohhhhhhhhhho',
+      'ohHhhhkhhhHo',
+      'ohHhhhhhhhHo',
+      '.ohHhhkhhHo.',
+      '..oooooooo..',
+    ],
+    xmasCandyCane: [
+      '...oooo...',
+      '..orxxro..',
+      '.orxoorxo.',
+      'orxo..oxro',
+      'oxro..orxo',
+      'orxo..oooo',
+      'oxroGGo...',
+      'orxoGrGo..',
+      'oxro.oo...',
+      'orxo......',
+      'oxro......',
+      'orxo......',
+      'oxro......',
+      'orxo......',
+      'oxro......',
+      'oooo......',
+    ],
+    xmasSleigh: [
+      '.....orRo..obBo',
+      '.....oCCo..oCCo',
+      '.oooooooooooooooo..oo',
+      '.oRrrrrrrrrrrrrrRo.oro',
+      '.oRrCCCCCCCCCCCrRooRro',
+      '.oRrrrrrrrrrrrrrrrrrRo',
+      '..oRrrrrrrrrrrrrrrrRo',
+      '...oooooooooooooooooo',
+      '....oY.....oY....oY',
+      '.YYYYYYYYYYYYYYYYYYYYo',
+      '..oooooooooooooooooooo',
+    ],
+    xmasBell: [
+      '.....oo.....',
+      '..oo.oo.oo..',
+      '.oiGoroGiGo.',
+      '.oGiorRoiGo.',
+      '..ooorrooo..',
+      '....oCCo....',
+      '...oCCCCo...',
+      '...oCeCCo...',
+      '..oCeCCCCo..',
+      '..oCCCCCYo..',
+      '.oCCCCCCCYo.',
+      'oYYYYYYYYYYo',
+      '.oooooooooo.',
+      '.....oko....',
+      '......o.....',
+    ],
+    xmasStocking: [
+      '...oo.......',
+      '..o..o......',
+      'oooooooooo..',
+      'ohhhhhhhho..',
+      'ohHhHhHhho..',
+      'oooooooooo..',
+      '.orrxrrro...',
+      '.orrrrrro...',
+      '.orxrrrxo...',
+      '.orrrrrro...',
+      '.orrrrrrooo.',
+      '.orrxrrrrrGo',
+      '.oGrrrrrrrGGo',
+      '.oGGrrrrrGGGo',
+      '..oGGooooooo',
+      '...ooo......',
+    ],
+    xmasWreath: [
+      '.................',
+      '.....ooGiGoo.....',
+      '...ooIiigrGgoo...',
+      '..oigiiiGGiirgo..',
+      '..oGigo...oiiIo..',
+      '.oIgio.....oggGo.',
+      '.oiro.......oiro.',
+      '.iGG.........igi.',
+      '.gGg.........Iii.',
+      '.ggI.........iGi.',
+      '.orIo.......orgo.',
+      '.oigioo.o.ooGIgo.',
+      '..oGGorrorroGGo..',
+      '..oGioRrrrRoGGo..',
+      '...ooIoorrogoo...',
+      '.....oorooro.....',
+      '.....oro.oro.....',
+    ],
+    xmasLightsGarland: [
+      '.........................',
+      'I...........I...........I',
+      '.III.....III.III.....III.',
+      '..k.IIIII.k...k.IIIII.k..',
+      '..r...k...b...u...k...C..',
+      '..r...y...b...u...r...C..',
+      '......y...........r......',
+    ],
+    nyFortuneBox: [
+      '....oo.oo....',
+      '...oCCoCCo...',
+      '....oCCCo....',
+      '...ojrjrjo...',
+      '..oCCCCCCCo..',
+      '.orrrrrrrrro.',
+      'orrrrCCCrrrro',
+      'orrrCCyCCrrro',
+      'orrrrCCCrrrro',
+      'orRrrrrrrrRro',
+      'orRrrrrrrrRro',
+      '.oRRrrrrrRRo.',
+      '..ooooooooo..',
+    ],
+    nyLanternStand: [
+      '.....oo.....',
+      '....oCCo....',
+      '..oooooooo..',
+      '..oCCCCCCo..',
+      '.orrreerrro.',
+      '.orreeeerro.',
+      '.orreeeerro.',
+      '.oCCCCCCCCo.',
+      '.obbeeeebbo.',
+      '.obbbeebbbo.',
+      '..oCCCCCCo..',
+      '..oooooooo..',
+      '.....oo.....',
+      '.....oWo....',
+      '.....oWo....',
+      '.....oWo....',
+      '...oooWooo..',
+      '...oNNNNNo..',
+      '...ooooooo..',
+    ],
+    nyGoldCoinJar: [
+      '....oo..oo....',
+      '...oCCooCCo...',
+      '..oCXCCCCXCo..',
+      '..oCCCCXCCCo..',
+      '..oooooooooo..',
+      '...oNNNNNNo...',
+      '..onnnnnnnno..',
+      '.onlnnnnnnnNo.',
+      'onlnnnCCnnnnNo',
+      'onlnnCCyCnnnNo',
+      'onlnnnCCnnnnNo',
+      '.onnnnnnnnnNo.',
+      '..onnnnnnnNo..',
+      '...oooooooo...',
+    ],
+    nyRiceCakeTable: [
+      '......S...S.......',
+      '.......S...S......',
+      '.....oooooooo.....',
+      '....oxhgxhyxho....',
+      '.....oaaaaaao.....',
+      '......obbbbo...ss.',
+      '.......oooo...ss..',
+      'oooooooooooooooooo',
+      'ollllllllllllllllo',
+      'oooooooooooooooooo',
+      '.oWo..........oWo.',
+      '.oo............oo.',
+    ],
+    nyConfettiBalloon: [
+      '....oooo....',
+      '..ooHHHHoo..',
+      '.oHxHHuHHHo.',
+      '.oHHyHHHrHo.',
+      'oHxHHHbHHHHo',
+      'oHHHrHHHyHHo',
+      'oHuHHHHHHuHo',
+      'oHHHyHHrHHHo',
+      '.oHHHHbHHHo.',
+      '.oHrHHHHuHo.',
+      '..ooHHHHoo..',
+      '....oHHo....',
+      '.....oo.....',
+      '.....o......',
+      '......o.....',
+      '.....o......',
+      '....oooo....',
+      '....oCCo....',
+      '....oooo....',
+    ],
+    nyDrumSet: [
+      '.......ooo.......',
+      '.....ooRCRoo.....',
+      '....oCRrrrRCo....',
+      '...orRrrrrrRro...',
+      '..oCRrrrrrrrRCo..',
+      '..oRrrrrrrbbbRo..',
+      '..orrrrrrbbbbro..',
+      '..oRrrrrbbbbbRo..',
+      '..orrrrbbbbbbro..',
+      '..oCrbbbbbbbrCo..',
+      '...oRrbbbbbrRo...',
+      '....oCrRbRrCo....',
+      '.....oorCroo.....',
+      '..oWo..ooo..oWo..',
+      '...oWo.....oWo...',
+      '....oWooooWo.....',
+      '...oWo....oWo....',
+    ],
+    nyZodiacFlag: [
+      'CoooooooooooooC',
+      '.oCCCCCCCCCCCo.',
+      '.orrrrrrrrrrro.',
+      '.orCrrrrrrrCro.',
+      '.orrrhhhhhrrro.',
+      '.orrhhhhkhhrro.',
+      '.orhhhhkkkhhro.',
+      '.orhhhkkkkkhro.',
+      '.orhhkkkkkkhro.',
+      '.orhkkkkkkhhro.',
+      '.orhkkhkkkhhro.',
+      '.orrhhhkkkhrro.',
+      '.orrrhhhhhrrro.',
+      '.orCrrrrrrrCro.',
+      '.oCCCCCCCCCCCo.',
+      '.orrrrro.orrro.',
+      '.orrrro...orro.',
+      '.orro.......oo.',
+      '.oo...........',
+      '..C.........C..',
+      '..Y.........Y..',
+    ],
+    nyNewYearClock: [
+      '......oo......',
+      '.....oYYo.....',
+      '....ooooo.....',
+      '...oXYYYYXo...',
+      '..oXYhhhhYXo..',
+      '..oYhhkhhhYo..',
+      '.oXYhhkhhhYXo.',
+      '.oYhhhkhhhhYo.',
+      '.oYhhhrhhhhYo.',
+      '.oYhhhhhhhhYo.',
+      'oXYYhhhhhhYYXo',
+      'oYYYYYYYYYYYYo',
+      'oXXXXXXXXXXXXo',
+      '.oooooooooooo.',
+      '......oYo.....',
+      '.......o......',
+    ],
+    nyKiteDeco: [
+      'oooooooooooo',
+      'obLLLrrLLLyo',
+      'oLNLrrrrLNLo',
+      'oLLNLrrLNLLo',
+      'oLLLNoooNLLo',
+      'oLLLo..oLLLo',
+      'oNNNo..oNNNo',
+      'oLLLo..oLLLo',
+      'oLLLNooNLLLo',
+      'oLLNLLLLNLLo',
+      'oLNLLLLLLNLo',
+      'oyLLLLLLLLbo',
+      'oooooooooooo',
+      '...r....b...',
+      '..r......b..',
+      '...r....b...',
+      '....r..b....',
+    ],
+    nyFireworkFrame: [
+      'oooooooooooooo',
+      'oCCCCCCCCCCCCo',
+      'oCDDDDDDDDDDCo',
+      'oCDyDyDDuDuDCo',
+      'oCDDCDDDDUDDCo',
+      'oCDyDyDuUhUuCo',
+      'oCDDDDDDDUDDCo',
+      'oCDDDrDDuDuDCo',
+      'oCDDrJrDDDDDCo',
+      'oCDDDrDDDDhDCo',
+      'oCkDkkDkkkDkCo',
+      'oCkkkkkkkkkkCo',
+      'oCCCCCCCCCCCCo',
+      'oooooooooooooo',
+    ],
   });
   Object.assign(GLOW_EXTRA, {
     arcade: [0.5, 0.4, 20], neon: [0.5, 0.45, 24], fridge: [0.5, 0.3, 6],
@@ -841,6 +1246,420 @@ window.Furniture = (() => {
     }
   }
 
+  // ---------------------------------------------------------------- 🎉 시즌 이벤트 벽지 15종: 무늬 · 분위기를 직접 그림 (한 칸 = 4px 도트)
+  const EV = (() => {
+    const U = 4;
+    const seeded = (seed) => { let s = seed * 7919 + 13; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; };
+    const R = (ctx, c, x, y, w, h) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
+    // 글자 격자 도장: rows 의 각 글자를 colors[글자] 색으로 한 칸 U 크기로 찍음
+    const stamp = (ctx, rows, colors, x, y, u = U) => {
+      for (let j = 0; j < rows.length; j++) for (let i = 0; i < rows[j].length; i++) {
+        const c = colors[rows[j][i]];
+        if (c) R(ctx, c, x + i * u, y + j * u, u, u);
+      }
+    };
+    const vgrad = (ctx, x, y, w, h, stops) => {
+      const g = ctx.createLinearGradient(0, y, 0, y + h);
+      stops.forEach(([p, c]) => g.addColorStop(p, c));
+      ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+    };
+    const clip = (ctx, x, y, w, h, fn) => { ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); fn(); ctx.restore(); };
+    const baseboard = (ctx, x, wb, w, c) => { R(ctx, c, x, wb - 8, w, 8); R(ctx, 'rgba(0,0,0,.18)', x, wb - 2, w, 2); };
+    const planks = (ctx, x, y, w, h, a, b, seed, plankH = 16) => {
+      const rnd = seeded(seed);
+      for (let yy = y, row = 0; yy < y + h; yy += plankH, row++) {
+        R(ctx, row % 2 ? a : b, x, yy, w, plankH);
+        R(ctx, 'rgba(0,0,0,.22)', x, yy + plankH - 2, w, 2);
+        for (let xx = x + ((row * 37) % 70); xx < x + w; xx += 70 + Math.floor(rnd() * 50)) R(ctx, 'rgba(0,0,0,.22)', xx, yy, 2, plankH - 2);
+      }
+    };
+    const twinkles = (ctx, x, y, w, h, seed, n, cols) => {
+      const rnd = seeded(seed);
+      for (let i = 0; i < n; i++) {
+        const px = x + Math.floor(rnd() * w / U) * U, py = y + Math.floor(rnd() * h / U) * U;
+        const c = cols[Math.floor(rnd() * cols.length)];
+        if (rnd() > 0.8) { R(ctx, c, px - U, py, U * 3, U); R(ctx, c, px, py - U, U, U * 3); } else R(ctx, c, px, py, U, U);
+      }
+    };
+    const burst = (ctx, cx, cy, r, c1, c2) => {
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        for (let t = 1; t <= 3; t++) {
+          const rr = (r * t) / 3;
+          R(ctx, t === 3 ? c2 : c1, cx + Math.cos(a) * rr - U / 2, cy + Math.sin(a) * rr - U / 2, U, U);
+        }
+      }
+      R(ctx, '#fff', cx - U / 2, cy - U / 2, U, U);
+    };
+    const tile = (x, w, step, fn) => { for (let xx = x - step; xx < x + w + step; xx += step) fn(xx); };
+
+    const PUMPKIN = ['..g...', '.oEEo.', 'oEqEEo', 'oEqEEo', '.oooo.'];
+    const PC = { g: '#3f8a3a', o: '#7a3a12', E: '#f7a33c', q: '#d9761c' };
+    const BAT = ['k.....k', 'kk.k.kk', 'kkkkkkk', '.k.k.k.'];
+    const CANDY = ['.p.ooo.p.', 'ppoyyyopp', '.p.ooo.p.'];
+    const CORN = ['.x.', 'yyy', 'EEE', '.E.'];
+
+    return {
+      // 🎃 호박밭 방: 따뜻한 주황 벽에 호박 무늬 격자 + 덩굴 테두리, 짙은 나무 바닥
+      hwWallPumpkin(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#f2a34e'], [1, '#e2802f']]);
+        clip(ctx, x, top, w, H, () => {
+          for (let yy = top + 28, row = 0; yy < wb - 30; yy += 44, row++) tile(x + (row % 2) * 40, w, 80, (xx) => {
+            R(ctx, 'rgba(255,255,255,.12)', xx + 6, yy - 16, U, U); R(ctx, 'rgba(255,255,255,.12)', xx + 46, yy + 6, U, U);
+            stamp(ctx, PUMPKIN, PC, xx, yy);
+          });
+          // 위쪽 덩굴 테두리
+          R(ctx, '#2f6a2e', x, top, w, 10);
+          tile(x, w, 24, (xx) => { R(ctx, '#4f9a3c', xx, top + 10, 12, U); R(ctx, '#4f9a3c', xx + 8, top + 14, U, U); R(ctx, '#2f6a2e', xx + 16, top + 6, 8, U); });
+        });
+        baseboard(ctx, x, wb, w, '#5a3014');
+        planks(ctx, x, wb, w, bottom - wb, '#4a2c18', '#553320', seed);
+        // 바닥 위 짚 부스러기
+        const rnd = seeded(seed + 3);
+        for (let i = 0; i < w / 18; i++) R(ctx, '#c9a24a', x + rnd() * w, wb + 6 + rnd() * (bottom - wb - 10), U * 2, 2);
+      },
+      // 🪦 묘지 방: 달 뜬 밤, 안개 낀 언덕에 묘비 · 십자가 실루엣, 마른 나무
+      hwWallGraveyard(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#1c1a33'], [0.7, '#3a3656'], [1, '#55506e']]);
+        clip(ctx, x, top, w, H, () => {
+          twinkles(ctx, x, top, w, H * 0.5, seed, w / 22, ['#fff6c8', '#cfd6ff']);
+          const mx = x + w - 110;
+          ctx.save(); ctx.shadowColor = '#fff3c4'; ctx.shadowBlur = 30; R(ctx, '#fff3c4', mx + 6, top + 24, 18, 18); ctx.restore();
+          stamp(ctx, ['.mmm.', 'mmmmm', 'mmmmm', 'mmmmm', '.mmm.'], { m: '#fff3c4' }, mx, top + 18, 6);
+          stamp(ctx, ['..s', '...'], { s: '#e6d9a8' }, mx + 6, top + 26, 6);
+          // 먼 언덕
+          ctx.fillStyle = '#2a2740';
+          for (let i = 0; i < w; i += U) { const h = 30 + Math.round(12 * Math.sin((i + seed * 9) / 70)); ctx.fillRect(x + i, wb - h, U, h); }
+          // 묘비 · 십자가 · 나무
+          const rnd = seeded(seed);
+          for (let xx = x + 20; xx < x + w; xx += 56 + Math.floor(rnd() * 40)) {
+            const t = rnd(), base = wb - 22 - Math.floor(rnd() * 10);
+            if (t < 0.45) stamp(ctx, ['.ooo.', 'ooooo', 'oo.oo', 'ooooo', 'ooooo', 'ooooo'], { o: '#1a1828' }, xx, base - 24);
+            else if (t < 0.8) stamp(ctx, ['.o.', 'ooo', '.o.', '.o.', '.o.'], { o: '#1a1828' }, xx, base - 20);
+            else stamp(ctx, ['o...o..', '.o.o..o', '..oo.o.', '...oo..', '...o...', '...o...', '..ooo..'], { o: '#14121f' }, xx, base - 28, 6);
+          }
+          // 안개
+          for (let i = 0; i < 3; i++) R(ctx, 'rgba(200,205,230,.10)', x, wb - 30 + i * 8, w, 6);
+        });
+        baseboard(ctx, x, wb, w, '#1e1c2c');
+        R(ctx, '#2c3326', x, wb, w, bottom - wb);
+        const rnd = seeded(seed + 1);
+        for (let i = 0; i < w / 6; i++) { const px = x + Math.floor(rnd() * w / U) * U, py = wb + Math.floor(rnd() * (bottom - wb) / U) * U; R(ctx, rnd() > 0.5 ? '#3c4a32' : '#232a1e', px, py, U, U); }
+        for (let i = 0; i < w / 30; i++) { const px = x + rnd() * w, py = wb + 4 + rnd() * (bottom - wb - 12); R(ctx, '#4f6640', px, py, U, U * 2); R(ctx, '#4f6640', px + U, py - U, U, U * 2); }
+      },
+      // 🦇 박쥐동굴 방: 울퉁불퉁 바위 벽 + 종유석, 눈이 빛나는 박쥐들, 자갈 바닥
+      hwWallBat(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        R(ctx, '#2a2433', x, top, w, H);
+        clip(ctx, x, top, w, H, () => {
+          const rnd = seeded(seed);
+          for (let yy = top; yy < wb; yy += 20) for (let xx = x - 20 + ((yy / 20) % 2) * 18; xx < x + w; xx += 36 + Math.floor(rnd() * 10)) {
+            R(ctx, rnd() > 0.5 ? '#332c40' : '#2e2839', xx, yy, 34, 18);
+            R(ctx, 'rgba(255,255,255,.05)', xx, yy, 34, 3);
+          }
+          // 종유석
+          for (let xx = x; xx < x + w; xx += 28) { const len = 8 + Math.floor(rnd() * 5) * U; for (let k = 0; k < len; k += U) R(ctx, '#1d1826', xx + Math.floor(k / 12) * 2, top + k, Math.max(U, 14 - Math.floor(k / 4)), U); }
+          // 박쥐
+          for (let i = 0; i < w / 120; i++) {
+            const bx = x + 30 + rnd() * (w - 60), by = top + 40 + rnd() * (H - 90);
+            stamp(ctx, BAT, { k: '#120f18' }, bx, by);
+            R(ctx, '#ffd84a', bx + 2 * U, by + 2 * U, 2, 2); R(ctx, '#ffd84a', bx + 4 * U + 2, by + 2 * U, 2, 2);
+          }
+        });
+        baseboard(ctx, x, wb, w, '#1a1520');
+        R(ctx, '#211c28', x, wb, w, bottom - wb);
+        const rnd = seeded(seed + 2);
+        for (let i = 0; i < w / 5; i++) R(ctx, ['#2e2838', '#3a3346', '#18141e'][i % 3], x + Math.floor(rnd() * w / U) * U, wb + Math.floor(rnd() * (bottom - wb) / U) * U, U * (1 + (i % 2)), U);
+      },
+      // 🏚️ 폐가 방: 빛바랜 다마스크 벽지, 찢어진 틈 사이 나무판, 구석 거미줄, 삐걱대는 바닥
+      hwWallHaunted(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        R(ctx, '#4d3d52', x, top, w, H);
+        clip(ctx, x, top, w, H, () => {
+          for (let yy = top + 8, row = 0; yy < wb; yy += 36, row++) tile(x + (row % 2) * 24, w, 48, (xx) =>
+            stamp(ctx, ['..d..', '.ddd.', 'dd.dd', '.ddd.', '..d..'], { d: '#5f4c66' }, xx, yy));
+          // 세로 줄무늬
+          tile(x, w, 48, (xx) => R(ctx, 'rgba(0,0,0,.08)', xx + 44, top, 4, H));
+          // 찢어진 곳
+          const rnd = seeded(seed);
+          for (let i = 0; i < Math.max(1, w / 260); i++) {
+            const tx = x + 60 + rnd() * (w - 160), ty = top + 30 + rnd() * (H - 90);
+            stamp(ctx, ['..eeee..', '.ewwwwe.', 'ewwwwwwe', 'eWWWWWWe', 'ewwwwwwe', 'ewwwwwe.', '.eWWWWe.', '..eewe..', '....e...'], { e: '#8c7a92', w: '#7a5434', W: '#3e2716' }, tx, ty, 5);
+          }
+          // 구석 거미줄
+          const web = (cx, dir) => { for (let k = 0; k < 6; k++) { R(ctx, 'rgba(230,230,240,.55)', cx + dir * k * 8, top + k * 2, 2, 40 - k * 6); R(ctx, 'rgba(230,230,240,.55)', cx, top + k * 7, dir * (44 - k * 7), 2); } };
+          web(x, 1); web(x + w - 2, -1);
+          // 삐뚤어진 액자
+          ctx.save(); ctx.translate(x + w * 0.42, top + 70); ctx.rotate(0.12);
+          R(ctx, '#3b2a1c', -26, -30, 52, 56); R(ctx, '#7a6a52', -20, -24, 40, 44); R(ctx, '#2a2230', -12, -14, 24, 26);
+          R(ctx, '#e6e0d0', -6, -8, 4, 4); R(ctx, '#e6e0d0', 4, -8, 4, 4);
+          ctx.restore();
+        });
+        baseboard(ctx, x, wb, w, '#2d2232');
+        planks(ctx, x, wb, w, bottom - wb, '#3a2e3a', '#33283a', seed, 20);
+        const rnd = seeded(seed + 5);
+        for (let i = 0; i < w / 40; i++) R(ctx, 'rgba(0,0,0,.35)', x + rnd() * w, wb + 4 + Math.floor(rnd() * 4) * 20, 20 + rnd() * 30, 3);
+      },
+      // 🍬 캔디 방: 보라 벽에 사탕 · 캔디콘 무늬, 주황 · 검정 체크 바닥
+      hwWallCandy(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#6b2f78'], [1, '#55245f']]);
+        clip(ctx, x, top, w, H, () => {
+          tile(x, w, 40, (xx) => R(ctx, 'rgba(255,255,255,.06)', xx, top, 20, H));
+          const cols = [{ p: '#ff8ad8', o: '#7a1f5a', y: '#ffd84a' }, { p: '#7fd6e8', o: '#1d5a6e', y: '#f28a1e' }, { p: '#b8f0c0', o: '#2f6a3a', y: '#ff6b6b' }];
+          for (let yy = top + 20, row = 0; yy < wb - 20; yy += 40, row++) tile(x + (row % 2) * 36, w, 72, (xx) => {
+            if ((Math.floor(xx / 72) + row) % 2) stamp(ctx, CANDY, cols[(row + Math.abs(Math.floor(xx / 72))) % 3], xx, yy);
+            else stamp(ctx, CORN, { x: '#fff', y: '#ffd84a', E: '#f28a1e' }, xx + 12, yy - 2);
+          });
+          // 위쪽 스캘럽 장식
+          tile(x, w, 24, (xx) => { R(ctx, '#f28a1e', xx, top, 24, 6); R(ctx, '#f28a1e', xx + 4, top + 6, 16, 4); R(ctx, '#111', xx + 10, top + 10, 4, 4); });
+        });
+        baseboard(ctx, x, wb, w, '#2a1030');
+        const sq = 20;
+        for (let yy = wb, r = 0; yy < bottom; yy += sq, r++) for (let xx = x, c = 0; xx < x + w; xx += sq, c++) R(ctx, (r + c) % 2 ? '#1f1a22' : '#f28a1e', xx, yy, sq, sq);
+        R(ctx, 'rgba(0,0,0,.15)', x, wb, w, 4);
+      },
+
+      // ❄️ 설경 방: 눈 내리는 하늘, 눈 쌓인 전나무 숲, 눈밭 바닥
+      xmasWallSnow(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#9cc7e8'], [1, '#e3f1fb']]);
+        clip(ctx, x, top, w, H, () => {
+          ctx.fillStyle = '#d4e6f3';
+          for (let i = 0; i < w; i += U) { const h = 40 + Math.round(16 * Math.sin((i + seed * 11) / 90)); ctx.fillRect(x + i, wb - h, U, h); }
+          const rnd = seeded(seed);
+          for (let xx = x + 10; xx < x + w; xx += 46 + Math.floor(rnd() * 30)) {
+            const s = rnd() > 0.5 ? 6 : 5, base = wb - 10 - Math.floor(rnd() * 3) * U;
+            stamp(ctx, ['...h...', '..hih..', '..iih..', '.hiiih.', '.iiiii.', 'hiihiih', 'iiiiiii', '...n...', '...n...'], { h: '#ffffff', i: '#2f6a46', n: '#5c3a26' }, xx, base - 9 * s, s);
+          }
+          ctx.fillStyle = '#f4f9fd';
+          for (let i = 0; i < w; i += U) { const h = 14 + Math.round(5 * Math.sin((i + seed * 5) / 40)); ctx.fillRect(x + i, wb - h, U, h); }
+          twinkles(ctx, x, top, w, H - 20, seed + 4, w / 9, ['#ffffff', '#ffffff', '#eaf4ff']);
+        });
+        R(ctx, '#f2f8fc', x, wb, w, bottom - wb);
+        R(ctx, 'rgba(120,160,200,.18)', x, wb, w, 4);
+        const rnd = seeded(seed + 6);
+        for (let i = 0; i < w / 14; i++) R(ctx, 'rgba(150,185,215,.35)', x + Math.floor(rnd() * w / U) * U, wb + 8 + Math.floor(rnd() * (bottom - wb - 10) / U) * U, U * 3, U);
+      },
+      // 🔥 벽난로 방: 붉은 벽돌 벽 + 나무 징두리판, 위쪽 전나무 가랜드와 전구, 따뜻한 나무 바닥에 러그
+      xmasWallFireplace(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        R(ctx, '#8a3a2c', x, top, w, H);
+        clip(ctx, x, top, w, H, () => {
+          for (let yy = top, row = 0; yy < wb; yy += 16, row++) {
+            R(ctx, '#6a2a20', x, yy + 14, w, 2);
+            for (let xx = x - 20 + (row % 2) * 20; xx < x + w; xx += 40) { R(ctx, '#6a2a20', xx, yy, 2, 14); R(ctx, row % 3 ? '#9a4434' : '#7e3326', xx + 4, yy + 2, 30, 4); }
+          }
+          // 나무 징두리판
+          R(ctx, '#5c3a26', x, wb - 56, w, 56); R(ctx, '#7a4b28', x, wb - 56, w, 6);
+          tile(x, w, 60, (xx) => { R(ctx, '#4a2e1c', xx + 8, wb - 44, 44, 30); R(ctx, '#6a4229', xx + 10, wb - 42, 40, 26); });
+          // 가랜드 + 전구
+          for (let xx = x; xx < x + w; xx += U) { const y = top + 10 + Math.round(8 * Math.sin(((xx - x) % 80) / 80 * Math.PI)); R(ctx, '#2f6a46', xx, y, U, 8); R(ctx, '#3f8a3a', xx, y + 2, U, 3); }
+          tile(x, w, 40, (xx) => { const y = top + 18 + Math.round(8 * Math.sin(((xx - x + 400) % 80) / 80 * Math.PI)); R(ctx, ['#ff6b6b', '#ffd84a', '#7fd6e8'][Math.abs(Math.floor(xx / 40)) % 3], xx, y, U, U * 2); });
+        });
+        baseboard(ctx, x, wb, w, '#3b2414');
+        planks(ctx, x, wb, w, bottom - wb, '#7a4b2c', '#6e4327', seed);
+        const rw = Math.min(260, w * 0.4), rx = x + w / 2 - rw / 2, ry = wb + (bottom - wb) * 0.35;
+        R(ctx, '#a3383a', rx, ry, rw, 30); R(ctx, '#f4cf4f', rx + 6, ry + 6, rw - 12, 3); R(ctx, '#f4cf4f', rx + 6, ry + 21, rw - 12, 3);
+        tile(rx + 10, rw - 30, 20, (xx) => { if (xx > rx && xx < rx + rw - 14) R(ctx, '#3f8a3a', xx, ry + 12, 8, 6); });
+      },
+      // 💡 트리전구 방: 짙은 초록 벽에 색색 전구 줄이 겹겹이, 반짝이는 별, 체크무늬 카펫
+      xmasWallLights(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#14301f'], [1, '#1d4a2c']]);
+        clip(ctx, x, top, w, H, () => {
+          twinkles(ctx, x, top, w, H, seed, w / 16, ['rgba(255,240,180,.5)']);
+          const cols = ['#ff5a5a', '#ffd84a', '#5ab8ff', '#7cf08a', '#ff8ad8'];
+          for (let line = 0; line < 3; line++) {
+            const y0 = top + 26 + line * 54, span = 120 + line * 20;
+            for (let xx = x; xx < x + w; xx += 2) { const y = y0 + Math.round(18 * Math.sin(((xx - x + line * 40) % span) / span * Math.PI)); R(ctx, '#0b1a10', xx, y, 2, 2); }
+            let n = 0;
+            for (let xx = x + 10 + line * 12; xx < x + w; xx += 24, n++) {
+              const y = y0 + Math.round(18 * Math.sin(((xx - x + line * 40) % span) / span * Math.PI));
+              const c = cols[(n + line) % cols.length];
+              ctx.save(); ctx.shadowColor = c; ctx.shadowBlur = 10; R(ctx, c, xx - 2, y + 2, U + 2, U * 2); ctx.restore();
+              R(ctx, '#333', xx - 1, y, U, 3); R(ctx, 'rgba(255,255,255,.6)', xx - 1, y + 3, 2, 3);
+            }
+          }
+        });
+        baseboard(ctx, x, wb, w, '#0e2416');
+        R(ctx, '#7a1f2a', x, wb, w, bottom - wb);
+        for (let xx = x; xx < x + w; xx += 24) R(ctx, 'rgba(20,60,30,.55)', xx, wb, 8, bottom - wb);
+        for (let yy = wb + 8; yy < bottom; yy += 24) R(ctx, 'rgba(20,60,30,.55)', x, yy, w, 8);
+        for (let xx = x + 11; xx < x + w; xx += 24) R(ctx, 'rgba(255,216,74,.35)', xx, wb, 2, bottom - wb);
+      },
+      // 🎁 선물상자 방: 포장지 같은 벽지 (초록 바탕 + 금색 리본 줄 + 작은 선물 · 별 무늬), 빨강 · 초록 체크 바닥
+      xmasWallGift(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        R(ctx, '#2a6a4e', x, top, w, H);
+        clip(ctx, x, top, w, H, () => {
+          tile(x, w, 120, (xx) => { R(ctx, '#e6b33a', xx + 56, top, 8, H); R(ctx, '#ffd84a', xx + 58, top, 2, H); });
+          R(ctx, '#e6b33a', x, top + H * 0.45, w, 8); R(ctx, '#ffd84a', x, top + H * 0.45 + 2, w, 2);
+          const gift = ['.y.y.', 'ooyoo', 'rryrr', 'rryrr', 'rryrr'];
+          for (let yy = top + 16, row = 0; yy < wb - 20; yy += 40, row++) tile(x + 20 + (row % 2) * 30, w, 60, (xx) => {
+            if ((row + Math.abs(Math.floor(xx / 60))) % 2) stamp(ctx, gift, { y: '#ffd84a', o: '#a3383a', r: '#e0564f' }, xx, yy);
+            else stamp(ctx, ['..x..', '.xxx.', 'xxxxx', '.x.x.'], { x: 'rgba(255,255,255,.75)' }, xx, yy + 2);
+          });
+          // 가운데 큰 리본 매듭
+          tile(x, w, 240, (xx) => stamp(ctx, ['yy..yy', 'yyyyyy', '.yyyy.', 'y.yy.y'], { y: '#ffd84a' }, xx + 106, top + H * 0.45 - 14));
+        });
+        baseboard(ctx, x, wb, w, '#1b4232');
+        R(ctx, '#c9433d', x, wb, w, bottom - wb);
+        for (let xx = x; xx < x + w; xx += 32) R(ctx, 'rgba(30,90,50,.6)', xx, wb, 12, bottom - wb);
+        for (let yy = wb + 10; yy < bottom; yy += 32) R(ctx, 'rgba(30,90,50,.6)', x, yy, w, 12);
+        for (let yy = wb + 15; yy < bottom; yy += 32) R(ctx, 'rgba(255,255,255,.25)', x, yy, w, 2);
+      },
+      // 🌌 북극 방: 오로라가 일렁이는 밤하늘, 빙산 실루엣, 반짝이는 얼음 바닥
+      xmasWallNorthPole(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#0e1636'], [1, '#22355e']]);
+        clip(ctx, x, top, w, H, () => {
+          twinkles(ctx, x, top, w, H * 0.8, seed, w / 12, ['#ffffff', '#cfe6ff', '#fff6c8']);
+          const bands = [['rgba(90,240,170,.35)', 0, 30], ['rgba(80,200,255,.28)', 22, 40], ['rgba(180,120,255,.22)', 44, 26]];
+          for (const [c, off, amp] of bands) for (let xx = x; xx < x + w; xx += U) {
+            const y = top + 30 + off + Math.round(amp * Math.sin((xx - x) / 110 + off)) ;
+            R(ctx, c, xx, y, U, 26 + Math.round(10 * Math.sin((xx - x) / 37)));
+          }
+          ctx.fillStyle = '#cfe6f7';
+          const rnd = seeded(seed);
+          for (let xx = x; xx < x + w; xx += 90 + Math.floor(rnd() * 40)) {
+            const h = 30 + Math.floor(rnd() * 26), bw = 60 + Math.floor(rnd() * 40);
+            for (let k = 0; k < bw; k += U) { const hh = Math.round(h * (1 - Math.abs(k - bw / 2) / (bw / 2)) ** 0.7); R(ctx, '#cfe6f7', xx + k, wb - hh, U, hh); R(ctx, '#a9cbe6', xx + k + (k > bw / 2 ? 0 : 0), wb - hh * 0.4, U, hh * 0.4); }
+          }
+        });
+        baseboard(ctx, x, wb, w, '#8fb6d6');
+        vgrad(ctx, x, wb, w, bottom - wb, [[0, '#d8ecfa'], [1, '#b6d8f0']]);
+        const rnd = seeded(seed + 9);
+        for (let i = 0; i < w / 50; i++) { const cx = x + rnd() * w, cy = wb + 10 + rnd() * (bottom - wb - 20); R(ctx, 'rgba(255,255,255,.8)', cx, cy, 20 + rnd() * 20, 2); R(ctx, 'rgba(140,180,215,.6)', cx + 6, cy + 4, 12, 2); }
+      },
+
+      // 🎆 불꽃놀이 방: 밤하늘 가득 불꽃, 아래 도시 불빛 실루엣, 기와 같은 어두운 바닥
+      nyWallFirework(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#0e0e2a'], [1, '#2a2050']]);
+        clip(ctx, x, top, w, H, () => {
+          twinkles(ctx, x, top, w, H * 0.7, seed, w / 20, ['#ffffff']);
+          const pal = [['#ffd84a', '#ff8a1e'], ['#ff6bd0', '#b04fd6'], ['#7cf0ff', '#3a8aff'], ['#9cff7a', '#3ac06a'], ['#ff6b6b', '#ffd84a']];
+          const rnd = seeded(seed);
+          for (let i = 0; i < Math.max(3, w / 110); i++) {
+            const [c1, c2] = pal[i % pal.length];
+            burst(ctx, x + 40 + rnd() * (w - 80), top + 36 + rnd() * (H - 110), 22 + rnd() * 16, c1, c2);
+          }
+          // 도시 실루엣 + 창문 불빛
+          for (let xx = x; xx < x + w; xx += 24) {
+            const h = 20 + Math.floor(rnd() * 5) * 8;
+            R(ctx, '#120f24', xx, wb - h, 22, h);
+            for (let wy = wb - h + 6; wy < wb - 6; wy += 10) for (let wx = xx + 4; wx < xx + 18; wx += 8) if (rnd() > 0.55) R(ctx, '#ffd98a', wx, wy, 4, 4);
+          }
+        });
+        baseboard(ctx, x, wb, w, '#141024');
+        R(ctx, '#2c2840', x, wb, w, bottom - wb);
+        for (let yy = wb, r = 0; yy < bottom; yy += 14, r++) { R(ctx, '#3a3552', x, yy, w, 3); for (let xx = x + (r % 2) * 14; xx < x + w; xx += 28) R(ctx, '#1e1b30', xx, yy + 3, 3, 11); }
+      },
+      // ✨ 금빛 방: 금색 바탕에 전통 구름무늬, 붉은 옻칠 징두리판, 반들반들한 짙은 마루
+      nyWallGold(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#d9a63a'], [1, '#b8862a']]);
+        clip(ctx, x, top, w, H, () => {
+          const CLOUD = ['..ccc.....', '.c...c.cc.', 'c..c..c..c', 'c.c.c.....', '.c..c.cccc', '..cc......'];
+          for (let yy = top + 14, row = 0; yy < wb - 60; yy += 38, row++) tile(x + (row % 2) * 50, w, 100, (xx) => stamp(ctx, CLOUD, { c: '#f7d77a' }, xx, yy));
+          // 붉은 징두리판 + 금 테두리
+          R(ctx, '#8e1f24', x, wb - 50, w, 50); R(ctx, '#ffd23f', x, wb - 50, w, 4); R(ctx, '#ffd23f', x, wb - 12, w, 2);
+          tile(x, w, 40, (xx) => stamp(ctx, ['.y.', 'y.y', '.y.'], { y: '#e6b33a' }, xx + 14, wb - 36));
+          R(ctx, '#ffd23f', x, top, w, 4);
+        });
+        baseboard(ctx, x, wb, w, '#5a1418');
+        planks(ctx, x, wb, w, bottom - wb, '#6a2c1c', '#5e2618', seed, 18);
+        for (let xx = x; xx < x + w; xx += 80) R(ctx, 'rgba(255,220,150,.10)', xx, wb, 30, bottom - wb);
+      },
+      // 🌅 해돋이 방: 남색에서 분홍 · 주황으로 물드는 하늘, 떠오르는 해, 산 능선과 바다, 전망대 나무 데크
+      nyWallSunrise(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#2a2e6a'], [0.45, '#d56a8a'], [0.8, '#ffb35a'], [1, '#ffd98a']]);
+        clip(ctx, x, top, w, H, () => {
+          twinkles(ctx, x, top, w, H * 0.25, seed, w / 40, ['rgba(255,255,255,.8)']);
+          const sx = x + w / 2, sy = wb - 34, r = 44;
+          ctx.save(); ctx.shadowColor = '#ffe08a'; ctx.shadowBlur = 40;
+          for (let yy = -r; yy <= 0; yy += U) { const half = Math.floor(Math.sqrt(r * r - yy * yy) / U) * U; R(ctx, '#ff7a3a', sx - half, sy + yy, half * 2, U); }
+          ctx.restore();
+          // 산 능선 (양쪽)
+          for (let i = 0; i < w; i += U) {
+            const d = Math.abs(i - w / 2) / (w / 2);
+            const h = Math.round(d * 60 + 8 * Math.sin(i / 23)) ;
+            if (h > 0) { R(ctx, '#3a2a4e', x + i, wb - 30 - h * 0.7, U, h * 0.7 + 4); R(ctx, '#251c38', x + i, wb - 30 - h * 0.35, U, h * 0.35 + 4); }
+          }
+          // 바다 + 햇빛 기둥
+          R(ctx, '#3e4f8a', x, wb - 30, w, 30);
+          for (let yy = wb - 28; yy < wb; yy += 6) { const ww = 70 - (wb - yy) * 1.2; R(ctx, '#ffb35a', sx - ww / 2, yy, ww, 3); R(ctx, 'rgba(255,255,255,.25)', x, yy + 3, w, 1); }
+        });
+        baseboard(ctx, x, wb, w, '#5c3a26');
+        planks(ctx, x, wb, w, bottom - wb, '#b07a4a', '#a06d40', seed, 16);
+        R(ctx, '#7a4b28', x, wb - 6, w, 6);
+        tile(x, w, 50, (xx) => R(ctx, '#7a4b28', xx, wb - 24, 6, 18));
+        R(ctx, '#8a5a32', x, wb - 26, w, 4);
+      },
+      // 🎊 색종이 방: 분홍 벽에 삼각 깃발 줄 · 꼬불꼬불 종이 테이프 · 흩날리는 색종이, 하늘색 바닥 위 색종이
+      nyWallConfetti(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#fbc4d4'], [1, '#f6a9bf']]);
+        const cols = ['#ff5a7a', '#ffd84a', '#5ab8ff', '#7cf08a', '#b79be8', '#ff9a3c'];
+        clip(ctx, x, top, w, H, () => {
+          tile(x, w, 30, (xx) => R(ctx, 'rgba(255,255,255,.18)', xx, top, 10, H));
+          // 꼬불 테이프
+          for (let k = 0; k < 4; k++) for (let yy = top; yy < wb; yy += 2) R(ctx, cols[k + 1], x + (k + 0.5) * w / 4 + Math.round(10 * Math.sin(yy / 9 + k)), yy, 3, 2);
+          // 흩날리는 색종이
+          const rnd = seeded(seed);
+          for (let i = 0; i < w / 6; i++) { const c = cols[i % cols.length]; const px = x + rnd() * w, py = top + 20 + rnd() * (H - 30); if (i % 3) R(ctx, c, px, py, 6, 3); else R(ctx, c, px, py, 3, 6); }
+          // 삼각 깃발 줄
+          for (let xx = x; xx < x + w; xx += 2) R(ctx, '#7a4b28', xx, top + 10 + Math.round(10 * Math.sin(((xx - x) % 160) / 160 * Math.PI)), 2, 2);
+          let n = 0;
+          for (let xx = x + 6; xx < x + w; xx += 20, n++) {
+            const y = top + 12 + Math.round(10 * Math.sin(((xx - x) % 160) / 160 * Math.PI));
+            for (let k = 0; k < 4; k++) R(ctx, cols[n % cols.length], xx + k * 2, y + k * U, 16 - k * 4, U);
+          }
+        });
+        baseboard(ctx, x, wb, w, '#d9708f');
+        R(ctx, '#9fe0f0', x, wb, w, bottom - wb);
+        for (let yy = wb + 20; yy < bottom; yy += 20) R(ctx, 'rgba(255,255,255,.35)', x, yy, w, 2);
+        const rnd = seeded(seed + 7);
+        for (let i = 0; i < w / 10; i++) R(ctx, cols[i % cols.length], x + rnd() * w, wb + 6 + rnd() * (bottom - wb - 10), 6, 3);
+      },
+      // 🏮 등불 방: 한옥 나무 기둥 · 서까래 사이 은은히 빛나는 창호지 문살, 청사초롱이 걸린 따뜻한 마루
+      nyWallLantern(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        R(ctx, '#3a2418', x, top, w, H);
+        clip(ctx, x, top, w, H, () => {
+          const seg = 160;
+          tile(x, w, seg, (xx) => {
+            // 창호지 문 (격자 문살)
+            const dx = xx + 18, dy = top + 40, dw = seg - 36, dh = H - 60;
+            R(ctx, '#f5e2b0', dx, dy, dw, dh);
+            ctx.save(); ctx.shadowColor = '#ffcf7a'; ctx.shadowBlur = 18; R(ctx, 'rgba(255,214,140,.35)', dx + 8, dy + 8, dw - 16, dh - 16); ctx.restore();
+            for (let gx = dx; gx <= dx + dw; gx += dw / 6) R(ctx, '#6b4426', gx - 2, dy, 4, dh);
+            for (let gy = dy; gy <= dy + dh; gy += dh / 6) R(ctx, '#6b4426', dx, gy - 2, dw, 4);
+            R(ctx, '#2a180e', xx, top, 14, H);   // 기둥
+            R(ctx, '#4a2e1c', xx + 2, top, 4, H);
+          });
+          // 서까래
+          R(ctx, '#2a180e', x, top, w, 26);
+          tile(x, w, 30, (xx) => { R(ctx, '#4a2e1c', xx, top + 4, 18, 18); R(ctx, '#a3383a', xx + 6, top + 10, 6, 6); });
+          // 청사초롱
+          tile(x + 80, w, seg, (xx) => {
+            R(ctx, '#2a180e', xx - 1, top + 26, 2, 14);
+            ctx.save(); ctx.shadowColor = '#ffb35a'; ctx.shadowBlur = 16;
+            stamp(ctx, ['.yyy.', 'rrrrr', 'rreer', 'rrrrr', 'yyyyy', 'bbbbb', 'bbeeb', '.yyy.', '..r..'], { y: '#ffd23f', r: '#d33a3a', e: '#ffe9a8', b: '#2f5fb8' }, xx - 10, top + 40);
+            ctx.restore();
+          });
+        });
+        baseboard(ctx, x, wb, w, '#2a180e');
+        planks(ctx, x, wb, w, bottom - wb, '#9a6236', '#8c5830', seed, 14);
+        for (let xx = x; xx < x + w; xx += 120) R(ctx, 'rgba(255,210,140,.12)', xx + 20, wb, 60, bottom - wb);
+      },
+    };
+  })();
+
   const THEMES = {
     // 실내 (단색 벽, 나무 바닥)
     basic:   { name: '크림 방',     kind: 'room', wall: '#f3e6d3', floor: '#c99a6b' },
@@ -855,27 +1674,28 @@ window.Furniture = (() => {
     roofNight:   { name: '옥상 (밤하늘)', kind: 'roof', night: true },
     roofDay:     { name: '옥상 (낮)',     kind: 'roof', night: false },
     // 🎃 할로윈 이벤트 전용
-    hwWallPumpkin:   { name: '호박밭 방',   kind: 'room', wall: '#f0a24a', floor: '#4a3020' },
-    hwWallGraveyard: { name: '묘지 방',     kind: 'room', wall: '#2a2a38', floor: '#3a3a30' },
-    hwWallBat:       { name: '박쥐동굴 방', kind: 'room', wall: '#241f2e', floor: '#17141c' },
-    hwWallHaunted:   { name: '폐가 방',     kind: 'room', wall: '#4a3a4a', floor: '#2e2436' },
-    hwWallCandy:     { name: '캔디 방',     kind: 'room', wall: '#6a2e5a', floor: '#e0564f' },
+    hwWallPumpkin:   { name: '호박밭 방',   kind: 'event', wall: '#f0a24a', floor: '#4a3020' },
+    hwWallGraveyard: { name: '묘지 방',     kind: 'event', wall: '#2a2a38', floor: '#3a3a30' },
+    hwWallBat:       { name: '박쥐동굴 방', kind: 'event', wall: '#241f2e', floor: '#17141c' },
+    hwWallHaunted:   { name: '폐가 방',     kind: 'event', wall: '#4a3a4a', floor: '#2e2436' },
+    hwWallCandy:     { name: '캔디 방',     kind: 'event', wall: '#6a2e5a', floor: '#e0564f' },
     // 🎄 크리스마스 이벤트 전용
-    xmasWallSnow:      { name: '설경 방',     kind: 'room', wall: '#dff0fa', floor: '#eef6fb' },
-    xmasWallFireplace: { name: '벽난로 방',   kind: 'room', wall: '#7a2e2a', floor: '#5c3a26' },
-    xmasWallLights:    { name: '트리전구 방', kind: 'room', wall: '#1c3a2a', floor: '#2a5a3a' },
-    xmasWallGift:      { name: '선물상자 방', kind: 'room', wall: '#2a5a4a', floor: '#c9962c' },
-    xmasWallNorthPole: { name: '북극 방',     kind: 'room', wall: '#2a3a5a', floor: '#cfe6f7' },
+    xmasWallSnow:      { name: '설경 방',     kind: 'event', wall: '#dff0fa', floor: '#eef6fb' },
+    xmasWallFireplace: { name: '벽난로 방',   kind: 'event', wall: '#7a2e2a', floor: '#5c3a26' },
+    xmasWallLights:    { name: '트리전구 방', kind: 'event', wall: '#1c3a2a', floor: '#2a5a3a' },
+    xmasWallGift:      { name: '선물상자 방', kind: 'event', wall: '#2a5a4a', floor: '#c9962c' },
+    xmasWallNorthPole: { name: '북극 방',     kind: 'event', wall: '#2a3a5a', floor: '#cfe6f7' },
     // 🧧 새해 이벤트 전용
-    nyWallFirework: { name: '불꽃놀이 방', kind: 'room', wall: '#1a1a38', floor: '#3a2a5a' },
-    nyWallGold:     { name: '금빛 방',     kind: 'room', wall: '#9c6f1e', floor: '#f4cf4f' },
-    nyWallSunrise:  { name: '해돋이 방',   kind: 'room', wall: '#f0a24a', floor: '#e0564f' },
-    nyWallConfetti: { name: '색종이 방',   kind: 'room', wall: '#f6a9bf', floor: '#7fd6e8' },
-    nyWallLantern:  { name: '등불 방',     kind: 'room', wall: '#3a2418', floor: '#a3383a' },
+    nyWallFirework: { name: '불꽃놀이 방', kind: 'event', wall: '#1a1a38', floor: '#3a2a5a' },
+    nyWallGold:     { name: '금빛 방',     kind: 'event', wall: '#9c6f1e', floor: '#f4cf4f' },
+    nyWallSunrise:  { name: '해돋이 방',   kind: 'event', wall: '#f0a24a', floor: '#e0564f' },
+    nyWallConfetti: { name: '색종이 방',   kind: 'event', wall: '#f6a9bf', floor: '#7fd6e8' },
+    nyWallLantern:  { name: '등불 방',     kind: 'event', wall: '#3a2418', floor: '#a3383a' },
   };
 
   function drawFloorArea(ctx, themeId, x, top, w, wallBottom, bottom, seed) {
     const t = THEMES[themeId] || THEMES.basic;
+    if (t.kind === 'event' && EV[themeId]) { EV[themeId](ctx, x, top, w, wallBottom, bottom, seed); return; }
     const wallH = wallBottom - top, floorH = bottom - wallBottom;
     if (t.kind === 'room') {
       ctx.fillStyle = t.wall; ctx.fillRect(x, top, w, wallH);
