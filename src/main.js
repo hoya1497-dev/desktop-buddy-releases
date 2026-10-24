@@ -31,6 +31,7 @@ const PRESETS = ['📚 공부중', '🎮 게임중', '💻 작업중', '☕ 휴�
 const DEFAULT_CONFIG = {
   nickname: '나',
   color: '#f2a65a',
+  nameColor: null,   // 채팅·이름표에 쓰는 닉네임 글자색 (안 고르면 기본 흰색)
   serverUrl: DEFAULTS.serverUrl,
   status: 'auto',
   customStatus: '',
@@ -316,7 +317,8 @@ function effectiveStatus() {
 function selfProfile() {
   const pet = session?.user.pet;
   return {
-    nickname: config.nickname, color: config.color, status: effectiveStatus(), species: config.species,
+    nickname: config.nickname, color: config.color, nameColor: config.nameColor || null,
+    nameEffect: session?.user.nameEffect || null, status: effectiveStatus(), species: config.species,
     pose: POSES.includes(config.pose) ? config.pose : 'auto',
     username: session?.user.username || '', hungry: !!pet && pet.full < 30, sad: !!pet && pet.mood < 25,
     skin: session?.user.skin?.v ? session.user.skin : null,
@@ -332,7 +334,7 @@ function onSelfChanged() {
   const p = selfProfile();
   overlay?.webContents.send('self', p);
   control?.webContents.send('self', p);
-  const wire = { nickname: p.nickname, color: p.color, status: p.status, species: p.species, pose: p.pose };
+  const wire = { nickname: p.nickname, color: p.color, nameColor: p.nameColor, status: p.status, species: p.species, pose: p.pose };
   const key = JSON.stringify(wire);
   if (session && key !== lastSentProfile) { lastSentProfile = key; wsSend({ type: 'profile', profile: wire }); }
   pushHome();
@@ -413,7 +415,7 @@ function handleServer(m, sock) {
       pendingAuth = null;
       session = { user: m.user, catalog: m.catalog };
       if (typeof m.serverNow === 'number') clockSkew = m.serverNow - Date.now();
-      config.nickname = m.user.nickname; config.color = m.user.color; config.species = m.user.species || config.species; saveConfig();
+      config.nickname = m.user.nickname; config.color = m.user.color; config.nameColor = m.user.nameColor || config.nameColor; config.species = m.user.species || config.species; saveConfig();
       lastSentProfile = '';
       setNet('online');
       onSelfChanged();
@@ -426,6 +428,9 @@ function handleServer(m, sock) {
       updateWidgets();
       break;
     }
+    case 'catalog':   // 🎉 관리자가 시즌 이벤트를 켜거나 꺼서 상점 목록이 바뀜
+      if (session) { session.catalog = m.catalog; pushHome(); }
+      break;
     case 'auth-fail':
       if (m.code === 'update-required') {
         // 앱이 너무 오래됨: 로그인 정보는 지우지 않고 업데이트를 안내
@@ -537,7 +542,7 @@ function handleServer(m, sock) {
     case 'chat': {
       const p = peers.get(m.id);
       overlay?.webContents.send('chat', { id: m.id, text: m.text });
-      addChat({ pid: m.id, from: p ? p.nickname : '?', username: p?.username, color: p?.color, text: m.text, ts: typeof m.ts === 'number' ? m.ts : serverTime() });
+      addChat({ pid: m.id, from: p ? p.nickname : '?', username: p?.username, color: p?.color, nameColor: p?.nameColor, nameEffect: p?.nameEffect, text: m.text, ts: typeof m.ts === 'number' ? m.ts : serverTime() });
       break;
     }
     case 'emote':
@@ -736,7 +741,7 @@ function sendChat(text) {
   const t = String(text || '').trim().slice(0, 200);
   if (!t) return;
   overlay?.webContents.send('chat', { id: 'me', text: t });
-  addChat({ pid: 'me', from: config.nickname, username: session?.user.username, color: config.color, text: t, mine: true });
+  addChat({ pid: 'me', from: config.nickname, username: session?.user.username, color: config.color, nameColor: config.nameColor, nameEffect: session?.user.nameEffect, text: t, mine: true });
   if (room) wsSend({ type: 'chat', text: t });
 }
 function sendEmote(kind, target = null) {
@@ -1074,10 +1079,11 @@ function registerIpc() {
     return { gwError, apps: [...byOwner.entries()].map(([owner, titles]) => ({ owner, titles: titles.slice(0, 3) })) };
   });
   ipcMain.on('save-config', (_e, partial) => {
-    const allowed = ['nickname', 'color', 'serverUrl', 'status', 'customStatus', 'targets',
+    const allowed = ['nickname', 'color', 'nameColor', 'serverUrl', 'status', 'customStatus', 'targets',
       'occlusion', 'hideOthers', 'petScale', 'statusRules', 'autoStart', 'species', 'showPetsDesktop', 'showAllPets'];
     for (const k of allowed) if (partial && k in partial) config[k] = partial[k];
     config.nickname = String(config.nickname || '나').slice(0, 16);
+    if (config.nameColor && !/^#[0-9a-f]{6}$/i.test(config.nameColor)) config.nameColor = null;
     config.petScale = Math.min(8, Math.max(2, Number(config.petScale) || 3));
     if (!['cat', 'dog', 'rabbit'].includes(config.species)) config.species = 'cat';
     saveConfig();

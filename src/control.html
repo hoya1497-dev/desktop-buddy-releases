@@ -32,6 +32,14 @@
           <div id="swatches" class="row"></div>
         </div>
       </label>
+      <label>닉네임 글자색 <span class="note-inline">(채팅 · 이름표에 보이는 색)</span>
+        <div class="row">
+          <input id="nameColor" type="color">
+          <button id="nameColorReset" class="ghost small" type="button">기본으로</button>
+          <div id="nameSwatches" class="row"></div>
+        </div>
+      </label>
+      <p id="nameEffectNote" class="note" hidden></p>
       <div class="note" style="margin-top:8px">캐릭터</div>
       <div class="species-row" id="speciesRow"></div>
       <label>바탕화면 크기 <span id="scaleVal" class="note-inline"></span><input id="petScale" type="range" min="2" max="8" step="1"></label>
@@ -147,6 +155,7 @@
   </section>
 
   <script src="theme.js"></script>
+  <script src="nickfx.js"></script>
   <script src="sprites.js"></script>
   <script src="skins.js"></script>
   <script src="control.js"></script>

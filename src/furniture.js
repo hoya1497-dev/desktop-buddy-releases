@@ -9,6 +9,63 @@ window.Furniture = (() => {
     a: '#e8e2da', A: '#bdb5aa',
   };
 
+  // ---------------------------------------------------------------- 시즌 이벤트 소품: 간단한 도형으로 빠르게 찍어내는 도우미
+  // circle(w,h,fill,outline,accent): 동그란 소품 (호박 · 금화 · 종 등) · accent 는 가운데 작은 점 장식
+  function circle(w, h, fill, out = 'o', accent = null) {
+    const rows = [];
+    const cx = (w - 1) / 2, cy = (h - 1) / 2, rx = w / 2, ry = h / 2;
+    for (let y = 0; y < h; y++) {
+      let row = '';
+      for (let x = 0; x < w; x++) {
+        const d = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2;
+        if (d > 1.08) row += '.';
+        else if (d > 0.72) row += out;
+        else if (accent && Math.abs(x - cx) < w * 0.14 && Math.abs(y - cy) < h * 0.14) row += accent;
+        else row += fill;
+      }
+      rows.push(row);
+    }
+    return rows;
+  }
+  // box(w,h,fill,outline): 네모난 소품 (상자 · 가판대 등), lidColor 가 있으면 위 2줄을 다른 색(상자 뚜껑)으로
+  function box(w, h, fill, out = 'o', lid = null) {
+    const rows = [];
+    for (let y = 0; y < h; y++) {
+      let row = '';
+      for (let x = 0; x < w; x++) {
+        const edge = x === 0 || x === w - 1 || y === 0 || y === h - 1;
+        row += edge ? out : (lid && y < Math.max(2, Math.round(h * 0.3)) ? lid : fill);
+      }
+      rows.push(row);
+    }
+    return rows;
+  }
+  // cone(w,h,fill,outline): 세모 소품 (트리 · 모자 등)
+  function cone(w, h, fill, out = 'o') {
+    const rows = [];
+    for (let y = 0; y < h; y++) {
+      const half = Math.round((y / (h - 1)) * (w / 2));
+      const l = Math.floor(w / 2) - half, r = Math.floor(w / 2) + half;
+      let row = '';
+      for (let x = 0; x < w; x++) {
+        if (x < l || x > r) row += '.';
+        else if (x === l || x === r || y === h - 1) row += out;
+        else row += fill;
+      }
+      rows.push(row);
+    }
+    return rows;
+  }
+  // wallFlat(w,h,fill,outline,accent): 벽에 거는 평평한 소품 (리스 · 거미줄 · 깃발 등)
+  function wallFlat(w, h, fill, out = 'o', accent = null) {
+    const rows = box(w, h, fill, out);
+    if (accent) {
+      const midY = Math.floor(h / 2);
+      rows[midY] = rows[midY].split('').map((c, x) => (x > 1 && x < w - 2 ? accent : c)).join('');
+    }
+    return rows;
+  }
+
   // ---------------------------------------------------------------- 그림 (글자 격자)
   const ART = {
     computer: [
@@ -647,7 +704,47 @@ window.Furniture = (() => {
     '....pPPp....',
     '.....pp.....',
   ];
-  Object.assign(GLOW_EXTRA, { arcade: [0.5, 0.4, 20], neon: [0.5, 0.45, 24], fridge: [0.5, 0.3, 6] });
+  // ---------------------------------------------------------------- 🎉 시즌 이벤트 소품 30종 (할로윈 10 · 크리스마스 10 · 새해 10)
+  Object.assign(ART, {
+    // 🎃 할로윈
+    hwPumpkinLamp: circle(14, 12, 'm', 'q', 'y'),
+    hwCauldron: box(14, 11, 'k', 'o', 'G'),
+    hwTombstone: box(12, 14, 's', 'o'),
+    hwGhostDoll: circle(11, 12, 'x', 'S', 'k'),
+    hwCandyBowl: box(14, 8, 'v', 'V'),
+    hwSkullJar: box(11, 13, 'x', 'o', 's'),
+    hwBlackCatDoll: circle(11, 11, 'k', 'o', 'y'),
+    hwSpiderWeb: wallFlat(14, 10, 'x', 'S', 's'),
+    hwBatGarland: wallFlat(16, 8, 'k', 'o', 'm'),
+    hwCobwebRug: box(18, 6, 'S', 's'),
+    // 🎄 크리스마스
+    xmasTree2: cone(14, 14, 'G', 'g'),
+    xmasFireplace: box(16, 13, 'q', 'Q', 'r'),
+    xmasGiftBox: box(12, 11, 'r', 'R', 'y'),
+    xmasSnowman: circle(12, 14, 'x', 'S', 'o'),
+    xmasCandyCane: box(6, 14, 'x', 'r'),
+    xmasSleigh: box(18, 10, 'R', 'r', 'y'),
+    xmasBell: circle(10, 11, 'y', 'Y', 'o'),
+    xmasStocking: wallFlat(10, 14, 'r', 'R', 'x'),
+    xmasWreath: circle(14, 14, 'G', 'g', 'r'),
+    xmasLightsGarland: wallFlat(18, 6, 'g', 'G', 'y'),
+    // 🧧 새해
+    nyFortuneBox: box(12, 12, 'r', 'y', 'Y'),
+    nyLanternStand: circle(11, 14, 'r', 'R', 'y'),
+    nyGoldCoinJar: box(12, 13, 'x', 's', 'Y'),
+    nyRiceCakeTable: box(16, 10, 'l', 'n'),
+    nyConfettiBalloon: circle(11, 13, 'p', 'P', 'y'),
+    nyDrumSet: box(13, 12, 'r', 'R', 'y'),
+    nyZodiacFlag: wallFlat(10, 16, 'y', 'Y', 'r'),
+    nyNewYearClock: circle(13, 13, 'x', 'Y', 'k'),
+    nyKiteDeco: wallFlat(14, 12, 't', 'T', 'y'),
+    nyFireworkFrame: wallFlat(14, 12, 'v', 'V', 'y'),
+  });
+  Object.assign(GLOW_EXTRA, {
+    arcade: [0.5, 0.4, 20], neon: [0.5, 0.45, 24], fridge: [0.5, 0.3, 6],
+    hwPumpkinLamp: [0.5, 0.45, 18], xmasTree2: [0.5, 0.4, 22], xmasFireplace: [0.5, 0.55, 20],
+    xmasLightsGarland: [0.5, 0.5, 18], nyLanternStand: [0.5, 0.4, 18],
+  });
 
   // 어항 속 물이 있는 칸 (물고기가 헤엄치는 범위): [x1, y1, x2, y2]
   const TANK_WATER = { tankS: [2, 3, 11, 6], tankM: [1, 2, 14, 8], tankL: [1, 3, 22, 10] };
@@ -757,6 +854,24 @@ window.Furniture = (() => {
     meadowNight: { name: '초원 (밤)',     kind: 'meadow', night: true },
     roofNight:   { name: '옥상 (밤하늘)', kind: 'roof', night: true },
     roofDay:     { name: '옥상 (낮)',     kind: 'roof', night: false },
+    // 🎃 할로윈 이벤트 전용
+    hwWallPumpkin:   { name: '호박밭 방',   kind: 'room', wall: '#f0a24a', floor: '#4a3020' },
+    hwWallGraveyard: { name: '묘지 방',     kind: 'room', wall: '#2a2a38', floor: '#3a3a30' },
+    hwWallBat:       { name: '박쥐동굴 방', kind: 'room', wall: '#241f2e', floor: '#17141c' },
+    hwWallHaunted:   { name: '폐가 방',     kind: 'room', wall: '#4a3a4a', floor: '#2e2436' },
+    hwWallCandy:     { name: '캔디 방',     kind: 'room', wall: '#6a2e5a', floor: '#e0564f' },
+    // 🎄 크리스마스 이벤트 전용
+    xmasWallSnow:      { name: '설경 방',     kind: 'room', wall: '#dff0fa', floor: '#eef6fb' },
+    xmasWallFireplace: { name: '벽난로 방',   kind: 'room', wall: '#7a2e2a', floor: '#5c3a26' },
+    xmasWallLights:    { name: '트리전구 방', kind: 'room', wall: '#1c3a2a', floor: '#2a5a3a' },
+    xmasWallGift:      { name: '선물상자 방', kind: 'room', wall: '#2a5a4a', floor: '#c9962c' },
+    xmasWallNorthPole: { name: '북극 방',     kind: 'room', wall: '#2a3a5a', floor: '#cfe6f7' },
+    // 🧧 새해 이벤트 전용
+    nyWallFirework: { name: '불꽃놀이 방', kind: 'room', wall: '#1a1a38', floor: '#3a2a5a' },
+    nyWallGold:     { name: '금빛 방',     kind: 'room', wall: '#9c6f1e', floor: '#f4cf4f' },
+    nyWallSunrise:  { name: '해돋이 방',   kind: 'room', wall: '#f0a24a', floor: '#e0564f' },
+    nyWallConfetti: { name: '색종이 방',   kind: 'room', wall: '#f6a9bf', floor: '#7fd6e8' },
+    nyWallLantern:  { name: '등불 방',     kind: 'room', wall: '#3a2418', floor: '#a3383a' },
   };
 
   function drawFloorArea(ctx, themeId, x, top, w, wallBottom, bottom, seed) {

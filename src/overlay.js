@@ -357,7 +357,7 @@
       const showName = !this.isMe || hovered;
       const line1 = [showName ? this.profile.nickname : '', this.profile.status].filter(Boolean).join(' · ');
       const line2 = showName && this.profile.username ? '@' + this.profile.username : '';
-      if (line1) labelTop = drawPill(line1, this.x, labelTop, this.isMe, line2) - 6;
+      if (line1) labelTop = drawPill(line1, this.x, labelTop, this.isMe, line2, this.profile) - 6;
 
       if (this.bubble) drawBubble(this.bubble.text, this.x, labelTop);
 
@@ -434,7 +434,7 @@
   }
 
   // ------------------------------------------------------------ 말풍선 / 라벨
-  function drawPill(text, cx, bottom, mine, sub) {
+  function drawPill(text, cx, bottom, mine, sub, profile) {
     ctx.font = `600 12px ${FONT}`;
     let w = ctx.measureText(text).width;
     if (sub) { ctx.font = `10px ${FONT}`; w = Math.max(w, ctx.measureText(sub).width); }
@@ -444,9 +444,12 @@
     ctx.fillStyle = mine ? 'rgba(30,30,40,0.72)' : 'rgba(40,60,110,0.82)';
     ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
+    const t = performance.now() / 1000;
+    const restore = profile && window.NickFX ? NickFX.applyCanvasGlow(ctx, profile, t) : () => {};
+    ctx.fillStyle = profile && window.NickFX ? NickFX.canvasColor(profile, t, '#fff') : '#fff';
     ctx.font = `600 12px ${FONT}`;
     ctx.fillText(text, cx, y + (sub ? 11 : h / 2 + 0.5), w - 12);
+    restore();
     if (sub) {
       ctx.font = `10px ${FONT}`;
       ctx.fillStyle = 'rgba(255,255,255,0.7)';

@@ -9,6 +9,14 @@
   const FONT = '"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif';
   const CAT_NAME = { T: '쓰레기', S: '작은 물고기', M: '중간 물고기', L: '큰 물고기' };
 
+  // 집 주인 왕관: 혼자 있을 땐 안 보이고, 방에 다른 사람이 있을 때만 주인 이름 앞에 보임
+  function showCrownDock(username) {
+    const s = H.S;
+    if (!s || !s.room || !username) return false;
+    const ownerName = s.room.isOwner ? U()?.username : s.room.owner.username;
+    if (username !== ownerName) return false;
+    return s.room.isOwner ? (s.peers || []).length > 0 : true;
+  }
   // 받침에 맞춰 을/를, 이/가
   const batchim = (w) => { const c = String(w).charCodeAt(String(w).length - 1); return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0; };
   const eul = (w) => w + (batchim(w) ? '을' : '를');
@@ -36,6 +44,8 @@
     return c;
   };
   const U = () => (H.S && H.S.session ? H.S.session.user : null);
+  // 🎉 이벤트 전용 아이템(벽지·가구·펫)은 이벤트 코인으로만 살 수 있음
+  const eventWallet = (def, u) => def.event ? { bal: u.eventCoins || 0, icon: '🎫', tag: ' · 이벤트 코인' } : { bal: u.coins, icon: '🪙', tag: '' };
   const FISH = () => (C() ? C().fish : {});
   const rar = (f) => C().rarity[f.rar];
 
@@ -63,7 +73,9 @@
   function renderShop() {
     const u = U(), c = C();
     if (!u || !c) return;
-    $('shopNote').textContent = `오늘 접속 코인 🪙${c.limits.onlinePerDay - (u.onlineLeft ?? 0)}/${c.limits.onlinePerDay} 받음 · 친구와 대화하면 30초마다 🪙30`;
+    const activeEvents = Object.values(c.events || {}).filter((e) => e.on).map((e) => `${e.icon} ${e.name}`).join(', ');
+    $('shopNote').textContent = `오늘 접속 코인 🪙${c.limits.onlinePerDay - (u.onlineLeft ?? 0)}/${c.limits.onlinePerDay} 받음 · 친구와 대화하면 30초마다 🪙30`
+      + (activeEvents ? ` · 🎉 진행 중인 이벤트: ${activeEvents} · 이벤트 코인 🎫${u.eventCoins || 0} (접속 중 5분마다 +10)` : '');
     const row = H.shopRow;
     const items = $('shopItems'), tanks = $('shopTanks'), wallItems = $('shopWallItems');
     items.textContent = ''; tanks.textContent = ''; wallItems.textContent = '';
@@ -77,8 +89,9 @@
     for (const [id, it] of Object.entries(c.items)) {
       if (it.free === true) continue;
       const own = u.owned[id] || 0;
-      const sub = `🪙 ${it.price}${own ? ` · ${own}개 있음` : ''}${it.tank ? ` · ${it.tank.cap}마리 · ${it.tank.allow.includes('M') ? '작은·중간' : '작은'} 물고기` : ''}`;
-      const r = row(Furniture.thumb(id), it.name, sub, [['사기', u.coins < it.price, () => srv({ type: 'buy', item: id })]]);
+      const w = eventWallet(it, u);
+      const sub = `${w.icon} ${it.price}${own ? ` · ${own}개 있음` : ''}${it.tank ? ` · ${it.tank.cap}마리 · ${it.tank.allow.includes('M') ? '작은·중간' : '작은'} 물고기` : ''}${w.tag}`;
+      const r = row(Furniture.thumb(id), it.name, sub, [['사기', w.bal < it.price, () => srv({ type: 'buy', item: id })]]);
       (it.tank ? tanks : it.wall ? wallItems : items).append(r);
     }
     const foods = $('shopFoods'); foods.textContent = '';
@@ -115,7 +128,8 @@
         continue;
       }
       const likes = p.likes.map((x) => c.petFoods[x]?.name).join(', ');
-      pets.append(row(PetArt.thumb(id, 34), p.name, `${p.code} · 🪙 ${p.price} · 좋아하는 것: ${likes}`, [['데려오기', full || u.coins < p.price, () => srv({ type: 'buy', item: id })]]));
+      const w = eventWallet(p, u);
+      pets.append(row(PetArt.thumb(id, 34), p.name, `${p.code} · ${w.icon} ${p.price} · 좋아하는 것: ${likes}${w.tag}`, [['데려오기', full || w.bal < p.price, () => srv({ type: 'buy', item: id })]]));
     }
     if (full) pets.append(el('li', { class: 'note', text: `펫은 ${c.limits.petsMax}마리까지 키울 수 있어요.` }));
     const acc = $('shopAcc'); acc.textContent = '';
@@ -133,10 +147,11 @@
     for (const [id, w] of Object.entries(c.walls)) {
       const own = id === 'basic' || u.owned[id];
       const on1 = u.home.wall1 === id, on2 = u.home.wall2 === id;
-      const sub = own ? ([on2 && '2층', on1 && '1층'].filter(Boolean).join('·') + (on1 || on2 ? '에 바름' : '가지고 있음')) : `🪙 ${w.price}`;
+      const ew = eventWallet(w, u);
+      const sub = own ? ([on2 && '2층', on1 && '1층'].filter(Boolean).join('·') + (on1 || on2 ? '에 바름' : '가지고 있음')) : `${ew.icon} ${w.price}${ew.tag}`;
       const buttons = own
         ? [['2층', on2, () => buddy.send('wall', { item: id, floor: 2 }), 'ghost small'], ['1층', on1, () => buddy.send('wall', { item: id, floor: 1 }), 'ghost small']]
-        : [['사기', u.coins < w.price, () => srv({ type: 'buy', item: id })]];
+        : [['사기', ew.bal < w.price, () => srv({ type: 'buy', item: id })]];
       walls.append(row(H.wallThumb(id), w.name, sub, buttons));
     }
   }
@@ -616,13 +631,17 @@
   const SLOT_X = (i) => 70 + i * 92;
   const DECK_Y = 410, WATER_Y = 300;
   function roundRect(g, x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); g.fill(); }
-  function namePill(g, text, cx, bottom, mine, fs) {
+  function namePill(g, text, cx, bottom, mine, fs, profile) {
     g.font = `bold ${fs}px ${FONT}`;
     const w = g.measureText(text).width + fs * 1.2, h = fs * 1.7;
     g.fillStyle = mine ? 'rgba(30,30,40,0.78)' : 'rgba(40,60,110,0.85)';
     roundRect(g, cx - w / 2, bottom - h, w, h, h / 2);
-    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const t = performance.now() / 1000;
+    const restore = profile && window.NickFX ? NickFX.applyCanvasGlow(g, profile, t) : () => {};
+    g.fillStyle = profile && window.NickFX ? NickFX.canvasColor(profile, t, '#fff') : '#fff';
     g.fillText(text, cx, bottom - h / 2 + 0.5);
+    restore();
     g.textBaseline = 'alphabetic';
     return bottom - h;
   }
@@ -680,7 +699,8 @@
       Sprites.drawPet(g, x - 24, y - 48, { species: who.species || 'cat', scale: 3, palette: Sprites.palette(who.color || '#f2a65a'), legs: 'sit', eyes: happy ? 'happy' : 'open', acc: who.acc || {}, flip: true });
     }
     // 이름표 + 결과 말풍선
-    let top = namePill(g, who.mine ? `나 · ${who.nickname}` : who.nickname, x + 4, y - 62, who.mine, fs);
+    const crown = showCrownDock(who.username) ? '👑 ' : '';
+    let top = namePill(g, crown + (who.mine ? `나 · ${who.nickname}` : who.nickname), x + 4, y - 62, who.mine, fs, who);
     if (s === 'result' && st.t < 3.5 && !who.mine) {
       const f = st.kind === 'catch' ? FISH()[st.code] : null;
       const txt = f ? `🎣 ${f.name}!` : { early: '너무 빨랐다!', late: '놓쳤다…', nothing: '꽝!' }[st.kind] || '';

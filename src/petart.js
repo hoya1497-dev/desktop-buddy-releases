@@ -135,6 +135,178 @@ window.PetArt = (() => {
     },
   };
 
+  // ---- 🎉 시즌 이벤트 전용 펫 (P12~P23)
+  ART.hwBat = {
+    pal: { o: '#1a1a20', k: '#2a2238', e: '#ffffff', n: '#e0463a' },
+    rows: [
+      '.oo......oo.',
+      'ookoo..ookoo',
+      '.ookoookoo..',
+      '..okkkkko...',
+      '.okkkkkkko..',
+      'okkekkkekko.'.slice(0, 12),
+      'okkkknkkkko.'.slice(0, 12),
+      '.okkkkkkko..',
+      '..oo....oo..',
+    ],
+  };
+  ART.hwGhost = {
+    pal: { o: '#c9c6e8', x: '#ffffff', e: '#1a1a20' },
+    rows: [
+      '....oooo....',
+      '..oxxxxxxo..',
+      '.oxxxxxxxxo.',
+      '.oxxexxexxo.',
+      '.oxxxxxxxxo.',
+      '.oxxxxxxxxo.',
+      '.oxxxxxxxxo.',
+      '.oxxxxxxxxo.',
+      '.oxoxoxoxxo.',
+      '.ox..o..oxo.',
+    ],
+  };
+  ART.hwBlackCat = {
+    pal: { o: '#1a1a20', k: '#2e2a38', e: '#f4cf4f', n: '#e0463a' },
+    rows: [
+      '.oo......oo.',
+      '.okoo....ooko'.slice(0, 12),
+      '.okkoooookko.'.slice(0, 12),
+      '.okkkkkkkkko.',
+      'okkkkkkkkkkko'.slice(0, 12),
+      'okkekkkkekko.'.slice(0, 12),
+      'okkknnkkkko..'.slice(0, 12),
+      '.okkkkkkkkko.',
+      '..oo....oo..',
+    ],
+  };
+  ART.hwPumpkinSlime = {
+    pal: { o: '#6a3a10', m: '#f0883a', q: '#c9962c', e: '#1a1a20' },
+    rows: [
+      '....oo..oo....',
+      '...omqoqqmo...'.slice(0, 12),
+      '..ommmqqmmmo..'.slice(0, 12),
+      '.ommmmqqmmmmo.'.slice(0, 12),
+      'ommmmemmemmmo.'.slice(0, 12),
+      'ommmmmmmmmmmo.'.slice(0, 12),
+      '.ommmmmmmmmo..'.slice(0, 12),
+      '..oommmmoo....'.slice(0, 12),
+    ],
+  };
+  ART.xmasReindeer = {
+    pal: { o: '#4a2e18', n: '#7a4a28', c: '#f0d8b0', e: '#1a1a20', r: '#e0463a' },
+    rows: [
+      'o.o......o.o',
+      '.o.o....o.o.',
+      '..onnnnnno..',
+      '.onnnnnnnno.',
+      '.oncncccnco.',
+      'onccceccccno',
+      'oncccccrccno',
+      '.onccccccno.',
+      '..oooooooo..',
+      '.oo......oo.',
+    ],
+  };
+  ART.xmasSnowOwl = {
+    pal: { o: '#9aa8b8', x: '#ffffff', e: '#1a1a20', m: '#f09a20' },
+    rows: [
+      '....oooo....',
+      '...oxxxxo...',
+      '..oxxxxxxo..',
+      '..oxexxexo..',
+      '..oxxmmxxo..',
+      '.oxxxxxxxxo.',
+      '.oxxoxxoxxo.',
+      '.oxxxxxxxxo.',
+      '..oxxxxxxo..',
+      '...o....o...',
+    ],
+  };
+  ART.xmasElfMouse = {
+    pal: { o: '#8a1a1a', g: '#e8e4d8', e: '#1a1a20', p: '#f6a9bf' },
+    rows: [
+      '.oo......oo.',
+      'oggo....oggo',
+      '.oggoooggo..',
+      '.oggggggggo.',
+      'ogggegggego.'.slice(0, 12),
+      'oggpgggpggo.'.slice(0, 12),
+      '.oggggggggo.',
+      '..oo....oo..',
+    ],
+  };
+  ART.xmasGingerbread = {
+    pal: { o: '#7a4a1e', n: '#c9962c', x: '#ffffff', e: '#1a1a20', r: '#e0463a' },
+    rows: [
+      '..onno..onno.',
+      '.onnnoonnnno.'.slice(0, 12),
+      '..onnnnnnno..',
+      '...onnnnno...',
+      '..onnoonnno..',
+      '.onnnnnnnnno.',
+      'onnnexnexnno.'.slice(0, 12),
+      '.onnnrnrnno..'.slice(0, 12),
+      '..onnnnnnno..',
+      '.onno....onno',
+    ],
+  };
+  ART.nyGoldMouse = {
+    pal: { o: '#9c6f1e', g: '#f4cf4f', e: '#1a1a20', p: '#f6a9bf' },
+    rows: [
+      '.oo......oo.',
+      'oggo....oggo',
+      '.oggoooggo..',
+      '.oggggggggo.',
+      'ogggegggego.'.slice(0, 12),
+      'oggpgggpggo.'.slice(0, 12),
+      '.oggggggggo.',
+      '..oo....oo..',
+    ],
+  };
+  ART.nyLuckyRabbit = {
+    pal: { o: '#b04ae0', x: '#ffffff', e: '#1a1a20', p: '#f6a9bf' },
+    rows: [
+      '.ox......xo.',
+      '.oxo....oxo.',
+      '..oxo..oxo..',
+      '..oxxxxxxo..',
+      '.oxxxxxxxxo.',
+      '.oxxexxexxo.',
+      '.oxxxppxxxo.',
+      '.oxxxxxxxxo.',
+      '..oxxxxxxo..',
+      '...o....o...',
+    ],
+  };
+  ART.nyDragonling = {
+    pal: { o: '#9c1e1e', r: '#e0463a', y: '#f4cf4f', e: '#1a1a20', x: '#ffffff' },
+    rows: [
+      '..x......x..',
+      '.oro....oro.',
+      '.orroooorro.',
+      'orrrrrrrrrro',
+      'orrerrrrerro',
+      '.orryyyyrro.',
+      '.orrryyrrro.',
+      '.orrrrrrrro.',
+      '..oo....oo..',
+    ],
+  };
+  ART.nyCrane = {
+    pal: { o: '#1a1a20', x: '#ffffff', e: '#1a1a20', m: '#e0463a' },
+    rows: [
+      '.......ox...',
+      '......oxo...',
+      '.....oxxo...',
+      '..oooxxxo...',
+      '.oxxxxxxo...',
+      'oxxexxxxo...',
+      'omxxxxxxxo..',
+      '.oxxxxxxxxo.',
+      '..o.....o...',
+    ],
+  };
+
   // ---- 운영자 전용 펫 (P09~P11)
   ART.unicorn = {
     pal: { o: '#6a5a78', b: '#ffffff', l: '#ece6f4', y: '#f4cf4f', p: '#f6a9bf', v: '#b79be8', c: '#7fd6e8', e: '#1a1a20' },

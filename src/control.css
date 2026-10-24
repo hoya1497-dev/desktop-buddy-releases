@@ -146,3 +146,13 @@ button { font: inherit; cursor: pointer; border-radius: 8px; }
 @media (prefers-reduced-motion: reduce) { :root[data-aurora="1"] body::before { animation: none; } }
 :root[data-aurora="1"] .card, :root[data-aurora="1"] .modal-card, :root[data-aurora="1"] .notice-card,
 :root[data-aurora="1"] .music-card { backdrop-filter: blur(10px); }
+
+/* 🎉 운영자 전용 닉네임 효과 (네온 · 무지개) */
+.nick-neon { animation: nick-neon-pulse 1.4s ease-in-out infinite; }
+@keyframes nick-neon-pulse {
+  0%, 100% { text-shadow: 0 0 4px var(--nick-glow, #6cf0ff), 0 0 8px var(--nick-glow, #6cf0ff); }
+  50% { text-shadow: 0 0 8px var(--nick-glow, #6cf0ff), 0 0 16px var(--nick-glow, #6cf0ff); }
+}
+.nick-rainbow { background: linear-gradient(90deg, #ff5a5a, #ff9a3c, #ffd23c, #5adf6b, #4ab8ff, #8a6bff, #ff6bd0, #ff5a5a); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: nick-rainbow-move 3s linear infinite; }
+@keyframes nick-rainbow-move { to { background-position: 300% 0; } }
+#nameSwatches button, #swatches button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }

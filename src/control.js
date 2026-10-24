@@ -42,6 +42,9 @@
   function renderSelf(p) {
     $('selfLine').textContent = `${p.nickname}${p.status ? ' · ' + p.status : ''}`;
     drawPreview(p.color);
+    const note = $('nameEffectNote');
+    if (p.nameEffect) { note.hidden = false; note.textContent = `✨ 운영자가 닉네임에 '${p.nameEffect === 'neon' ? '네온' : '무지개'}' 효과를 줬어요! (글자색은 아래에서 바꿀 수 있어요)`; }
+    else note.hidden = true;
   }
   renderSelf(state.self);
   buddy.on('self', renderSelf);
@@ -59,7 +62,17 @@
     $('swatches').append(b);
   });
   renderSpecies();
-  const scaleName = (v) => ['', '', '아주 작게', '작게', '보통', '조금 크게', '크게', '아주 크게', '엄청 크게'][v] || '';
+  // ---------------------------------------------------- 닉네임 글자색 (채팅 · 이름표)
+  $('nameColor').value = config.nameColor || '#ffffff';
+  $('nameColor').onchange = (e) => save({ nameColor: e.target.value });
+  $('nameColorReset').onclick = () => { $('nameColor').value = '#ffffff'; save({ nameColor: null }); };
+  ['#ffffff', '#ff6b6b', '#ffb347', '#ffe066', '#6cf0ff', '#6b9fff', '#b78cff', '#ff8cc6'].forEach((hex) => {
+    const b = document.createElement('button');
+    b.style.background = hex; b.title = hex;
+    b.onclick = () => { $('nameColor').value = hex; save({ nameColor: hex }); };
+    $('nameSwatches').append(b);
+  });
+  const scaleName = (v) =>['', '', '아주 작게', '작게', '보통', '조금 크게', '크게', '아주 크게', '엄청 크게'][v] || '';
   $('petScale').value = config.petScale;
   $('scaleVal').textContent = scaleName(config.petScale);
   $('petScale').oninput = (e) => { $('scaleVal').textContent = scaleName(Number(e.target.value)); };

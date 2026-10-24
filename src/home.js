@@ -211,9 +211,10 @@
       }
     }
     drawLabels() {
-      const line1 = this.profile.nickname + (this.profile.status ? ' · ' + this.profile.status : '');
+      const crown = showCrown(this.profile.username) ? '👑 ' : '';
+      const line1 = crown + this.profile.nickname + (this.profile.status ? ' · ' + this.profile.status : '');
       const line2 = this.profile.username ? '@' + this.profile.username : '';
-      const top = pill(line1, line2, this.x, this.y - PET_H - 6, this.isMe) - 4;
+      const top = pill(line1, line2, this.x, this.y - PET_H - 6, this.isMe, this.profile) - 4;
       if (this.bubble) bubble(this.bubble.text, this.x, top);
       this.emotes.forEach((e, i) => {
         ctx.globalAlpha = Math.min(1, e.t * 2);
@@ -237,7 +238,14 @@
   }
 
   // ------------------------------------------------------------ 그리기 도우미
-  function pill(text, sub, cx, bottom, mine) {
+  // 집 주인 왕관: 혼자 있을 땐 안 보이고, 방에 다른 사람이 있을 때만 주인 이름 앞에 보임
+  function showCrown(username) {
+    if (!S || !S.room || !username) return false;
+    const ownerName = S.room.isOwner ? (S.session?.user.username) : S.room.owner.username;
+    if (username !== ownerName) return false;
+    return S.room.isOwner ? (S.peers || []).length > 0 : true;   // 놀러 온 사람 입장에선 항상 주인이 있으니 보임
+  }
+  function pill(text, sub, cx, bottom, mine, profile) {
     ctx.font = `600 11px ${FONT}`;
     let w = ctx.measureText(text).width;
     if (sub) { ctx.font = `10px ${FONT}`; w = Math.max(w, ctx.measureText(sub).width); }
@@ -247,8 +255,12 @@
     ctx.fillStyle = mine ? 'rgba(30,30,40,0.72)' : 'rgba(40,60,110,0.82)';
     ctx.beginPath(); ctx.roundRect(x, y, w, h, 9); ctx.fill();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff'; ctx.font = `600 11px ${FONT}`;
+    const t = performance.now() / 1000;
+    const restore = profile ? NickFX.applyCanvasGlow(ctx, profile, t) : () => {};
+    ctx.fillStyle = profile ? NickFX.canvasColor(profile, t, '#fff') : '#fff';
+    ctx.font = `600 11px ${FONT}`;
     ctx.fillText(text, x + w / 2, y + (sub ? 10 : h / 2 + 0.5), w - 10);
+    restore();
     if (sub) { ctx.font = `10px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.72)'; ctx.fillText(sub, x + w / 2, y + 21, w - 10); }
     ctx.textBaseline = 'alphabetic';
     return y;
@@ -531,7 +543,9 @@
     const li = document.createElement('li');
     const dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = p.color || '#ccc';
     const who = document.createElement('span'); who.className = 'who';
-    const nm = document.createElement('b'); nm.textContent = p.nickname;
+    const nm = document.createElement('b');
+    nm.textContent = (showCrown(p.username) ? '👑 ' : '') + p.nickname;
+    nm.className = NickFX.domClass(p); nm.style.cssText = NickFX.domStyle(p);
     const id = document.createElement('small'); id.textContent = '@' + p.username;
     who.append(nm, id);
     li.append(dot, who);
@@ -860,7 +874,8 @@
     if (m.system) { div.className = 'msg sys'; div.append(document.createTextNode(m.text), timeTag(m.ts)); }
     else {
       div.className = 'msg';
-      const b = document.createElement('b'); b.textContent = m.from; b.style.color = m.color || 'inherit'; b.style.marginRight = '3px';
+      const b = document.createElement('b'); b.textContent = m.from; b.style.marginRight = '3px';
+      b.className = NickFX.domClass(m); b.style.cssText += ';' + NickFX.domStyle(m, m.color);
       const id = document.createElement('small'); id.textContent = m.username ? '@' + m.username : '';
       div.append(b, id, document.createTextNode(m.text), timeTag(m.ts));
     }
