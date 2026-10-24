@@ -212,9 +212,9 @@
     }
     drawLabels() {
       const crown = showCrown(this.profile.username) ? '👑 ' : '';
-      const line1 = crown + this.profile.nickname + (this.profile.status ? ' · ' + this.profile.status : '');
+      const name = crown + this.profile.nickname, tail = this.profile.status ? ' · ' + this.profile.status : '';
       const line2 = this.profile.username ? '@' + this.profile.username : '';
-      const top = pill(line1, line2, this.x, this.y - PET_H - 6, this.isMe, this.profile) - 4;
+      const top = pill([name, tail], line2, this.x, this.y - PET_H - 6, this.isMe, this.profile) - 4;
       if (this.bubble) bubble(this.bubble.text, this.x, top);
       this.emotes.forEach((e, i) => {
         ctx.globalAlpha = Math.min(1, e.t * 2);
@@ -246,6 +246,8 @@
     return S.room.isOwner ? (S.peers || []).length > 0 : true;   // 놀러 온 사람 입장에선 항상 주인이 있으니 보임
   }
   function pill(text, sub, cx, bottom, mine, profile) {
+    const [name, tail] = Array.isArray(text) ? text : [text, ''];
+    text = name + tail;
     ctx.font = `600 11px ${FONT}`;
     let w = ctx.measureText(text).width;
     if (sub) { ctx.font = `10px ${FONT}`; w = Math.max(w, ctx.measureText(sub).width); }
@@ -256,11 +258,8 @@
     ctx.beginPath(); ctx.roundRect(x, y, w, h, 9); ctx.fill();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const t = performance.now() / 1000;
-    const restore = profile ? NickFX.applyCanvasGlow(ctx, profile, t) : () => {};
-    ctx.fillStyle = profile ? NickFX.canvasColor(profile, t, '#fff') : '#fff';
     ctx.font = `600 11px ${FONT}`;
-    ctx.fillText(text, x + w / 2, y + (sub ? 10 : h / 2 + 0.5), w - 10);
-    restore();
+    NickFX.drawNameLine(ctx, name, tail, x + w / 2, y + (sub ? 10 : h / 2 + 0.5), w - 10, profile, t);
     if (sub) { ctx.font = `10px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.72)'; ctx.fillText(sub, x + w / 2, y + 21, w - 10); }
     ctx.textBaseline = 'alphabetic';
     return y;
@@ -925,7 +924,8 @@
     const me = pets.get('me');
     if (r.reason === 'online') toast(`+${r.amount} 🪙 접속 보상`, true);
     else if (r.reason === 'chat') { toast(`+${r.amount} 🪙 대화 보상`, true); me?.emote('🪙'); }
-    else if (r.reason === 'buy') toast(`구매 완료! (${r.amount} 🪙)`);
+    else if (r.reason === 'buy') toast(`구매 완료! (${r.amount} ${r.event ? catalog?.events?.[r.event]?.coin?.icon || '🎫' : '🪙'})`);
+    else if (r.reason === 'event-coin') toast(`+${r.amount} ${(r.events || []).map((k) => catalog?.events?.[k]?.coin?.name ? `${catalog.events[k].coin.icon} ${catalog.events[k].coin.name}` : '').filter(Boolean).join(' · ')} 접속 보상`, true);
     else if (r.reason === 'gift-sent') toast(`🎁 ${r.to}님에게 🪙${-r.amount}을 선물했어요`);
     else if (r.reason === 'gift' || r.reason === 'admin') { me?.emote('🎁'); }
     else if (r.reason === 'skin') toast('캐릭터 그림을 바꿨어요!');

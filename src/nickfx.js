@@ -39,5 +39,22 @@ window.NickFX = (() => {
     if (profile && profile.nameEffect === 'rainbow') return '';
     return `color:${(profile && profile.nameColor) || fallback || 'inherit'}`;
   }
-  return { canvasColor, applyCanvasGlow, domClass, domStyle, RAINBOW };
+  // 이름표 한 줄: 닉네임은 닉네임 색·효과로, 뒤에 붙는 상태(' · 공부 중' 등)는 항상 흰색으로 그림
+  function drawNameLine(ctx, name, tail, cx, cy, maxW, profile, t) {
+    const nw = name ? ctx.measureText(name).width : 0, tw = tail ? ctx.measureText(tail).width : 0;
+    const k = Math.min(1, maxW / Math.max(1, nw + tw));
+    const align = ctx.textAlign;
+    ctx.textAlign = 'left';
+    let x = cx - (nw + tw) * k / 2;
+    if (name) {
+      const restore = profile ? applyCanvasGlow(ctx, profile, t) : () => {};
+      ctx.fillStyle = profile ? canvasColor(profile, t, '#fff') : '#fff';
+      ctx.fillText(name, x, cy, nw * k);
+      restore();
+      x += nw * k;
+    }
+    if (tail) { ctx.fillStyle = '#fff'; ctx.fillText(tail, x, cy, tw * k); }
+    ctx.textAlign = align;
+  }
+  return { canvasColor, applyCanvasGlow, drawNameLine, domClass, domStyle, RAINBOW };
 })();

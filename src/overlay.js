@@ -355,9 +355,10 @@
       // 닉네임(굵게) 아래에 @아이디(작게). 내 캐릭터는 마우스를 올렸을 때만 이름 표시.
       let labelTop = (this.dw ? this.y - this.h * 1.15 : top) - 6;
       const showName = !this.isMe || hovered;
-      const line1 = [showName ? this.profile.nickname : '', this.profile.status].filter(Boolean).join(' · ');
+      const name = showName ? this.profile.nickname : '';
+      const tail = this.profile.status ? (name ? ' · ' : '') + this.profile.status : '';
       const line2 = showName && this.profile.username ? '@' + this.profile.username : '';
-      if (line1) labelTop = drawPill(line1, this.x, labelTop, this.isMe, line2, this.profile) - 6;
+      if (name || tail) labelTop = drawPill([name, tail], this.x, labelTop, this.isMe, line2, this.profile) - 6;
 
       if (this.bubble) drawBubble(this.bubble.text, this.x, labelTop);
 
@@ -435,6 +436,8 @@
 
   // ------------------------------------------------------------ 말풍선 / 라벨
   function drawPill(text, cx, bottom, mine, sub, profile) {
+    const [name, tail] = Array.isArray(text) ? text : [text, ''];
+    text = name + tail;
     ctx.font = `600 12px ${FONT}`;
     let w = ctx.measureText(text).width;
     if (sub) { ctx.font = `10px ${FONT}`; w = Math.max(w, ctx.measureText(sub).width); }
@@ -445,11 +448,8 @@
     ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const t = performance.now() / 1000;
-    const restore = profile && window.NickFX ? NickFX.applyCanvasGlow(ctx, profile, t) : () => {};
-    ctx.fillStyle = profile && window.NickFX ? NickFX.canvasColor(profile, t, '#fff') : '#fff';
     ctx.font = `600 12px ${FONT}`;
-    ctx.fillText(text, cx, y + (sub ? 11 : h / 2 + 0.5), w - 12);
-    restore();
+    NickFX.drawNameLine(ctx, name, tail, cx, y + (sub ? 11 : h / 2 + 0.5), w - 12, profile, t);
     if (sub) {
       ctx.font = `10px ${FONT}`;
       ctx.fillStyle = 'rgba(255,255,255,0.7)';

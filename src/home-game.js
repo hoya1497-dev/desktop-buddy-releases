@@ -45,7 +45,13 @@
   };
   const U = () => (H.S && H.S.session ? H.S.session.user : null);
   // 🎉 이벤트 전용 아이템(벽지·가구·펫)은 이벤트 코인으로만 살 수 있음
-  const eventWallet = (def, u) => def.event ? { bal: u.eventCoins || 0, icon: '🎫', tag: ' · 이벤트 코인' } : { bal: u.coins, icon: '🪙', tag: '' };
+  // 이벤트마다 전용 코인이 따로: 🎃 호박 코인 · 🎄 트리 코인 · 🧧 복주머니 코인 (일반 코인 🪙과 별개)
+  const evCoins = (u) => (u.eventCoins && typeof u.eventCoins === 'object' ? u.eventCoins : {});
+  const eventWallet = (def, u) => {
+    if (!def.event) return { bal: u.coins, icon: '🪙' };
+    const coin = C().events?.[def.event]?.coin || { icon: '🎫' };
+    return { bal: evCoins(u)[def.event] || 0, icon: coin.icon };
+  };
   const FISH = () => (C() ? C().fish : {});
   const rar = (f) => C().rarity[f.rar];
 
@@ -75,10 +81,32 @@
     if (!u || !c) return;
     const activeEvents = Object.values(c.events || {}).filter((e) => e.on).map((e) => `${e.icon} ${e.name}`).join(', ');
     $('shopNote').textContent = `오늘 접속 코인 🪙${c.limits.onlinePerDay - (u.onlineLeft ?? 0)}/${c.limits.onlinePerDay} 받음 · 친구와 대화하면 30초마다 🪙30`
-      + (activeEvents ? ` · 🎉 진행 중인 이벤트: ${activeEvents} · 이벤트 코인 🎫${u.eventCoins || 0} (접속 중 5분마다 +10)` : '');
+      + (activeEvents ? ` · 🎉 ${activeEvents} 이벤트 진행 중! '🎉 이벤트' 탭을 확인해 보세요` : '');
     const row = H.shopRow;
     const items = $('shopItems'), tanks = $('shopTanks'), wallItems = $('shopWallItems');
     items.textContent = ''; tanks.textContent = ''; wallItems.textContent = '';
+    // 🎉 이벤트 상점: 켜진 이벤트의 전용 벽지·가구·펫은 일반 탭이 아니라 여기에만 나옴
+    const evBox = $('shopEvent'); evBox.textContent = '';
+    const evOn = Object.entries(c.events || {}).filter(([, e]) => e.on);
+    const evTab = $('shopEventTab');
+    evTab.hidden = !evOn.length;
+    if (!evOn.length && evTab.classList.contains('active')) $('shopTabs').querySelector('button[data-shop=furniture]').click();
+    const wal = $('shopEventWallet'); wal.textContent = '';
+    const earned = u.eventEarned && typeof u.eventEarned === 'object' ? u.eventEarned : {};
+    for (const [key, e] of evOn) {
+      const coin = e.coin || { name: '이벤트 코인', icon: '🎫' };
+      wal.append(el('div', { class: 'ecoin-card ecoin-' + key },
+        el('span', { class: 'ecoin ecoin-' + key, text: coin.icon }),
+        el('div', {}, el('div', {}, `${coin.name} `, el('b', { text: (evCoins(u)[key] || 0).toLocaleString() })),
+          el('small', { text: `접속해 있으면 5분마다 +${c.rewards?.eventCoin ?? 10} · 지금까지 접속으로 번 ${coin.icon}${(earned[key] || 0).toLocaleString()}` }))));
+    }
+    const evLists = {};
+    for (const [key, e] of evOn) {
+      const mk = (label) => { const ul = el('ul', { class: 'shop' }); return [el('h4', { text: label }), ul]; };
+      const [h1, walls] = mk('벽지'), [h2, furn] = mk('가구 · 장식'), [h3, pets] = mk('펫');
+      evBox.append(el('h3', {}, `${e.icon} ${e.name} 이벤트 `, el('span', { class: 'note-inline', text: `${e.coin?.icon || '🎫'} ${e.coin?.name || '이벤트 코인'}으로만 살 수 있어요` })), h1, walls, h2, furn, h3, pets);
+      evLists[key] = { walls, furn, pets };
+    }
     // 🏗️ 집 넓히기 (가로로 한 단계씩)
     const steps = c.room?.expand || [];
     const lv = u.home.level || 0, next = steps[lv + 1];
@@ -90,8 +118,9 @@
       if (it.free === true) continue;
       const own = u.owned[id] || 0;
       const w = eventWallet(it, u);
-      const sub = `${w.icon} ${it.price}${own ? ` · ${own}개 있음` : ''}${it.tank ? ` · ${it.tank.cap}마리 · ${it.tank.allow.includes('M') ? '작은·중간' : '작은'} 물고기` : ''}${w.tag}`;
+      const sub = `${w.icon} ${it.price.toLocaleString()}${own ? ` · ${own}개 있음` : ''}${it.tank ? ` · ${it.tank.cap}마리 · ${it.tank.allow.includes('M') ? '작은·중간' : '작은'} 물고기` : ''}${it.wall && it.event ? ' · 벽에 거는 장식' : ''}`;
       const r = row(Furniture.thumb(id), it.name, sub, [['사기', w.bal < it.price, () => srv({ type: 'buy', item: id })]]);
+      if (it.event) { evLists[it.event]?.furn.append(r); continue; }
       (it.tank ? tanks : it.wall ? wallItems : items).append(r);
     }
     const foods = $('shopFoods'); foods.textContent = '';
@@ -129,7 +158,8 @@
       }
       const likes = p.likes.map((x) => c.petFoods[x]?.name).join(', ');
       const w = eventWallet(p, u);
-      pets.append(row(PetArt.thumb(id, 34), p.name, `${p.code} · ${w.icon} ${p.price} · 좋아하는 것: ${likes}${w.tag}`, [['데려오기', full || w.bal < p.price, () => srv({ type: 'buy', item: id })]]));
+      const pr = row(PetArt.thumb(id, 34), p.name, `${p.code} · ${w.icon} ${p.price.toLocaleString()} · 좋아하는 것: ${likes}`, [['데려오기', full || w.bal < p.price, () => srv({ type: 'buy', item: id })]]);
+      if (p.event) evLists[p.event]?.pets.append(pr); else pets.append(pr);
     }
     if (full) pets.append(el('li', { class: 'note', text: `펫은 ${c.limits.petsMax}마리까지 키울 수 있어요.` }));
     const acc = $('shopAcc'); acc.textContent = '';
@@ -148,11 +178,12 @@
       const own = id === 'basic' || u.owned[id];
       const on1 = u.home.wall1 === id, on2 = u.home.wall2 === id;
       const ew = eventWallet(w, u);
-      const sub = own ? ([on2 && '2층', on1 && '1층'].filter(Boolean).join('·') + (on1 || on2 ? '에 바름' : '가지고 있음')) : `${ew.icon} ${w.price}${ew.tag}`;
+      const sub = own ? ([on2 && '2층', on1 && '1층'].filter(Boolean).join('·') + (on1 || on2 ? '에 바름' : '가지고 있음')) : `${ew.icon} ${w.price.toLocaleString()}`;
       const buttons = own
         ? [['2층', on2, () => buddy.send('wall', { item: id, floor: 2 }), 'ghost small'], ['1층', on1, () => buddy.send('wall', { item: id, floor: 1 }), 'ghost small']]
         : [['사기', ew.bal < w.price, () => srv({ type: 'buy', item: id })]];
-      walls.append(row(H.wallThumb(id), w.name, sub, buttons));
+      const wr = row(H.wallThumb(id), w.name, sub, buttons);
+      if (w.event) evLists[w.event]?.walls.append(wr); else walls.append(wr);
     }
   }
   function rodThumb(color) {

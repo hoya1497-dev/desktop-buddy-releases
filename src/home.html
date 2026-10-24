@@ -403,6 +403,7 @@
           <button data-shop="acc">액세서리</button>
           <button data-shop="wall">벽지</button>
           <button data-shop="rod">🎣 낚싯대</button>
+          <button data-shop="event" id="shopEventTab" class="event-tab" hidden>🎉 이벤트</button>
         </div>
         <div class="shop-sec" data-sec="furniture">
           <h3>가구 · 인형</h3><ul id="shopItems" class="shop"></ul>
@@ -424,6 +425,10 @@
         </div>
         <div class="shop-sec" data-sec="wall" hidden>
           <h3>벽지 · 바닥 <span class="note-inline">1층과 2층에 따로 발라요</span></h3><ul id="shopWalls" class="shop"></ul>
+        </div>
+        <div class="shop-sec" data-sec="event" hidden>
+          <p class="event-wallet" id="shopEventWallet"></p>
+          <div id="shopEvent"></div>
         </div>
       </div>
       <div class="pane" id="pane-bag">
