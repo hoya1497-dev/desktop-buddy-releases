@@ -293,12 +293,20 @@
     ctx.fillStyle = '#7a4b28'; ctx.fillRect(0, slabTop, RW, 2);
     // 사다리 (2층 바닥 ~ 1층 바닥)
     const x = LADDER_X, top = ladderY(2) - 4, bot = ladderY(1) + 14;
-    ctx.fillStyle = '#3b2a25'; ctx.fillRect(x - 18, top, 36, slabH + 4);              // 바닥판 구멍
-    ctx.fillStyle = '#a8703f';
-    ctx.fillRect(x - 16, top, 5, bot - top); ctx.fillRect(x + 11, top, 5, bot - top);
-    for (let y = top + 10; y < bot - 4; y += 16) ctx.fillRect(x - 11, y, 22, 4);
-    ctx.fillStyle = '#7a4b28';
-    ctx.fillRect(x - 12, top, 1, bot - top); ctx.fillRect(x + 15, top, 1, bot - top);
+    // 2층 바닥의 구멍(해치): 바닥판까지 이어진 구멍 + 테두리
+    const holeB = FLOORS[1].top;
+    ctx.fillStyle = '#2a1d18'; ctx.fillRect(x - 20, top - 2, 40, holeB - top + 2);
+    ctx.fillStyle = '#1c130f'; ctx.fillRect(x - 20, top - 2, 40, 5);                   // 안쪽 그림자
+    ctx.fillStyle = '#7a4b28'; ctx.fillRect(x - 22, top - 4, 44, 2); ctx.fillRect(x - 22, top - 4, 2, slabTop - top + 4); ctx.fillRect(x + 20, top - 4, 2, slabTop - top + 4);
+    // 사다리: 구멍 안쪽은 그늘져서 어둡게
+    const rail = (y0, y1, c, d) => {
+      ctx.fillStyle = c;
+      ctx.fillRect(x - 16, y0, 5, y1 - y0); ctx.fillRect(x + 11, y0, 5, y1 - y0);
+      for (let y = top + 10; y < bot - 4; y += 16) if (y >= y0 && y < y1) ctx.fillRect(x - 11, y, 22, 4);
+      ctx.fillStyle = d; ctx.fillRect(x - 12, y0, 1, y1 - y0); ctx.fillRect(x + 15, y0, 1, y1 - y0);
+    };
+    rail(top, holeB, '#7d5232', '#5a3920');
+    rail(holeB, bot, '#a8703f', '#7a4b28');
   }
 
   // 가구 크기 · 회전 중심
@@ -337,7 +345,8 @@
       const theme = Furniture.THEMES[v.home['wall' + f]] || Furniture.THEMES.basic;
       if (theme.kind !== 'room' || lightOn(v.home, f)) continue;
       g.fillStyle = 'rgba(10,12,32,0.62)';
-      g.fillRect(0, FLOORS[f].top, RW, FLOORS[f].bottom - FLOORS[f].top);
+      // 2층은 아래 바닥판(층 사이)까지 같이 어둡게: 사이에 밝은 줄이 안 생기게
+      g.fillRect(0, FLOORS[f].top, RW, (f === 2 ? FLOORS[1].top : FLOORS[f].bottom) - FLOORS[f].top);
     }
     g.globalCompositeOperation = 'destination-out';
     for (const it of layout) {

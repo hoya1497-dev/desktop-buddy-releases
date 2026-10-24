@@ -1730,6 +1730,120 @@ window.Furniture = (() => {
         planks(ctx, x, wb, w, bottom - wb, '#9a6236', '#8c5830', seed, 14);
         for (let xx = x; xx < x + w; xx += 120) R(ctx, 'rgba(255,210,140,.12)', xx + 20, wb, 60, bottom - wb);
       },
+
+      // ---------------- 분위기 벽지 (0.13.5, 언제나 상점에) — 불을 끄면 일반 방처럼 어두워짐
+      // 🪵 원목 패널 방: 호두나무 세로 판넬 + 몰딩, 짙은 마루
+      moodWalnut(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top, rnd = seeded(seed);
+        R(ctx, '#5a3a26', x, top, w, H);
+        clip(ctx, x, top, w, H, () => {
+          tile(x, w, 36, (xx) => {
+            R(ctx, rnd() > 0.5 ? '#5f3e29' : '#553522', xx, top, 36, H);
+            R(ctx, 'rgba(0,0,0,.28)', xx, top, 2, H);
+            R(ctx, 'rgba(255,220,170,.06)', xx + 2, top, 3, H);
+            for (let k = 0; k < 3; k++) R(ctx, 'rgba(0,0,0,.08)', xx + 8 + Math.floor(rnd() * 22), top + Math.floor(rnd() * H), 2, 18 + Math.floor(rnd() * 30));   // 나뭇결
+          });
+          R(ctx, '#3e2618', x, top, w, 8); R(ctx, '#7a5236', x, top + 8, w, 2);                       // 천장 몰딩
+          const rail = top + Math.round(H * 0.62);
+          R(ctx, '#3e2618', x, rail, w, 6); R(ctx, '#80583a', x, rail, w, 2);                       // 허리 몰딩
+          tile(x + 18, w, 72, (xx) => { R(ctx, 'rgba(0,0,0,.14)', xx, rail + 14, 52, wb - rail - 26); R(ctx, 'rgba(255,220,170,.05)', xx + 2, rail + 16, 48, 2); });
+        });
+        baseboard(ctx, x, wb, w, '#2e1c12');
+        planks(ctx, x, wb, w, bottom - wb, '#4a2e1e', '#402818', seed, 14);
+      },
+      // 🧱 벽돌 카페 방: 붉은 벽돌 + 줄눈, 위쪽은 은은한 조명 그라데이션, 진한 마루
+      moodBrick(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top, rnd = seeded(seed + 1);
+        R(ctx, '#d8c9b6', x, top, w, H);   // 줄눈
+        clip(ctx, x, top, w, H, () => {
+          const bh = 12, bw = 32;
+          for (let yy = top, row = 0; yy < wb; yy += bh, row++) tile(x + (row % 2 ? bw / 2 : 0), w, bw, (xx) => {
+            const c = ['#a4513a', '#984a35', '#ae5a40', '#8e4330', '#b0634a'][Math.floor(rnd() * 5)];
+            R(ctx, c, xx + 1, yy + 1, bw - 2, bh - 2);
+            R(ctx, 'rgba(255,230,200,.10)', xx + 1, yy + 1, bw - 2, 2);
+            if (rnd() > 0.85) R(ctx, 'rgba(0,0,0,.12)', xx + 4 + rnd() * 18, yy + 4, 6, 3);
+          });
+          vgrad(ctx, x, top, w, H, [[0, 'rgba(30,14,8,.40)'], [0.45, 'rgba(30,14,8,.05)'], [1, 'rgba(30,14,8,.25)']]);
+        });
+        baseboard(ctx, x, wb, w, '#2b1a12');
+        planks(ctx, x, wb, w, bottom - wb, '#5a3a28', '#4e3222', seed, 14);
+      },
+      // 🌲 숲 서재 방: 짙은 초록 벽 + 금빛 가는 줄 + 아래쪽 나무 판넬, 헤링본 바닥
+      moodForest(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#1f3a2e'], [1, '#2b4d3c']]);
+        clip(ctx, x, top, w, H, () => {
+          tile(x, w, 44, (xx) => R(ctx, 'rgba(220,190,110,.10)', xx, top, 2, H));          // 금빛 세로 줄
+          tile(x + 22, w, 44, (xx) => { for (let yy = top + 20; yy < wb; yy += 40) R(ctx, 'rgba(220,190,110,.16)', xx - 2, yy, 4, 4); });
+          const rail = top + Math.round(H * 0.6);
+          R(ctx, '#3a2618', x, rail, w, H - (rail - top));
+          R(ctx, '#c9a24a', x, rail, w, 2); R(ctx, '#2a1a10', x, rail + 2, w, 4);
+          tile(x + 10, w, 60, (xx) => { R(ctx, '#46301f', xx, rail + 14, 46, wb - rail - 24); R(ctx, 'rgba(0,0,0,.2)', xx, rail + 14, 46, 2); });
+        });
+        baseboard(ctx, x, wb, w, '#24170e');
+        // 헤링본 마루
+        R(ctx, '#6e4a2e', x, wb, w, bottom - wb);
+        clip(ctx, x, wb, w, bottom - wb, () => {
+          for (let yy = wb, row = 0; yy < bottom; yy += 8, row++) tile(x + (row % 2) * 12, w, 24, (xx) => {
+            R(ctx, row % 2 ? '#7a5434' : '#644228', xx, yy, 12, 8);
+            R(ctx, 'rgba(0,0,0,.2)', xx + 11, yy, 1, 8);
+          });
+        });
+      },
+      // 🍷 와인 벨벳 방: 버건디 다마스크 무늬 + 금빛 몰딩, 짙은 마루
+      moodVelvet(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#4a1622'], [1, '#5e1d2b']]);
+        clip(ctx, x, top, w, H, () => {
+          const D = ['..x..', '.x.x.', 'x.o.x', '.x.x.', '..x..'];
+          for (let yy = top + 18, row = 0; yy < wb - 12; yy += 34, row++) tile(x + (row % 2) * 24, w, 48, (xx) => stamp(ctx, D, { x: 'rgba(240,180,120,.16)', o: 'rgba(240,190,120,.28)' }, xx, yy));
+          R(ctx, '#2e0c14', x, top, w, 6); R(ctx, '#b8893a', x, top + 6, w, 2);
+          vgrad(ctx, x, top, w, H, [[0, 'rgba(0,0,0,.25)'], [0.5, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,.2)']]);
+        });
+        R(ctx, '#b8893a', x, wb - 10, w, 2);
+        baseboard(ctx, x, wb, w, '#24080e');
+        planks(ctx, x, wb, w, bottom - wb, '#3e2418', '#361e14', seed, 14);
+      },
+      // 🕯️ 빈티지 줄무늬 방: 따뜻한 베이지 줄무늬 벽지 + 흰 판넬 웨인스코팅
+      moodVintage(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        R(ctx, '#e8d6b8', x, top, w, H);
+        clip(ctx, x, top, w, H, () => {
+          tile(x, w, 28, (xx) => { R(ctx, '#dcc5a2', xx, top, 12, H); R(ctx, 'rgba(160,110,70,.18)', xx + 18, top, 2, H); });
+          tile(x + 6, w, 28, (xx) => { for (let yy = top + 16; yy < wb; yy += 28) R(ctx, 'rgba(160,90,70,.25)', xx, yy, U, U); });   // 작은 꽃점
+          const rail = top + Math.round(H * 0.6);
+          R(ctx, '#f2ead8', x, rail, w, H - (rail - top));
+          R(ctx, '#fff8ea', x, rail, w, 3); R(ctx, 'rgba(0,0,0,.12)', x, rail + 3, w, 2);
+          tile(x + 10, w, 56, (xx) => { R(ctx, 'rgba(120,90,60,.16)', xx, rail + 14, 42, 2); R(ctx, 'rgba(120,90,60,.16)', xx, rail + 14, 2, wb - rail - 24); R(ctx, 'rgba(255,255,255,.7)', xx + 42, rail + 14, 2, wb - rail - 24); R(ctx, 'rgba(255,255,255,.7)', xx, wb - 10, 44, 2); });
+          vgrad(ctx, x, top, w, H, [[0, 'rgba(90,50,20,.18)'], [0.4, 'rgba(90,50,20,0)']]);
+        });
+        baseboard(ctx, x, wb, w, '#8a6a4a');
+        planks(ctx, x, wb, w, bottom - wb, '#a8754a', '#9c6c42', seed, 14);
+      },
+      // 🏮 한옥 방: 한지 창살 벽 + 나무 기둥, 노란 장판 바닥 (따뜻하고 차분하게)
+      moodHanok(ctx, x, top, w, wb, bottom, seed) {
+        const H = wb - top;
+        vgrad(ctx, x, top, w, H, [[0, '#efe2c4'], [1, '#e6d4ae']]);
+        clip(ctx, x, top, w, H, () => {
+          const seg = 150;
+          tile(x, w, seg, (xx) => {
+            // 창살 (한지 위 가는 나무 격자)
+            for (let gx = xx + 22; gx < xx + seg - 18; gx += 16) R(ctx, 'rgba(110,70,40,.35)', gx, top + 24, 2, H - 52);
+            for (let gy = top + 24; gy < wb - 26; gy += 16) R(ctx, 'rgba(110,70,40,.35)', xx + 22, gy, seg - 42, 2);
+            R(ctx, '#5a3a22', xx, top, 12, H); R(ctx, '#7a5232', xx + 2, top, 3, H);   // 기둥
+          });
+          R(ctx, '#5a3a22', x, top, w, 14); R(ctx, '#7a5232', x, top + 14, w, 3);     // 인방
+          R(ctx, '#5a3a22', x, wb - 22, w, 10);
+        });
+        baseboard(ctx, x, wb, w, '#4a2e1a');
+        // 장판: 노르스름한 큰 네모
+        R(ctx, '#d9a95a', x, wb, w, bottom - wb);
+        clip(ctx, x, wb, w, bottom - wb, () => {
+          for (let yy = wb; yy < bottom; yy += 30) R(ctx, 'rgba(120,70,20,.18)', x, yy, w, 2);
+          for (let yy = wb, row = 0; yy < bottom; yy += 30, row++) tile(x + (row % 2) * 45, w, 90, (xx) => R(ctx, 'rgba(120,70,20,.18)', xx, yy, 2, 30));
+          R(ctx, 'rgba(255,240,200,.15)', x, wb, w, 6);
+        });
+      },
     };
   })();
 
@@ -1741,6 +1855,13 @@ window.Furniture = (() => {
     peach:   { name: '복숭아 방',   kind: 'room', wall: '#fbd9cf', floor: '#c48b6a' },
     lavender:{ name: '라벤더 방',   kind: 'room', wall: '#e2d8f3', floor: '#a88f7a' },
     navy:    { name: '밤 방',       kind: 'room', wall: '#2f3456', floor: '#5b4a5e' },
+    // 분위기 벽지 (그림은 EV 쪽에서, 불 끄기는 일반 방처럼)
+    moodWalnut:  { name: '원목 패널 방',  kind: 'room', paint: true, wall: '#5a3a26', floor: '#4a2e1e' },
+    moodBrick:   { name: '벽돌 카페 방',  kind: 'room', paint: true, wall: '#a4513a', floor: '#5a3a28' },
+    moodForest:  { name: '숲 서재 방',    kind: 'room', paint: true, wall: '#1f3a2e', floor: '#6e4a2e' },
+    moodVelvet:  { name: '와인 벨벳 방',  kind: 'room', paint: true, wall: '#4a1622', floor: '#3e2418' },
+    moodVintage: { name: '빈티지 줄무늬 방', kind: 'room', paint: true, wall: '#e8d6b8', floor: '#a8754a' },
+    moodHanok:   { name: '한옥 방',       kind: 'room', paint: true, wall: '#efe2c4', floor: '#d9a95a' },
     // 바깥
     meadowDay:   { name: '초원 (낮)',     kind: 'meadow', night: false },
     meadowNight: { name: '초원 (밤)',     kind: 'meadow', night: true },
@@ -1768,7 +1889,7 @@ window.Furniture = (() => {
 
   function drawFloorArea(ctx, themeId, x, top, w, wallBottom, bottom, seed) {
     const t = THEMES[themeId] || THEMES.basic;
-    if (t.kind === 'event' && EV[themeId]) { EV[themeId](ctx, x, top, w, wallBottom, bottom, seed); return; }
+    if ((t.kind === 'event' || t.paint) && EV[themeId]) { EV[themeId](ctx, x, top, w, wallBottom, bottom, seed); return; }
     const wallH = wallBottom - top, floorH = bottom - wallBottom;
     if (t.kind === 'room') {
       ctx.fillStyle = t.wall; ctx.fillRect(x, top, w, wallH);
