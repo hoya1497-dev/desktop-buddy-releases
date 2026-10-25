@@ -17,6 +17,7 @@
   const FONT = '"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif';
   const EMOJI_FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
   const PET_H = 56;            // 집 안 캐릭터 키
+  const MEET_H = 64;           // 🏢 회의장 캐릭터 키 (8번 인형 자리는 이것보다 작게)
   const SPEED = 170;           // 걷는 속도 (px/s)
   const CLIMB = 140;           // 사다리 속도
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -60,7 +61,7 @@
     const v = viewing();
     const steps = catalog?.room?.expand;
     const lv = Math.max(0, Math.min((steps?.length || 1) - 1, v?.home?.level || 0));
-    const w = steps ? steps[lv].w : (catalog?.room?.w || 600);
+    const w = meetingMode() ? MeetScene.W : steps ? steps[lv].w : (catalog?.room?.w || 600);
     if (w !== RW) { RW = w; LADDER_X = RW - 44; fit(); }
   }
   new ResizeObserver(fit).observe($('stage'));
@@ -69,6 +70,8 @@
     return { x: (e.clientX - r.left) * (RW / r.width), y: (e.clientY - r.top) * (RH / r.height) };
   }
 
+  // 🏢 운영자 회의장에 있는지 (집 대신 회의실, 채팅만)
+  const meetingMode = () => !!(S && S.room && S.room.meeting && window.MeetScene);
   // ------------------------------------------------------------ 지금 보는 집
   const viewing = () => {
     if (!S || !S.session) return null;
@@ -226,6 +229,26 @@
         ctx.fillStyle = `rgba(90,110,200,${1 - k})`; ctx.textAlign = 'left';
         ctx.fillText('z', this.x + 20 + k * 10, this.y - PET_H - k * 16);
       }
+    }
+    // 🏢 회의장: 정해진 자리에 앉아서 가만히 (걷기 · 눕기 없이 앉기 그림만)
+    drawSeated(seat) {
+      const h = Math.round(MEET_H * seat.scale);
+      const skin = Skins.get(this.profile.username, this.profile.skin);
+      this.dw = skin ? Skins.draw(ctx, skin, 'sit', seat.cx, seat.bottom, h, seat.dir, 0) : 0;
+      if (!this.dw) {
+        const s = Math.max(1, Math.round((h / 16) * 2) / 2);
+        const blink = Math.floor(this.anim * 10) % 37 === 0;
+        Sprites.drawPet(ctx, Math.round(seat.cx - 8 * s), Math.round(seat.bottom - 16 * s), {
+          species: this.profile.species, acc: this.profile.acc, scale: s, palette: this.pal, legs: 'sit',
+          eyes: this.happyT > 0 ? 'happy' : blink ? 'closed' : 'open', flip: seat.dir > 0,
+        });
+      }
+    }
+    drawSeatLabels(seat) {
+      const h = Math.round(MEET_H * seat.scale);
+      const line2 = this.profile.username ? '@' + this.profile.username : '';
+      const top = pill([this.profile.nickname, ''], seat.scale < 1 ? '' : line2, seat.cx, seat.bottom - h - 6, this.isMe, this.profile) - 4;
+      if (this.bubble) bubble(this.bubble.text, seat.cx, top);
     }
     drawLabels() {
       const crown = showCrown(this.profile.username) ? '👑 ' : '';
@@ -431,6 +454,7 @@
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, RW, RH);
     if (!catalog) return;
+    if (meetingMode()) { drawMeeting(); return; }
     if (fishingMode()) { HomeGame.drawFishing(ctx, RW, RH, MINI); return; }
     drawHouse();
     const safeDraw = (fn) => { try { fn(); } catch (e) { reportLoopError(e); } };
@@ -444,6 +468,29 @@
     drawDarkness();
     drawGrid();
     for (const p of pets.values()) p.drawLabels();
+  }
+
+  // 🏢 회의장 그리기: 배경 + 자리마다 앉은 사람 (내 펫 · 가구 · 친구 펫은 안 보임)
+  // 창밖 계절: 각자 화면에서만 고르는 설정 (시간대는 늘 실제 시간)
+  let meetSeason = 'auto';
+  try { const v = localStorage.getItem('meetSeason'); if (v && (v === 'auto' || MeetScene.SEASONS[v])) meetSeason = v; } catch {}
+  $('meetSeason').value = meetSeason;
+  $('meetSeason').onchange = (e) => { meetSeason = e.target.value; try { localStorage.setItem('meetSeason', meetSeason); } catch {} };
+  addEventListener('storage', (e) => { if (e.key === 'meetSeason' && e.newValue) { meetSeason = e.newValue; $('meetSeason').value = meetSeason; } });   // 미니맵도 같이
+  function drawMeeting() {
+    const seats = S.room.meeting.seats || {};
+    const myName = S.session?.user.username;
+    const byUser = new Map();
+    for (const p of pets.values()) byUser.set(p.isMe ? myName : p.profile.username, p);
+    const seated = [];
+    MeetScene.draw(ctx, RW, RH, performance.now() / 1000, (g, n, seat) => {
+      const pet = seats[n] && byUser.get(seats[n]);
+      if (!pet) return;
+      pet.drawSeated(seat);
+      seated.push([pet, seat]);
+    }, { season: meetSeason });
+    // 이름표 · 말풍선은 맨 위에 (앞줄이 뒷줄 말풍선을 가리지 않게)
+    for (const [pet, seat] of seated) { try { pet.drawSeatLabels(seat); } catch (e) { reportLoopError(e); } }
   }
 
   // 그림 하나에서 오류가 나면(물고기 · 가구 데이터가 이상한 경우 등) 화면 전체가 멈춰서
@@ -460,7 +507,7 @@
   let lastPosSend = 0, lastPosSent = null;
   function sendMyPos(t) {
     const me = pets.get('me');
-    if (!me || !S || !S.room) return;
+    if (!me || !S || !S.room || meetingMode()) return;
     if (t - lastPosSend < 180) return;
     const snap = { x: Math.round(me.x), y: Math.round(me.y), state: me.state, dir: me.dir, inBed: !!me.inBed };
     const same = lastPosSent && snap.x === lastPosSent.x && snap.y === lastPosSent.y && snap.state === lastPosSent.state && snap.dir === lastPosSent.dir;
@@ -500,7 +547,7 @@
   }
 
   canvas.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || meetingMode()) return;   // 🏢 회의장에서는 캐릭터를 끌거나 누를 수 없음
     if (fishingMode()) { if (!MINI) HomeGame.fishClick(); return; }
     const p = toRoom(e);
     if (decorating) {
@@ -531,6 +578,7 @@
       }
       return;
     }
+    if (e.target === canvas && meetingMode()) { canvas.style.cursor = 'default'; return; }
     if (e.target === canvas && fishingMode()) { canvas.style.cursor = 'pointer'; return; }
     if (e.target === canvas) {
       const hov = decorating ? itemAt(p) : (petAt(p) || ['computer', 'record'].includes(itemAt(p)?.item));
@@ -572,12 +620,12 @@
   // 친구 캐릭터 우클릭: 간식 나눠먹기 · 이모트 · 대결 신청 메뉴
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    if (decorating) return;
+    if (decorating || meetingMode()) return;
     const pet = petAt(toRoom(e));
     if (pet) buddy.send('char-menu', { id: pet.id });   // 내 캐릭터: 자세 · 상태 메뉴, 친구: 간식 · 대결 메뉴
   });
   canvas.addEventListener('wheel', (e) => {
-    if (!decorating) return;
+    if (!decorating || meetingMode()) return;
     const it = itemAt(toRoom(e)) || selected;
     if (!it) return;
     e.preventDefault();
@@ -1119,11 +1167,37 @@
     if (roomChanged && decorating) $('decoBtn').click();
     $('offlineCover').hidden = st.net === 'online' || !st.session;
     $('offlineText').textContent = st.net === 'reconnecting' || st.net === 'connecting' ? '서버와 연결이 끊겼어요' : '오프라인이에요';
+    const wasMeeting = document.body.classList.contains('meeting-mode');
+    if (meetingMode() && !wasMeeting) enterMeetingLook();
+    document.body.classList.toggle('meeting-mode', meetingMode());
     syncLayout();
     syncPets();
     renderPanels();
     if (window.HomeGame) HomeGame.onState(st);
+    if (meetingMode()) renderMeetingBar();
+    if (wasMeeting !== meetingMode()) setTimeout(fit, 0);
   });
+  // 🏢 회의장에 들어가면: 채팅 탭만 남기고 열린 창 · 꾸미기 · 낚시를 모두 닫음
+  function enterMeetingLook() {
+    if (decorating) $('decoBtn').click();
+    document.querySelector('.tabs button[data-tab=chat]')?.click();
+    try { closeComputer(); } catch {}
+    for (const el of document.querySelectorAll('.modal, .notice-modal')) el.hidden = true;
+    if (aside.classList.contains('collapsed')) setCollapsed(false);
+    mouse = null;
+  }
+  function renderMeetingBar() {
+    const n = S.peers.length + 1;
+    $('homeTitle').textContent = '🏢 운영자 회의장';
+    $('roomBadge').className = 'badge on';
+    $('roomBadge').textContent = `👥 ${n}명`;
+    $('roomBadge').title = `회의장에 ${n}명이 있어요`;
+    $('miniTitle').textContent = `🏢 회의장 · ${n}명`;
+    $('chatHint').textContent = '🏢 회의장에서는 채팅만 할 수 있어요.';
+    const mine = Object.entries(S.room.meeting.seats || {}).find(([, name]) => name === S.session?.user.username);
+    $('meetSeat').textContent = mine ? `내 자리 ${mine[0]}번${mine[0] === '1' ? ' (대표)' : ''}` : '';
+  }
+  $('meetHomeBtn').onclick = () => buddy.send('open-my-room');
   $('settingsBtn').onclick = () => buddy.send('open-settings');
   $('allPetsBox').onchange = (e) => buddy.send('save-config', { showAllPets: e.target.checked });
 

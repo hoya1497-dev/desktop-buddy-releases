@@ -479,3 +479,23 @@ body.mini .music-modal, body.mini .music-bar { display: none !important; }
 .light-group button:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
 .light-group button.dark { background: #2b2d48; color: #c9cbe8; border-color: #2b2d48; }
 .light-group.off button { opacity: .55; }
+
+/* ---------------- 🏢 운영자 회의장 (채팅만 되고 다른 건 다 숨김) */
+.meet-bar { display: none; align-items: center; gap: 10px; }
+body.meeting-mode .meet-bar { display: flex; }
+body.meeting-mode .top .stats,
+body.meeting-mode #noticeBar,
+body.meeting-mode .toolbar,
+body.meeting-mode .selbar,
+body.meeting-mode .deco-hint,
+body.meeting-mode .knock,
+body.meeting-mode .modal,
+body.meeting-mode .notice-modal,
+body.meeting-mode .board-modal,
+body.meeting-mode .tabs,
+body.meeting-mode .pane:not(#pane-chat),
+body.meeting-mode #pane-chat .emotes { display: none !important; }
+body.meeting-mode #pane-chat { display: flex !important; }
+body.meeting-mode #room { cursor: default !important; }
+.meet-bar #meetSeason { width: auto; flex: none; padding: 4px 8px; font-size: 12px; }
+.meet-bar > * { white-space: nowrap; flex: none; }

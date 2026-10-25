@@ -19,6 +19,14 @@
       <span id="homeTitle">🏠 내 집</span>
       <span id="roomBadge" class="badge off">혼자</span>
     </div>
+    <!-- 🏢 운영자 회의장에 있을 때만 보여요 -->
+    <div class="meet-bar">
+      <span id="meetSeat" class="note-inline"></span>
+      <select id="meetSeason" title="창밖 계절 (나한테만 보여요 · 시간대는 실제 시간을 따라가요)">
+        <option value="auto">📅 계절 자동</option><option value="spring">🌸 봄</option><option value="summer">🌿 여름</option><option value="autumn">🍁 가을</option><option value="winter">❄️ 겨울</option>
+      </select>
+      <button id="meetHomeBtn" class="primary small">🏠 집으로 돌아가기</button>
+    </div>
     <div class="stats">
       <span class="coins">🪙 <b id="coins">0</b></span>
       <span class="lv">Lv.<b id="level">1</b> <span class="bar"><i id="expBar"></i></span></span>
@@ -639,6 +647,7 @@
   <script src="rodart.js"></script>
   <script src="petart.js"></script>
   <script src="emoteart.js"></script>
+  <script src="meetscene.js"></script>
   <script src="home.js"></script>
   <script src="fishscene.js"></script>
   <script src="home-game.js"></script>

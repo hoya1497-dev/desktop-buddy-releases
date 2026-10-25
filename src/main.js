@@ -494,15 +494,20 @@ function handleServer(m, sock) {
     case 'welcome':
       wantRoom = null;
       myPeerId = m.id;
-      room = { code: m.room, owner: m.owner, isOwner: m.isOwner, locked: m.locked, max: m.max, home: m.home };
+      // 🏢 운영자 회의장: 집 대신 회의실 (집 그림은 내 집 걸로 채워 두고, 화면은 회의장만 그림)
+      room = { code: m.room, owner: m.owner, isOwner: m.isOwner, locked: m.locked, max: m.max, home: m.home || session?.user.home || null, meeting: m.meeting || null };
       peers = new Map(m.peers.map((p) => [p.id, p.profile]));
       // 이미 방에 있던 사람들 그림도 받아 오기 (예전엔 빠져서 집주인이 기본 고양이로 보였음)
       for (const p of peers.values()) requestSkin(p.username, p.skin?.v);
       pushPeers();
-      addChat({ system: true, text: m.isOwner ? '내 집에 있어요. 친구들이 놀러 올 수 있어요.' : `${m.owner.nickname}(@${m.owner.username})님의 집에 들어왔어요. (${peers.size + 1}명)` });
+      addChat({ system: true, text: m.meeting ? `🏢 운영자 회의장에 들어왔어요. (${peers.size + 1}명) 여기서는 채팅만 할 수 있어요.`
+        : m.isOwner ? '내 집에 있어요. 친구들이 놀러 올 수 있어요.' : `${m.owner.nickname}(@${m.owner.username})님의 집에 들어왔어요. (${peers.size + 1}명)` });
       updateTray();
       break;
     case 'left':
+      break;
+    case 'meet-seats':   // 🏢 회의장 자리가 바뀜
+      if (room?.meeting) { room.meeting = { seats: m.seats || {} }; pushHome(); }
       break;
     case 'peer-join':
       peers.set(m.id, m.profile); pushPeers();
@@ -744,7 +749,8 @@ function pushSkins() {
 
 function peerList() { return [...peers.entries()].map(([id, p]) => ({ id, ...p })); }
 function pushPeers() {
-  overlay?.webContents.send('peers', peerList());
+  // 🏢 회의장 사람들은 바탕화면에는 안 나오고 회의장 안에만 보여요
+  overlay?.webContents.send('peers', room?.meeting ? [] : peerList());
   pushHome();
 }
 function homeState() {
@@ -785,9 +791,17 @@ function logout() {
   updateWidgets();
   showLogin('로그아웃했어요.');
 }
+const MEET_CMD = /^\/(회의장|회의|자리빼기|자리)(\s|$)/;
 function sendChat(text) {
   const t = String(text || '').trim().slice(0, 200);
   if (!t) return;
+  // 🏢 회의장 명령: 말풍선 · 채팅으로 안 띄우고 서버에만 (방에 없어도 보냄)
+  if (MEET_CMD.test(t)) {
+    addChat({ system: true, text: `› ${t}` });
+    if (ws && ws.readyState === WebSocket.OPEN) wsSend({ type: 'chat', text: t });
+    else addChat({ system: true, text: '서버에 연결돼 있을 때만 쓸 수 있어요.' });
+    return;
+  }
   overlay?.webContents.send('chat', { id: 'me', text: t });
   addChat({ pid: 'me', from: config.nickname, username: session?.user.username, color: config.color, nameColor: config.nameColor, nameEffect: session?.user.nameEffect, text: t, mine: true });
   if (room) wsSend({ type: 'chat', text: t });
@@ -798,7 +812,7 @@ function sendEmote(kind, target = null) {
   if (!target && EMOTE_LABEL[kind]) {   // 💬 내가 보낸 이모티콘도 채팅 로그에 남김
     addChat({ pid: 'me', from: config.nickname, username: session?.user.username, color: config.color, nameColor: config.nameColor, nameEffect: session?.user.nameEffect, text: EMOTE_LABEL[kind], mine: true });
   }
-  if (room) wsSend({ type: 'emote', kind, target: target || undefined });
+  if (room && !room.meeting) wsSend({ type: 'emote', kind, target: target || undefined });   // 회의장에서는 이모트를 안 보냄
 }
 
 // ---------------------------------------------------------------- 캐릭터 우클릭 메뉴
