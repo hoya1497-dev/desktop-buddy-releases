@@ -5,6 +5,7 @@
   let W = innerWidth, H = innerHeight, DPR = devicePixelRatio || 1;
 
   const G = 2200;          // 중력 (px/s²)
+  const POKE_HOP = 600;    // 콕 찔렀을 때 튀어오르는 힘 (찌른 사람 · 찔린 사람 · 같은 방 모두 똑같이)
   const WALK = 110;        // 걷는 속도 (px/s)
   const FONT = '"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif';
 
@@ -229,20 +230,6 @@
 
       const seg = this.currentSeg();
       if (!seg) { this.fall(); return; }
-
-      // 친구 캐릭터: 내가 직접 AI로 걷지 않고, 그 사람 화면에서 보낸 자리(화면 비율)를 따라감 (모두의 화면에서 같은 자리)
-      if (!this.isMe) {
-        if (this.target) {
-          const tx = clamp(this.target.fx * W, this.w / 2, W - this.w / 2);
-          const dx = tx - this.x;
-          if (Math.abs(dx) > 1.5) { this.x += dx * Math.min(1, dt * 8); if (Math.abs(dx) > 3) this.dir = dx > 0 ? 1 : -1; }
-          else this.x = tx;
-          if (typeof this.target.dir === 'number' && Math.abs(dx) <= 3) this.dir = this.target.dir;
-          const nextState = this.target.state || 'idle';
-          if (nextState !== this.state) this.setState(nextState, 999);
-        }
-        return;
-      }
 
       if (this.state === 'walk') {
         this.x += this.dir * WALK * dt;
@@ -558,8 +545,8 @@
       else {
         // 친구 캐릭터 클릭: 콕 찌르기
         p.happyT = 0.7;
-        p.hop(420);
-        p.emote(['❗', '💕', '✨', '😆'][Math.floor(Math.random() * 4)]);
+        p.hop(POKE_HOP);
+        p.emote('poke');
         buddy.send('poke', { target: p.id });
       }
     } else {
@@ -657,12 +644,6 @@
     }
   });
   buddy.on('chat', ({ id, text }) => { pets.get(id)?.say(text); });
-  // 🚶 친구의 데스크톱 버디 위치(화면 비율) → 내 화면에서도 같은 자리로 따라감
-  buddy.on('overlay-peer-pos', ({ id, fx, dir, state }) => {
-    const pet = pets.get(id);
-    if (!pet || pet.isMe) return;
-    pet.target = { fx, dir, state };
-  });
   // 간식 나눠먹기
   buddy.on('snack', ({ from, to, icon, name }) => {
     const a = pets.get(from), b = pets.get(to);
@@ -687,7 +668,7 @@
       if (from === 'me') return; // 내가 찌른 건 이미 표시함
       if (!target) { pet.happyT = 0.7; pet.hop(420); pet.emote('✨'); return; }   // 자기 캐릭터를 콕 → 점프만
       pet.happyT = 0.7;
-      pet.hop(480);
+      pet.hop(POKE_HOP);
       pet.emote('poke');
       if (fromName) pet.say(`${fromName}님이 콕 찔렀어요!`);
       return;
@@ -737,24 +718,11 @@
 
   // ------------------------------------------------------------ 루프
   let last = performance.now();
-  let lastOverlayPosSend = 0, lastOverlayPosSent = null;
-  function sendMyOverlayPos(t) {
-    const me = pets.get('me');
-    if (!me || t - lastOverlayPosSend < 180) return;
-    const fx = Math.max(0, Math.min(1, me.x / W));
-    const state = me.air ? 'fall' : me.state;
-    const snap = { fx: Math.round(fx * 1000) / 1000, dir: me.dir, state };
-    const same = lastOverlayPosSent && snap.fx === lastOverlayPosSent.fx && snap.dir === lastOverlayPosSent.dir && snap.state === lastOverlayPosSent.state;
-    if (same) return;
-    lastOverlayPosSend = t; lastOverlayPosSent = snap;
-    buddy.send('overlay-pos', snap);
-  }
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     // 캐릭터 하나에서 오류가 나도 화면 전체가 멈추지 않게 (멈추면 끌기 · 말풍선 입력이 안 됨)
     for (const p of pets.values()) { try { p.update(dt); } catch (e) { report(e); } }
-    sendMyOverlayPos(now);
     try { updateFollowers(dt); } catch (e) { report(e); }
     refreshHover();
     try { placeChat(); } catch (e) { report(e); }

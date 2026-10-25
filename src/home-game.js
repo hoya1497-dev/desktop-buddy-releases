@@ -755,7 +755,7 @@
     const x = SLOT_X(i), y = DECK_Y;
     const fs = mini ? 19 : 13;
     // 낚싯대 끝 (그림은 캐릭터 · 이름표 위에 맨 나중에 그림)
-    const tip = { x: x + 84, y: y - 96 };
+    const tip = { x: x + 64, y: y - 72 };
     // 찌
     const rest = { x: x + 80, y: 452 + (i % 2) * 26 };
     let bob = null;

@@ -595,9 +595,6 @@ function handleServer(m, sock) {
     case 'peer-pos':   // 🧍 친구가 보낸 집 안 위치 → 내 화면의 그 친구 캐릭터도 같은 자리로
       for (const w of homes()) w.webContents.send('peer-pos', { id: m.id, x: m.x, y: m.y, state: m.state, dir: m.dir, inBed: m.inBed });
       break;
-    case 'overlay-peer-pos':   // 🚶 친구가 보낸 데스크톱 버디 위치(화면 비율) → 오버레이에서 같은 자리로
-      overlay?.webContents.send('overlay-peer-pos', { id: m.id, fx: m.fx, dir: m.dir, state: m.state });
-      break;
     case 'fish-peer':   // 미니맵에도 같이 낚시하는 친구가 보이게
     case 'fish-show':   // 🐟 잡은 물고기 자랑
       for (const w of homes()) w.webContents.send('srv', m);
@@ -1103,9 +1100,8 @@ function registerIpc() {
   });
   ipcMain.on('open-control', () => showHome());
   ipcMain.on('poke', (_e, { target }) => sendEmote('poke', target));
-  // 🧍 집 캐릭터 위치, 🚶 데스크톱 버디 위치: 같은 방 친구들에게 그대로 전달해서 모두의 화면에서 같은 자리로 보이게
+  // 🧍 집 캐릭터 위치: 같은 방 친구들에게 그대로 전달해서 모두의 화면에서 같은 자리로 보이게 (바탕화면 버디는 각자 따로 움직임)
   ipcMain.on('home-pos', (_e, pos) => { if (room) wsSend({ type: 'home-pos', ...pos }); });
-  ipcMain.on('overlay-pos', (_e, pos) => { if (room) wsSend({ type: 'overlay-pos', ...pos }); });
 
   // 로그인
   ipcMain.on('auth', (_e, d) => {
