@@ -802,7 +802,7 @@
     const crown = showCrownDock(who.username) ? '👑 ' : '';
     let top = namePill(g, crown + (who.mine ? `나 · ${who.nickname}` : who.nickname), x + 4, y - 62, who.mine, fs, who);
     // 낚싯대 (종류마다 그림이 다름) — 캐릭터보다 위, 3배 크기라 줄여 보여도 덜 뭉개짐
-    RodArt.drawAt(g, C()?.rods?.[who.rod] ? who.rod : 'rod1', tip.x, tip.y, 75);
+    RodArt.drawAt(g, C()?.rods?.[who.rod] ? who.rod : 'rod1', tip.x, tip.y, 54);
     if (who.rod === 'rod7') { g.fillStyle = `rgba(255,220,120,${0.5 + 0.5 * Math.sin(t * 6)})`; g.fillRect(tip.x - 4, tip.y - 4, 8, 8); }   // 전설의 낚싯대는 반짝
     // ✨ 자랑: 물고기를 머리 위로 번쩍
     const sh = st.show && (performance.now() - st.show.at) / 1000 < SHOW_SEC ? st.show : null;
@@ -1304,14 +1304,29 @@
   }
 
   // ------------------------------------------------------------ 루프 · 연결 지점
+  // 물고기 그림 하나가 이상해서(bitmap이 null 등) 오류가 나도 낚시 · 아쿠아리움 루프가
+  // 영원히 멈추지 않게 감싸기 (예전엔 한 번 오류 나면 그 뒤로 화면이 안 그려졌음)
+  const reportedTickErrors = new Set();
+  function reportTickError(e) {
+    const msg = String((e && e.stack) || e).slice(0, 1500);
+    console.error(msg);
+    if (reportedTickErrors.has(msg) || reportedTickErrors.size > 20) return;
+    reportedTickErrors.add(msg);
+    try { buddy.send('overlay-error', msg); } catch {}
+  }
   let last = performance.now();
   let presenceT = 0;
   function tick(now) {
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if ((presenceT -= dt) <= 0) { presenceT = 0.5; syncFishHere(); }
-    if (!H.isMini) updateFishing(dt);
-    if (viewer.kind === 'tank' && !$('tankModal').hidden) drawWater(waterCanvas('tankCanvas'), 'tank');
-    if (viewer.kind === 'aqua' && !$('aquaModal').hidden) drawWater(waterCanvas('aquaCanvas'), 'aqua');
+    try {
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      if ((presenceT -= dt) <= 0) { presenceT = 0.5; syncFishHere(); }
+      if (!H.isMini) updateFishing(dt);
+      if (viewer.kind === 'tank' && !$('tankModal').hidden) drawWater(waterCanvas('tankCanvas'), 'tank');
+      if (viewer.kind === 'aqua' && !$('aquaModal').hidden) drawWater(waterCanvas('aquaCanvas'), 'aqua');
+    } catch (e) {
+      reportTickError(e);
+      last = now;
+    }
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);

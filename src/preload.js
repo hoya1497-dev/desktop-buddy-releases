@@ -9,7 +9,7 @@ const SEND = [
   // 설정
   'save-config', 'logout', 'open-settings',
   // 집
-  'join-room', 'open-my-room', 'leave-room', 'send-chat', 'emote',
+  'join-room', 'open-my-room', 'leave-room', 'send-chat', 'emote', 'home-pos', 'overlay-pos',
   'buy', 'place', 'wall', 'feed', 'pat', 'lock', 'kick',
   'friend-add', 'friend-accept', 'friend-decline', 'friend-remove', 'visit', 'knock', 'knock-answer', 'invite-answer',
   'skin-set', 'light', 'gift', 'overlay-focus', 'set-theme',
@@ -21,7 +21,7 @@ const SEND = [
 ];
 const INVOKE = ['get-state', 'list-windows', 'get-chat', 'get-skins', 'get-theme', 'get-update', 'get-timers', 'yt-info', 'sticky-get'];
 const ON = [
-  'init', 'config', 'self', 'windows', 'peers', 'chat', 'emote', 'summon',
+  'init', 'config', 'self', 'windows', 'peers', 'chat', 'emote', 'summon', 'peer-pos', 'overlay-peer-pos',
   'login-state', 'login-error', 'account',
   'home-state', 'reward', 'toast', 'focus-chat', 'skins', 'skin-saved', 'theme', 'update', 'srv',
   'timers', 'snack', 'alarm', 'open-dm', 'sticky-data',

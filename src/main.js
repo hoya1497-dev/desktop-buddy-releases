@@ -587,6 +587,16 @@ function handleServer(m, sock) {
         fromName: peers.get(m.id)?.nickname || '',
       });
       for (const w of homes()) w.webContents.send('emote', { from: m.id, kind: m.kind, target: m.target ? (m.target === myPeerId ? 'me' : m.target) : null });
+      if (!m.target && EMOTE_LABEL[m.kind]) {   // 💬 이모티콘도 채팅 로그에 남김
+        const p = peers.get(m.id);
+        addChat({ pid: m.id, from: p ? p.nickname : '?', username: p?.username, color: p?.color, nameColor: p?.nameColor, nameEffect: p?.nameEffect, text: EMOTE_LABEL[m.kind] });
+      }
+      break;
+    case 'peer-pos':   // 🧍 친구가 보낸 집 안 위치 → 내 화면의 그 친구 캐릭터도 같은 자리로
+      for (const w of homes()) w.webContents.send('peer-pos', { id: m.id, x: m.x, y: m.y, state: m.state, dir: m.dir, inBed: m.inBed });
+      break;
+    case 'overlay-peer-pos':   // 🚶 친구가 보낸 데스크톱 버디 위치(화면 비율) → 오버레이에서 같은 자리로
+      overlay?.webContents.send('overlay-peer-pos', { id: m.id, fx: m.fx, dir: m.dir, state: m.state });
       break;
     case 'fish-peer':   // 미니맵에도 같이 낚시하는 친구가 보이게
     case 'fish-show':   // 🐟 잡은 물고기 자랑
@@ -788,11 +798,15 @@ function sendChat(text) {
 function sendEmote(kind, target = null) {
   overlay?.webContents.send('emote', { from: 'me', kind, target, fromName: config.nickname });
   for (const w of homes()) w.webContents.send('emote', { from: 'me', kind, target });
+  if (!target && EMOTE_LABEL[kind]) {   // 💬 내가 보낸 이모티콘도 채팅 로그에 남김
+    addChat({ pid: 'me', from: config.nickname, username: session?.user.username, color: config.color, nameColor: config.nameColor, nameEffect: session?.user.nameEffect, text: EMOTE_LABEL[kind], mine: true });
+  }
   if (room) wsSend({ type: 'emote', kind, target: target || undefined });
 }
 
 // ---------------------------------------------------------------- 캐릭터 우클릭 메뉴
-const EMOTES = [['wave', '👋 손 흔들기'], ['heart', '💖 하트'], ['cheer', '🎉 응원'], ['zzz', '💤 졸려요']];
+const EMOTE_LABEL = { wave: '👋 안녕!', bye: '🚶 잘가!', zzz: '💤 잘자...', good: '👍 굿!', dislike: '👎 싫어...', heart: '💖 좋아!', cheer: '🎉 신난다!' };
+const EMOTES = [['wave', '👋 안녕'], ['bye', '🚶 잘가'], ['zzz', '💤 잘자'], ['good', '👍 굿'], ['dislike', '👎 싫어'], ['heart', '💖 좋아'], ['cheer', '🎉 응원']];
 const POSES = ['auto', 'stand', 'sit', 'lie'];
 const THEME_MODES = ['system', 'light', 'dark', 'aurora', 'custom'];
 const themePayload = () => ({ mode: THEME_MODES.includes(config.theme) ? config.theme : 'system', custom: { ...DEFAULT_CONFIG.themeCustom, ...(config.themeCustom || {}) } });
@@ -1089,6 +1103,9 @@ function registerIpc() {
   });
   ipcMain.on('open-control', () => showHome());
   ipcMain.on('poke', (_e, { target }) => sendEmote('poke', target));
+  // 🧍 집 캐릭터 위치, 🚶 데스크톱 버디 위치: 같은 방 친구들에게 그대로 전달해서 모두의 화면에서 같은 자리로 보이게
+  ipcMain.on('home-pos', (_e, pos) => { if (room) wsSend({ type: 'home-pos', ...pos }); });
+  ipcMain.on('overlay-pos', (_e, pos) => { if (room) wsSend({ type: 'overlay-pos', ...pos }); });
 
   // 로그인
   ipcMain.on('auth', (_e, d) => {

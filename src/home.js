@@ -127,6 +127,19 @@
       if (this.bubble && (this.bubble.t -= dt) <= 0) this.bubble = null;
       this.emotes = this.emotes.filter((e) => (e.t -= dt) > 0);
       if (this.dragging) return;
+      // 친구 캐릭터: 내가 AI로 움직이지 않고, 그 사람 화면에서 보낸 자리를 그대로 따라감 (모두의 화면에서 같은 위치)
+      if (!this.isMe) {
+        if (this.target) {
+          const dx = this.target.x - this.x, dy = this.target.y - this.y;
+          const d = Math.hypot(dx, dy);
+          if (d > 2) { this.x += dx * Math.min(1, dt * 8); this.y += dy * Math.min(1, dt * 8); }
+          else { this.x = this.target.x; this.y = this.target.y; }
+          if (typeof this.target.dir === 'number') this.dir = this.target.dir;
+          const nextState = this.target.state || 'idle';
+          if (nextState !== this.state) { this.state = nextState; this.inBed = !!this.target.inBed; }
+        }
+        return;
+      }
       if (this.state === 'walk' || this.state === 'climb') {
         const wp = this.path[0];
         if (!wp) { this.arrive(); return; }
@@ -222,8 +235,9 @@
       if (this.bubble) bubble(this.bubble.text, this.x, top);
       this.emotes.forEach((e, i) => {
         ctx.globalAlpha = Math.min(1, e.t * 2);
-        ctx.font = `24px ${EMOJI_FONT}`; ctx.textAlign = 'center';
-        ctx.fillText(e.icon, this.x + 24 + i * 6, this.y - PET_H - 4 - (1.8 - e.t) * 26);
+        const ex = this.x + 24 + i * 6, ey = this.y - PET_H - 4 - (1.8 - e.t) * 26;
+        if (window.EmoteArt && EmoteArt.has(e.icon)) EmoteArt.draw(ctx, e.icon, this.x, top - 2 - (1.8 - e.t) * 14, 48);   // 그림 이모티콘은 이름표 위 가운데에 크게
+        else { ctx.font = `24px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.fillText(e.icon, ex, ey); }
         ctx.globalAlpha = 1;
       });
     }
@@ -419,25 +433,53 @@
     if (!catalog) return;
     if (fishingMode()) { HomeGame.drawFishing(ctx, RW, RH, MINI); return; }
     drawHouse();
+    const safeDraw = (fn) => { try { fn(); } catch (e) { reportLoopError(e); } };
     const flat = layout.filter((it) => isFlat(it.item));
-    flat.forEach(drawItem);
+    flat.forEach((it) => safeDraw(() => drawItem(it)));
     const things = layout.filter((it) => !isFlat(it.item)).map((it) => ({ y: it.y, draw: () => drawItem(it) }));
     for (const p of pets.values()) things.push({ y: p.sortY(), draw: () => p.draw() });
     if (foodDrop) things.push({ y: foodDrop.y, draw: () => { ctx.font = `26px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.fillText(foodDrop.icon, foodDrop.x, foodDrop.y); } });
     if (window.HomeGame) HomeGame.addThings(ctx, things);   // 키우는 동물
-    things.sort((a, b) => a.y - b.y).forEach((t) => t.draw());
+    things.sort((a, b) => a.y - b.y).forEach((t) => safeDraw(t.draw));
     drawDarkness();
     drawGrid();
     for (const p of pets.values()) p.drawLabels();
   }
 
+  // 그림 하나에서 오류가 나면(물고기 · 가구 데이터가 이상한 경우 등) 화면 전체가 멈춰서
+  // 그 뒤로 가구 · 낚시 · 아쿠아리움이 투명하게 보이기만 하던 버그 → 루프가 멈추지 않게 감싸기
+  const reportedLoopErrors = new Set();
+  function reportLoopError(e) {
+    const msg = String((e && e.stack) || e).slice(0, 1500);
+    console.error(msg);
+    if (reportedLoopErrors.has(msg) || reportedLoopErrors.size > 20) return;
+    reportedLoopErrors.add(msg);
+    try { buddy.send('overlay-error', msg); } catch {}
+  }
   let last = performance.now();
+  let lastPosSend = 0, lastPosSent = null;
+  function sendMyPos(t) {
+    const me = pets.get('me');
+    if (!me || !S || !S.room) return;
+    if (t - lastPosSend < 180) return;
+    const snap = { x: Math.round(me.x), y: Math.round(me.y), state: me.state, dir: me.dir, inBed: !!me.inBed };
+    const same = lastPosSent && snap.x === lastPosSent.x && snap.y === lastPosSent.y && snap.state === lastPosSent.state && snap.dir === lastPosSent.dir;
+    if (same) return;
+    lastPosSend = t; lastPosSent = snap;
+    buddy.send('home-pos', snap);
+  }
   function loop(t) {
-    const dt = Math.min(0.05, (t - last) / 1000); last = t;
-    for (const p of pets.values()) p.update(dt);
-    if (window.HomeGame) HomeGame.update(dt);
-    if (foodDrop && (foodDrop.t -= dt) <= 0) foodDrop = null;
-    render();
+    try {
+      const dt = Math.min(0.05, (t - last) / 1000); last = t;
+      for (const p of pets.values()) p.update(dt);
+      sendMyPos(t);
+      if (window.HomeGame) HomeGame.update(dt);
+      if (foodDrop && (foodDrop.t -= dt) <= 0) foodDrop = null;
+      render();
+    } catch (e) {
+      reportLoopError(e);
+      try { ctx.setTransform(K, 0, 0, K, 0, 0); ctx.clearRect(0, 0, RW, RH); } catch {}
+    }
     requestAnimationFrame(loop);
   }
 
@@ -512,7 +554,7 @@
       pet.happyT = 0.8;
       pet.hopT = 0.45;
       if (pet.isMe) { buddy.send('pat'); pet.emote('💗'); buddy.send('poke', { target: 'me' }); }
-      else { pet.emote('💥'); buddy.send('poke', { target: pet.id }); }
+      else { pet.emote('poke'); buddy.send('poke', { target: pet.id }); }
       return;
     }
     if (m.kind === 'click' && e.target === canvas) {
@@ -957,7 +999,13 @@
       const b = document.createElement('b'); b.textContent = m.from; b.style.marginRight = '3px';
       b.className = NickFX.domClass(m); b.style.cssText += ';' + NickFX.domStyle(m, m.color);
       const id = document.createElement('small'); id.textContent = m.username ? '@' + m.username : '';
-      div.append(b, id, document.createTextNode(m.text), timeTag(m.ts));
+      let body = document.createTextNode(m.text);
+      if (m.emote) {   // 그림 이모티콘은 채팅 로그에도 그림으로
+        body = document.createElement('img');
+        body.src = `assets/emotes/${m.emote}.png`;
+        body.style.cssText = 'height:40px;width:auto;vertical-align:middle;margin-left:4px;';
+      }
+      div.append(b, id, body, timeTag(m.ts));
     }
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
     log.append(div);
@@ -986,7 +1034,15 @@
       $('fishChatInput').value = '';
     };
   }
-  document.querySelectorAll('[data-emote]').forEach((b) => { b.onclick = () => buddy.send('emote', { kind: b.dataset.emote }); });
+  document.querySelectorAll('[data-emote]').forEach((b) => {
+    b.onclick = () => buddy.send('emote', { kind: b.dataset.emote });
+    if (window.EmoteArt && EmoteArt.has(b.dataset.emote)) {   // 버튼도 이모지 글자 대신 그림 아이콘으로
+      const img = document.createElement('img');
+      img.src = `assets/emotes/${b.dataset.emote}.png`;
+      img.style.cssText = 'height:26px;width:auto;vertical-align:middle;';
+      b.textContent = ''; b.append(img);
+    }
+  });
   buddy.on('focus-chat', () => { document.querySelector('.tabs button[data-tab=chat]').click(); $('chatInput').focus(); });
 
   // 간식 나눠먹기: 둘 다 같이 먹는 모습
@@ -998,13 +1054,22 @@
       b.emote(icon); b.happyT = 1.4; setTimeout(() => b.emote('😋'), 700);
     } else (a || b)?.emote(icon);
   });
-  const EMOTE_ICON = { wave: '👋', heart: '💖', cheer: '🎉', zzz: '💤', poke: '💥' };
+  const EMOTE_ICON = { wave: '👋', heart: '💖', cheer: '🎉', zzz: '💤', poke: '💥', bye: '🚶', good: '👍', dislike: '👎' };
   buddy.on('emote', ({ from, kind, target }) => {
     const pet = pets.get(target || from);
     if (!pet || (kind === 'poke' && from === 'me')) return;
     if (kind === 'poke') pet.hopT = 0.45;   // 누가 콕 찌르면 모두의 화면에서 폴짝
-    if (EMOTE_ICON[kind]) pet.emote(EMOTE_ICON[kind]);
+    if (window.EmoteArt && EmoteArt.has(kind)) {
+      pet.emote(kind);
+      if (kind !== 'poke') addMsg({ ...pet.profile, from: pet.profile.nickname, text: '', emote: kind, ts: Date.now() });
+    } else if (EMOTE_ICON[kind]) pet.emote(EMOTE_ICON[kind]);
     pet.happyT = 0.6;
+  });
+  // 친구 캐릭터 위치 동기화: 그 친구 화면에서 보낸 자리를 그대로 따라감 (모두의 화면에서 같은 자리)
+  buddy.on('peer-pos', ({ id, x, y, state, dir, inBed }) => {
+    const pet = pets.get(id);
+    if (!pet || pet.isMe) return;
+    pet.target = { x, y, state, dir, inBed };
   });
 
   // ------------------------------------------------------------ 알림

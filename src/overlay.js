@@ -39,23 +39,8 @@
   }
 
   function rebuildPlatforms() {
+    // 하루 요청(0.13.8): 다른 창 위로는 안 올라가고 바닥만 걸어다님
     const segs = [{ winId: 'floor', x1: 0, x2: W, y: floorY, wx: 0, wy: floorY }];
-    rawWindows.forEach((w, i) => {
-      if (!w.target) return;
-      const y = w.y;
-      if (y < 60 || y > floorY - 30) return; // 화면 맨 위(최대화)나 바닥 근처는 제외
-      let parts = [[Math.max(0, w.x), Math.min(W, w.x + w.w)]];
-      if (cfg.occlusion) {
-        // 앞쪽에 있는 창(목록에서 더 앞)에 가려진 부분은 밟을 수 없음
-        for (let j = 0; j < i; j++) {
-          const o = rawWindows[j];
-          if (y >= o.y && y <= o.y + o.h) parts = subtract(parts, o.x, o.x + o.w);
-        }
-      }
-      for (const [a, b] of parts) {
-        if (b - a >= 30) segs.push({ winId: w.id, x1: a, x2: b, y, wx: w.x, wy: w.y });
-      }
-    });
     segs.sort((a, b) => a.y - b.y);
     platforms = segs;
 
@@ -245,6 +230,20 @@
       const seg = this.currentSeg();
       if (!seg) { this.fall(); return; }
 
+      // 친구 캐릭터: 내가 직접 AI로 걷지 않고, 그 사람 화면에서 보낸 자리(화면 비율)를 따라감 (모두의 화면에서 같은 자리)
+      if (!this.isMe) {
+        if (this.target) {
+          const tx = clamp(this.target.fx * W, this.w / 2, W - this.w / 2);
+          const dx = tx - this.x;
+          if (Math.abs(dx) > 1.5) { this.x += dx * Math.min(1, dt * 8); if (Math.abs(dx) > 3) this.dir = dx > 0 ? 1 : -1; }
+          else this.x = tx;
+          if (typeof this.target.dir === 'number' && Math.abs(dx) <= 3) this.dir = this.target.dir;
+          const nextState = this.target.state || 'idle';
+          if (nextState !== this.state) this.setState(nextState, 999);
+        }
+        return;
+      }
+
       if (this.state === 'walk') {
         this.x += this.dir * WALK * dt;
         const lo = seg.x1 + 4, hi = seg.x2 - 4;
@@ -365,9 +364,9 @@
       for (const e of this.emotes) {
         const k = 1 - e.t / e.max;
         ctx.globalAlpha = Math.min(1, e.t * 2);
-        ctx.font = `${Math.round(s * 7)}px ${FONT}`;
-        ctx.textAlign = 'center';
-        ctx.fillText(e.icon, this.x + this.w * 0.45 + e.dx, top - k * 40);
+        const ex = this.x + this.w * 0.45 + e.dx, ey = top - k * 40;
+        if (window.EmoteArt && EmoteArt.has(e.icon)) EmoteArt.draw(ctx, e.icon, this.x, labelTop - 2 - k * 24, Math.round(s * 13));   // 그림 이모티콘은 머리 위 가운데에 크게
+        else { ctx.font = `${Math.round(s * 7)}px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(e.icon, ex, ey); }
         ctx.globalAlpha = 1;
       }
     }
@@ -658,6 +657,12 @@
     }
   });
   buddy.on('chat', ({ id, text }) => { pets.get(id)?.say(text); });
+  // 🚶 친구의 데스크톱 버디 위치(화면 비율) → 내 화면에서도 같은 자리로 따라감
+  buddy.on('overlay-peer-pos', ({ id, fx, dir, state }) => {
+    const pet = pets.get(id);
+    if (!pet || pet.isMe) return;
+    pet.target = { fx, dir, state };
+  });
   // 간식 나눠먹기
   buddy.on('snack', ({ from, to, icon, name }) => {
     const a = pets.get(from), b = pets.get(to);
@@ -673,7 +678,7 @@
     me.emote('✨');
   });
 
-  const EMOTE_ICON = { wave: '👋', heart: '💖', cheer: '🎉', zzz: '💤', coin: '🪙', gift: '🎁', mail: '✉️' };
+  const EMOTE_ICON = { wave: '👋', heart: '💖', cheer: '🎉', zzz: '💤', bye: '🚶', good: '👍', dislike: '👎', coin: '🪙', gift: '🎁', mail: '✉️' };
   buddy.on('emote', ({ from, kind, target, fromName }) => {
     const pet = pets.get(target || from);
     if (!pet) return;
@@ -683,13 +688,13 @@
       if (!target) { pet.happyT = 0.7; pet.hop(420); pet.emote('✨'); return; }   // 자기 캐릭터를 콕 → 점프만
       pet.happyT = 0.7;
       pet.hop(480);
-      pet.emote('💥');
+      pet.emote('poke');
       if (fromName) pet.say(`${fromName}님이 콕 찔렀어요!`);
       return;
     }
     const icon = EMOTE_ICON[kind];
     if (!icon) return;
-    pet.emote(icon);
+    pet.emote(window.EmoteArt && EmoteArt.has(kind) ? kind : icon);
     if (target && from !== 'me' && fromName) pet.say(`${fromName}님: ${icon}`);
     if (kind === 'cheer' || kind === 'wave') pet.hop(380);
   });
@@ -732,11 +737,24 @@
 
   // ------------------------------------------------------------ 루프
   let last = performance.now();
+  let lastOverlayPosSend = 0, lastOverlayPosSent = null;
+  function sendMyOverlayPos(t) {
+    const me = pets.get('me');
+    if (!me || t - lastOverlayPosSend < 180) return;
+    const fx = Math.max(0, Math.min(1, me.x / W));
+    const state = me.air ? 'fall' : me.state;
+    const snap = { fx: Math.round(fx * 1000) / 1000, dir: me.dir, state };
+    const same = lastOverlayPosSent && snap.fx === lastOverlayPosSent.fx && snap.dir === lastOverlayPosSent.dir && snap.state === lastOverlayPosSent.state;
+    if (same) return;
+    lastOverlayPosSend = t; lastOverlayPosSent = snap;
+    buddy.send('overlay-pos', snap);
+  }
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     // 캐릭터 하나에서 오류가 나도 화면 전체가 멈추지 않게 (멈추면 끌기 · 말풍선 입력이 안 됨)
     for (const p of pets.values()) { try { p.update(dt); } catch (e) { report(e); } }
+    sendMyOverlayPos(now);
     try { updateFollowers(dt); } catch (e) { report(e); }
     refreshHover();
     try { placeChat(); } catch (e) { report(e); }
