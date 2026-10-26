@@ -43,7 +43,7 @@
     $('selfLine').textContent = `${p.nickname}${p.status ? ' · ' + p.status : ''}`;
     drawPreview(p.color);
     const note = $('nameEffectNote');
-    if (p.nameEffect) { note.hidden = false; note.textContent = `✨ 운영자가 닉네임에 '${p.nameEffect === 'neon' ? '네온' : '무지개'}' 효과를 줬어요! (글자색은 아래에서 바꿀 수 있어요)`; }
+    if (p.nameEffect) { note.hidden = false; note.textContent = `✨ 운영자가 닉네임에 '${(window.NickFX && NickFX.LABEL[p.nameEffect]) || p.nameEffect}' 효과를 줬어요!${p.nameEffect === 'neon' ? ' (빛 색은 아래 글자색으로 바꿀 수 있어요)' : ''}`; }
     else note.hidden = true;
   }
   renderSelf(state.self);

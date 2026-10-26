@@ -158,7 +158,7 @@
     if (c) return c;
     const sp = SPECIES[opts.species] || SPECIES.cat;
     c = document.createElement('canvas'); c.width = BW; c.height = BH;
-    const g = c.getContext('2d');
+    const g = c.getContext('2d', { willReadFrequently: true });
     const rows = eyes(sp.body, opts.eyes || 'open', sp.eyeRows).concat(LEGS[opts.legs] || LEGS.stand);
     const px = (x, y, col) => {
       const dx = opts.flip ? 15 - x : x;
@@ -194,7 +194,7 @@
   }
 
   window.Sprites = {
-    drawPet, palette, SIZE: 16, ACC,
+    drawPet, palette, SIZE: 16, ACC, clearCache: () => cache.clear(),
     species: Object.fromEntries(Object.entries(SPECIES).map(([k, v]) => [k, v.name])),
   };
 })();

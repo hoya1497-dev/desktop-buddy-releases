@@ -576,7 +576,7 @@ window.FishArt = (() => {
     const w = b.w, h = b.h;
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
-    const g = c.getContext('2d');
+    const g = c.getContext('2d', { willReadFrequently: true });
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (b.g[y][x]) { g.fillStyle = b.g[y][x]; g.fillRect(x, y, 1, 1); }
     cache.set(key, c);
     return c;
@@ -597,12 +597,12 @@ window.FishArt = (() => {
     c.width = side; c.height = side;
     const bm = bitmap(fish);
     if (!bm) return c;
-    const g = c.getContext('2d');
+    const g = c.getContext('2d', { willReadFrequently: true });
     const k = Math.max(1, Math.floor(Math.min(side / bm.width, side / bm.height)));
     g.imageSmoothingEnabled = false;
     g.drawImage(bm, Math.floor((side - bm.width * k) / 2), Math.floor((side - bm.height * k) / 2), bm.width * k, bm.height * k);
     if (unknown) { g.globalCompositeOperation = 'source-in'; g.fillStyle = 'rgba(60,60,72,0.85)'; g.fillRect(0, 0, side, side); }
     return c;
   }
-  return { bitmap, draw, thumb, SIZE };
+  return { bitmap, draw, thumb, SIZE, clearCache: () => cache.clear() };
 })();

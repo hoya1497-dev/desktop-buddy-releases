@@ -503,6 +503,15 @@
     reportedLoopErrors.add(msg);
     try { buddy.send('overlay-error', msg); } catch {}
   }
+  // 🪑 가구가 갑자기 사라지는 문제: 그래픽 카드가 초기화되면(절전 해제 · 모니터 변경 등) 그림 캐시가 비어 버릴 수 있어요.
+  // 화면 캔버스가 다시 살아나거나, 창이 다시 보이거나, 4초마다 캐시를 확인해서 비었으면 모두 다시 그려요.
+  function resetArtCaches() {
+    for (const m of [window.Furniture, window.Sprites, window.PetArt, window.FishArt, window.RodArt]) { try { m && m.clearCache && m.clearCache(); } catch {} }
+  }
+  canvas.addEventListener('contextrestored', resetArtCaches);
+  canvas.addEventListener('contextlost', (e) => e.preventDefault());
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && window.Furniture?.verifyCache && Furniture.verifyCache()) resetArtCaches(); });
+  setInterval(() => { try { if (window.Furniture?.verifyCache && Furniture.verifyCache()) resetArtCaches(); } catch {} }, 4000);
   let last = performance.now();
   let lastPosSend = 0, lastPosSent = null;
   function sendMyPos(t) {

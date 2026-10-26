@@ -89,7 +89,7 @@ window.RodArt = (() => {
     }
     for (const [x, y, c] of add) g[y][x] = c;
     const c = document.createElement('canvas'); c.width = W + 2; c.height = H + 2;
-    const cg = c.getContext('2d');
+    const cg = c.getContext('2d', { willReadFrequently: true });
     for (let y = 0; y < H + 2; y++) for (let x = 0; x < W + 2; x++) if (g[y][x]) { cg.fillStyle = g[y][x]; cg.fillRect(x, y, 1, 1); }
     return c;
   }
@@ -104,11 +104,11 @@ window.RodArt = (() => {
   }
   function thumb(id, side = 34) {
     const c = document.createElement('canvas'); c.width = side; c.height = side;
-    const bm = bitmap(id), g = c.getContext('2d');
+    const bm = bitmap(id), g = c.getContext('2d', { willReadFrequently: true });
     const k = Math.max(1, Math.floor(Math.min(side / bm.width, side / bm.height)));
     g.imageSmoothingEnabled = false;
     g.drawImage(bm, Math.floor((side - bm.width * k) / 2), Math.floor((side - bm.height * k) / 2), bm.width * k, bm.height * k);
     return c;
   }
-  return { bitmap, drawAt, thumb, KINDS };
+  return { bitmap, drawAt, thumb, KINDS, clearCache: () => cache.clear() };
 })();

@@ -1925,7 +1925,24 @@ window.Furniture = (() => {
   const GLOW = { lamp: [0.5, 0.12, 30], tv: [0.5, 0.5, 18], tree: [0.5, 0.45, 22], tankS: [0.5, 0.45, 10], tankM: [0.5, 0.45, 14], tankL: [0.5, 0.45, 18], computer: [0.5, 0.25, 14], ...GLOW_EXTRA };
 
   // ---------------------------------------------------------------- 캐시
+  // 그린 가구 그림은 캐시에 두고 계속 다시 써요. 예전엔 이 캐시 캔버스가 그래픽 카드(GPU) 메모리에 있어서
+  // 절전에서 깨어나거나 모니터가 바뀌면 내용이 통째로 비어 버려 '가구가 갑자기 사라지는' 일이 있었어요(앱을 다시 켜야 돌아옴).
+  // → 캐시는 CPU 캔버스(willReadFrequently)로 만들고, 그래도 비어 버리면 알아채서 다시 그려요.
   const cache = new Map();
+  const probes = new Map();   // 캐시 키 -> 반드시 색이 있어야 하는 칸 [x, y]
+  const cpuCtx = (c) => c.getContext('2d', { willReadFrequently: true });
+  function clearCache() { cache.clear(); probes.clear(); }
+  // 캐시 그림마다 '있어야 할 점' 하나가 투명해졌는지 확인 (CPU 캔버스라 1점 읽기는 아주 가벼움) → 하나라도 비었으면 전부 다시 그림
+  function verifyCache() {
+    for (const [k, pr] of probes) {
+      const c = cache.get(k);
+      if (!c) continue;
+      try {
+        if (cpuCtx(c).getImageData(pr[0], pr[1], 1, 1).data[3] === 0) { clearCache(); return true; }
+      } catch { clearCache(); return true; }
+    }
+    return false;
+  }
   function sky(h = new Date().getHours()) {
     if (h >= 6 && h < 17) return '#9fd3f7';
     if (h >= 17 && h < 20) return '#f6b38a';
@@ -1943,16 +1960,19 @@ window.Furniture = (() => {
     const w = Math.max(...rows.map((r) => r.length)), h = rows.length;
     c = document.createElement('canvas');
     c.width = w; c.height = h;
-    const g = c.getContext('2d');
+    const g = cpuCtx(c);
+    let probe = null;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < rows[y].length; x++) {
         const ch = rows[y][x];
         if (ch === '.' || ch === ' ') continue;
         g.fillStyle = ch === '@' && pal === PAL ? skyColor : (pal[ch] || '#f0f');
         g.fillRect(x, y, 1, 1);
+        if (!probe && !/transparent|rgba\([^)]*,\s*0\)/.test(g.fillStyle)) probe = [x, y];
       }
     }
     cache.set(key, c);
+    if (probe) probes.set(key, probe);
     return c;
   }
 
@@ -2629,5 +2649,5 @@ window.Furniture = (() => {
     }
   }
 
-  return { ART, PAL, GLOW, THEMES, TANK_WATER, draw, size, thumb, bitmap, sky, drawFloorArea };
+  return { ART, PAL, GLOW, THEMES, TANK_WATER, draw, size, thumb, bitmap, sky, drawFloorArea , clearCache, verifyCache };
 })();

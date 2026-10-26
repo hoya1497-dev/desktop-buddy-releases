@@ -136,11 +136,9 @@
     $('musicAddBtn').textContent = own ? '넣기' : '신청';
     $('musicUrl').disabled = !M.hasRecord;
     $('musicHint').textContent = !M.hasRecord ? '레코드 플레이어는 상점 → 가구에서 살 수 있어요. 집에 두면 친구들과 같이 들을 수 있어요.'
-      : own ? '집주인이 넣은 노래는 친구들 신청곡보다 먼저 나와요. 친구 신청은 오른쪽에서 수락하면 대기열에 올라가요.'
+      : own ? '집주인이 넣은 노래는 친구들 신청곡보다 먼저 나와요. 대기열은 ⠿를 잡고 끌거나 ▲▼로 순서를 바꿀 수 있어요. 친구 신청은 오른쪽에서 수락하면 대기열에 올라가요.'
         : '유튜브 링크를 넣으면 집주인에게 신청돼요. 수락되면 대기열에 올라가 차례대로 나와요. 볼륨과 소리 끄기는 나한테만 적용돼요.';
-    const q = $('musicQueue'); q.textContent = '';
-    if (!M.queue.length) q.append(el('li', { class: 'note', text: '대기열이 비었어요' }));
-    for (const s of M.queue) q.append(songRow(s, own ? [smallBtn('✕', 'x', () => srv({ type: 'music-remove', id: s.id }), '대기열에서 빼기')] : []));
+    if (!drag) renderQueue();
     $('pendingTitle').textContent = own ? `📮 친구들 신청 (${M.pending.length})` : '📮 내가 신청한 노래';
     const p = $('musicPending'); p.textContent = '';
     if (!M.pending.length) p.append(el('li', { class: 'note', text: own ? '들어온 신청이 없어요' : '신청한 노래가 없어요' }));
@@ -150,6 +148,58 @@
         : [smallBtn('취소', 'ghost small', () => srv({ type: 'music-remove', id: s.id }))]));
     }
   }
+  // ---------------------------------------------------- 대기열: 집주인은 끌어서(또는 ▲▼로) 순서를 바꿀 수 있어요
+  let drag = null;   // { id, li }
+  function moveSong(id, to) {
+    const from = M.queue.findIndex((x) => x.id === id);
+    if (from < 0) return;
+    to = Math.max(0, Math.min(M.queue.length - 1, to));
+    if (to === from) return;
+    const [it] = M.queue.splice(from, 1);
+    M.queue.splice(to, 0, it);   // 서버 답을 기다리지 않고 바로 보여 줌
+    renderQueue();
+    srv({ type: 'music-move', id, to });
+  }
+  function renderQueue() {
+    const own = M?.isOwner;
+    const q = $('musicQueue'); q.textContent = '';
+    q.classList.toggle('sortable', !!own && M.queue.length > 1);
+    if (!M.queue.length) { q.append(el('li', { class: 'note', text: '대기열이 비었어요' })); return; }
+    M.queue.forEach((s, i) => {
+      const btns = own ? [
+        smallBtn('▲', 'x mv', () => moveSong(s.id, i - 1), '한 칸 위로'),
+        smallBtn('▼', 'x mv', () => moveSong(s.id, i + 1), '한 칸 아래로'),
+        smallBtn('✕', 'x', () => srv({ type: 'music-remove', id: s.id }), '대기열에서 빼기'),
+      ] : [];
+      if (own) { btns[0].disabled = i === 0; btns[1].disabled = i === M.queue.length - 1; }
+      const li = songRow(s, btns);
+      if (own && M.queue.length > 1) {
+        li.prepend(el('span', { class: 'grip', text: '⠿', title: '끌어서 순서 바꾸기' }));
+        li.draggable = true;
+        li.dataset.id = s.id;
+        li.addEventListener('dragstart', (e) => { drag = { id: s.id, li }; li.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', s.id); } catch {} });
+        li.addEventListener('dragend', () => { li.classList.remove('dragging'); clearMarks(); drag = null; render(); });
+        li.addEventListener('dragover', (e) => {
+          if (!drag || drag.id === s.id) return;
+          e.preventDefault();
+          const r = li.getBoundingClientRect(), below = e.clientY > r.top + r.height / 2;
+          clearMarks(); li.classList.add(below ? 'drop-below' : 'drop-above');
+        });
+        li.addEventListener('drop', (e) => {
+          if (!drag) return;
+          e.preventDefault();
+          const r = li.getBoundingClientRect(), below = e.clientY > r.top + r.height / 2;
+          const from = M.queue.findIndex((x) => x.id === drag.id);
+          let to = i + (below ? 1 : 0);
+          if (from < to) to--;
+          const id = drag.id; drag = null; clearMarks();
+          moveSong(id, to);
+        });
+      }
+      q.append(li);
+    });
+  }
+  const clearMarks = () => document.querySelectorAll('#musicQueue .drop-above, #musicQueue .drop-below').forEach((x) => x.classList.remove('drop-above', 'drop-below'));
   setInterval(() => { if (M?.current && !$('musicModal').classList.contains('closed')) render(); }, 1000);
 
   function open() {

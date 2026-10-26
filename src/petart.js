@@ -418,7 +418,7 @@ window.PetArt = (() => {
     const w = Math.max(...a.rows.map((r) => r.length)), h = a.rows.length;
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
-    const g = c.getContext('2d');
+    const g = c.getContext('2d', { willReadFrequently: true });
     a.rows.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.' && a.pal[ch]) { g.fillStyle = a.pal[ch]; g.fillRect(x, y, 1, 1); } }));
     cache.set(kind, c);
     return c;
@@ -439,11 +439,11 @@ window.PetArt = (() => {
     c.width = side; c.height = side;
     const bm = bitmap(kind);
     if (!bm) return c;
-    const g = c.getContext('2d');
+    const g = c.getContext('2d', { willReadFrequently: true });
     const k = Math.floor(side / Math.max(bm.width, bm.height));
     g.imageSmoothingEnabled = false;
     g.drawImage(bm, (side - bm.width * k) / 2, side - bm.height * k, bm.width * k, bm.height * k);
     return c;
   }
-  return { bitmap, draw, thumb, kinds: Object.keys(ART) };
+  return { bitmap, draw, thumb, kinds: Object.keys(ART), clearCache: () => cache.clear() };
 })();
