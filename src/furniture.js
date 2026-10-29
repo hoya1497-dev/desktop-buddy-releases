@@ -2590,13 +2590,13 @@ window.Furniture = (() => {
     hwWallHaunted:   { name: '폐가 방',     kind: 'event', wall: '#4a3a4a', floor: '#2e2436' },
     hwWallCandy:     { name: '캔디 방',     kind: 'event', wall: '#6a2e5a', floor: '#e0564f' },
     // 🎄 크리스마스 이벤트 전용
-    xmasWallSnow:      { name: '설경 방',     kind: 'event', wall: '#dff0fa', floor: '#eef6fb' },
+    xmasWallSnow:      { name: '설경 방',     kind: 'event', outdoor: true, wall: '#dff0fa', floor: '#eef6fb' },
     xmasWallFireplace: { name: '벽난로 방',   kind: 'event', wall: '#7a2e2a', floor: '#5c3a26' },
     xmasWallLights:    { name: '트리전구 방', kind: 'event', wall: '#1c3a2a', floor: '#2a5a3a' },
     xmasWallGift:      { name: '선물상자 방', kind: 'event', wall: '#2a5a4a', floor: '#c9962c' },
     xmasWallNorthPole: { name: '북극 방',     kind: 'event', wall: '#2a3a5a', floor: '#cfe6f7' },
     // 🧧 새해 이벤트 전용
-    nyWallFirework: { name: '불꽃놀이 방', kind: 'event', wall: '#1a1a38', floor: '#3a2a5a' },
+    nyWallFirework: { name: '불꽃놀이 방', kind: 'event', outdoor: true, wall: '#1a1a38', floor: '#3a2a5a' },
     nyWallGold:     { name: '금빛 방',     kind: 'event', wall: '#9c6f1e', floor: '#f4cf4f' },
     nyWallSunrise:  { name: '해돋이 방',   kind: 'event', wall: '#f0a24a', floor: '#e0564f' },
     nyWallConfetti: { name: '색종이 방',   kind: 'event', wall: '#f6a9bf', floor: '#7fd6e8' },

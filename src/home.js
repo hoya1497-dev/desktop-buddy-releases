@@ -381,19 +381,26 @@
     if (!v || ![1, 2].some((f) => !lightOn(v.home, f))) return;
     const dc = darkCanvas;
     if (dc.width !== RW) { dc.width = RW; dc.height = RH; }
+    // 실내 벽지(room)와 이벤트 벽지(event)는 불을 끄면 어두워져요.
+    // 초원 · 옥상, 그리고 바깥 풍경인 이벤트 벽지(outdoor: 설경 · 불꽃놀이)는 그대로.
+    const darkFloor = (f) => {
+      if (lightOn(v.home, f)) return false;
+      const theme = Furniture.THEMES[v.home['wall' + f]] || Furniture.THEMES.basic;
+      return (theme.kind === 'room' || theme.kind === 'event') && !theme.outdoor;
+    };
+    if (!darkFloor(1) && !darkFloor(2)) return;
     const g = dc.getContext('2d');
     g.clearRect(0, 0, RW, RH);
     g.globalCompositeOperation = 'source-over';
     for (const f of [1, 2]) {
-      const theme = Furniture.THEMES[v.home['wall' + f]] || Furniture.THEMES.basic;
-      if (theme.kind !== 'room' || lightOn(v.home, f)) continue;
+      if (!darkFloor(f)) continue;
       g.fillStyle = 'rgba(10,12,32,0.62)';
       // 2층은 아래 바닥판(층 사이)까지 같이 어둡게: 사이에 밝은 줄이 안 생기게
       g.fillRect(0, FLOORS[f].top, RW, (f === 2 ? FLOORS[1].top : FLOORS[f].bottom) - FLOORS[f].top);
     }
     g.globalCompositeOperation = 'destination-out';
     for (const it of layout) {
-      if (lightOn(v.home, floorOf(it.y))) continue;
+      if (!darkFloor(floorOf(it.y))) continue;
       const glow = Furniture.GLOW[it.item];
       const isWindow = /window/i.test(it.item);
       if (!glow && !isWindow) continue;
@@ -408,9 +415,30 @@
       g.fillStyle = grad;
       g.fillRect(cx - r, cy - r, r * 2, r * 2);
     }
+    // ✨ 이벤트 가구는 스스로 은은하게 빛나요: 가구 모양만큼 어둠을 걷어 내고 + 둘레에 시즌 색 빛무리
+    const glowing = layout.filter((it) => isEventItem(it.item) && darkFloor(floorOf(it.y)));
+    for (const it of glowing) {
+      const gm = geom(it), r = Math.max(gm.w, gm.h) * 0.75 + 6;
+      g.globalCompositeOperation = 'destination-out';
+      const halo = g.createRadialGradient(gm.cx, gm.cy, 2, gm.cx, gm.cy, r);
+      halo.addColorStop(0, 'rgba(0,0,0,0.5)'); halo.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = halo; g.fillRect(gm.cx - r, gm.cy - r, r * 2, r * 2);
+      g.globalAlpha = 0.8;   // 가구 자체는 거의 다 보이게
+      Furniture.draw(g, it.item, it.x, it.y, itemScale(it.item), it.rot || 0, !!it.flip);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+      const tint = g.createRadialGradient(gm.cx, gm.cy, 2, gm.cx, gm.cy, r);
+      tint.addColorStop(0, EVENT_GLOW[eventOf(it.item)] || EVENT_GLOW.other); tint.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = tint; g.fillRect(gm.cx - r, gm.cy - r, r * 2, r * 2);
+    }
     g.globalCompositeOperation = 'source-over';
     ctx.drawImage(dc, 0, 0, RW, RH);
   }
+  // 이벤트 가구인지: 카탈로그에 event 표시가 있거나 이름이 hw · xmas · ny 로 시작
+  const eventOf = (id) => (catalog.items[id] && catalog.items[id].event)
+    || (/^hw[A-Z]/.test(id) ? 'halloween' : /^xmas[A-Z]/.test(id) ? 'christmas' : /^ny[A-Z]/.test(id) ? 'newyear' : null);
+  const isEventItem = (id) => !!eventOf(id) && !!Furniture.ART[id];
+  const EVENT_GLOW = { halloween: 'rgba(255,150,60,0.22)', christmas: 'rgba(255,214,130,0.2)', newyear: 'rgba(255,205,90,0.22)', other: 'rgba(255,220,150,0.2)' };
 
   // 꾸미기 격자: 화면에서 너무 촘촘하면 몇 칸마다 한 줄씩, 8칸마다 진한 줄
   function drawGrid() {
