@@ -182,8 +182,11 @@
       const buttons = own
         ? [['2층', on2, () => buddy.send('wall', { item: id, floor: 2 }), 'ghost small'], ['1층', on1, () => buddy.send('wall', { item: id, floor: 1 }), 'ghost small']]
         : [['사기', ew.bal < w.price, () => srv({ type: 'buy', item: id })]];
-      const wr = row(H.wallThumb(id), w.name, sub, buttons);
-      if (w.event) evLists[w.event]?.walls.append(wr); else walls.append(wr);
+      // 끝난 이벤트 벽지: 상점에서는 빠지지만, 이미 산 건 일반 벽지 목록에서 계속 바를 수 있어요
+      const evOff = w.event && !evLists[w.event];
+      if (evOff && !own) continue;
+      const wr = row(H.wallThumb(id), w.name, evOff ? `${c.events?.[w.event]?.icon || '🎉'} 이벤트 벽지 · ${sub}` : sub, buttons);
+      if (w.event && !evOff) evLists[w.event].walls.append(wr); else walls.append(wr);
     }
   }
   function renderRodPick() {
