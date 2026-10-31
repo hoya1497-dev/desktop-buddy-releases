@@ -93,17 +93,42 @@
             <span id="musicVolText" class="note-inline"></span>
             <button id="musicSkip" class="ghost small" hidden>⏭ 다음 곡</button>
           </div>
+          <div class="row music-repeat" id="musicRepeat">
+            <button id="repOne" class="ghost small" title="지금 노래가 끝나면 같은 노래를 다시 틀어요">🔂 한 곡 반복</button>
+            <button id="repAll" class="ghost small" title="끝난 노래가 대기열 맨 뒤로 가서 전체가 계속 돌아요">🔁 전체 반복</button>
+            <span id="repText" class="note-inline"></span>
+          </div>
           <form id="musicForm" class="row">
             <input id="musicUrl" placeholder="유튜브 링크 붙여넣기 (예: https://youtu.be/...)" autocomplete="off">
             <button id="musicAddBtn" class="primary small">넣기</button>
+            <button id="musicFavBtn" type="button" class="ghost small" title="링크를 즐겨찾기에만 저장해요 (틀지 않음)">⭐ 저장</button>
           </form>
           <p id="musicHint" class="note"></p>
         </div>
         <div class="music-right">
-          <h3>⏳ 대기열</h3>
-          <ol id="musicQueue" class="music-list"></ol>
-          <h3 id="pendingTitle">📮 신청</h3>
-          <ul id="musicPending" class="music-list"></ul>
+          <div class="music-tabs" id="musicTabs">
+            <button data-mtab="queue" class="on">⏳ 대기열</button>
+            <button data-mtab="fav">⭐ 즐겨찾기</button>
+            <button data-mtab="bgm">🏠 배경음</button>
+          </div>
+          <div data-msec="queue">
+            <ol id="musicQueue" class="music-list"></ol>
+            <h3 id="pendingTitle">📮 신청</h3>
+            <ul id="musicPending" class="music-list"></ul>
+          </div>
+          <div data-msec="fav" hidden>
+            <p id="favNote" class="note"></p>
+            <ul id="musicFavs" class="music-list"></ul>
+          </div>
+          <div data-msec="bgm" hidden>
+            <div class="row bgm-top">
+              <button id="bgmToggle" class="ghost small"></button>
+              <button id="bgmAll" class="ghost small" title="고른 노래를 차례대로 돌려요">🔁 전체 반복</button>
+              <button id="bgmOne" class="ghost small" title="지금 배경음 한 곡만 계속">🔂 한 곡 반복</button>
+            </div>
+            <ol id="musicBgm" class="music-list"></ol>
+            <p id="bgmNote" class="note"></p>
+          </div>
         </div>
       </div>
     </div>

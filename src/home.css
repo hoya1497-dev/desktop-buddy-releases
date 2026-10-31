@@ -517,3 +517,20 @@ body.meeting-mode #room { cursor: default !important; }
 #musicQueue li button { border: 0; background: none; color: var(--muted); font-size: 11px; padding: 2px 4px; cursor: pointer; border-radius: 6px; }
 #musicQueue li button:hover:not(:disabled) { color: var(--accent); background: rgba(0,0,0,.05); }
 #musicQueue li button:disabled { opacity: .25; cursor: default; }
+
+/* 🎵 0.15: 반복 · 즐겨찾기 · 집 배경음 */
+.music-repeat { gap: 6px; align-items: center; margin: -2px 0 8px; flex-wrap: wrap; }
+.music-repeat button.on, .bgm-top button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.music-tabs { display: flex; gap: 4px; margin: 2px 0 8px; }
+.music-tabs button { flex: 1; border: 1px solid var(--line, rgba(0,0,0,.12)); background: none; color: var(--muted); border-radius: 8px; padding: 5px 4px; font-size: 12px; cursor: pointer; }
+.music-tabs button.on { border-color: var(--accent); color: var(--accent); font-weight: 700; background: rgba(0,0,0,.03); }
+.bgm-top { gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+#bgmToggle.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#musicFavs li button, #musicBgm li button, #musicQueue li .star, .now-playing .star { border: 0; background: none; color: var(--muted); font-size: 12px; padding: 2px 4px; cursor: pointer; border-radius: 6px; white-space: nowrap; }
+#musicFavs li button:hover:not(:disabled), #musicBgm li button:hover:not(:disabled), .now-playing .star:hover { color: var(--accent); background: rgba(0,0,0,.05); }
+#musicFavs li button:disabled, #musicBgm li button:disabled { opacity: .25; cursor: default; }
+#musicFavs li button.in { color: var(--accent); font-weight: 700; }
+.music-list .bgm-tag, .now-playing .bgm-tag { color: var(--accent); font-size: 10px; font-weight: 700; margin-right: 4px; }
+.now-playing .star { font-size: 15px; margin-left: 4px; }
+.now-playing .star.on { color: #e8a317; }
+.music-list .star.on { color: #e8a317 !important; }

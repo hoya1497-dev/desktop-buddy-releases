@@ -1046,9 +1046,11 @@
     renderKnock();
   }
   function placeNew(id, floor) {
-    const u = S.session.user;
     const def = catalog.items[id];
-    layout = u.home.items.map((x) => ({ ...x }));
+    // 지금 화면의 배치에 더해요. (예전엔 서버에서 마지막으로 받은 배치로 다시 시작해서,
+    // 방금 놓은 가구가 아직 저장 전이거나 저장이 안 됐으면 가방으로 돌아가 버렸음)
+    const max = catalog.limits?.furnitureMax || 60;
+    if (layout.length >= max) { toast(`가구는 한 집에 ${max}개까지 놓을 수 있어요. 다른 가구를 가방에 넣고 놓아 주세요.`); return; }
     const fl = FLOORS[floor];
     const y = def.wall ? Math.round(fl.top + (fl.wall - fl.top) * 0.6) : Math.round(rand(band(floor).min + 10, band(floor).max));
     const it = { item: id, x: Math.round(rand(140, LADDER_X - 80)), y, rot: 0, flip: false };

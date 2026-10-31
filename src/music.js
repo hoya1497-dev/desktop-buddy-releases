@@ -120,6 +120,82 @@
   function songRow(s, extra) {
     return el('li', {}, el('span', { class: 't' }, s.owner ? el('span', { class: 'own', text: '집주인 ' }) : null, s.title, el('small', { text: `${s.nick}(@${s.by})` })), ...(extra || []));
   }
+  // ---------------------------------------------------- ⭐ 즐겨찾기 · 🏠 배경음 (내 계정에 저장)
+  const mine = () => H.S?.session?.user?.music || { favs: [], bgm: { on: false, list: [], mode: 'all' }, repeat: 'off' };
+  const isFav = (vid) => mine().favs.some((f) => f.vid === vid);
+  function starBtn(s) {
+    const on = isFav(s.vid);
+    const b = smallBtn(on ? '★' : '☆', 'star' + (on ? ' on' : ''), () => srv({ type: 'music-fav', op: on ? 'del' : 'add', vid: s.vid, title: s.title }),
+      on ? '즐겨찾기에서 빼기' : '즐겨찾기에 저장 (다음엔 링크 없이 바로 틀 수 있어요)');
+    return b;
+  }
+  let tab = load('musicTab', 'queue');
+  function showTab(t) {
+    tab = t; store('musicTab', t);
+    for (const b of document.querySelectorAll('#musicTabs button')) b.classList.toggle('on', b.dataset.mtab === t);
+    for (const d of document.querySelectorAll('[data-msec]')) d.hidden = d.dataset.msec !== t;
+  }
+  for (const b of document.querySelectorAll('#musicTabs button')) b.onclick = () => showTab(b.dataset.mtab);
+  function renderFavs() {
+    const my = mine(), own = !!M?.isOwner, rec = !!M?.hasRecord;
+    const ul = $('musicFavs'); ul.textContent = '';
+    $('favNote').textContent = my.favs.length
+      ? (own ? `${my.favs.length}곡 · ▶ 지금 틀기 · ＋ 대기열에 넣기 · 🏠 우리 집 배경음으로 고르기` : `${my.favs.length}곡 · 신청을 누르면 링크 없이 바로 집주인에게 신청돼요 · 🏠는 우리 집 배경음`)
+      : '노래 옆 ☆를 누르거나, 링크를 넣고 ⭐ 저장을 누르면 여기에 모여요. 다음엔 링크 없이 바로 틀 수 있어요.';
+    for (const f of my.favs) {
+      const inBgm = my.bgm.list.includes(f.vid);
+      const li = el('li', {}, el('span', { class: 't' }, inBgm ? el('span', { class: 'bgm-tag', text: '🏠' }) : null, f.title));
+      if (own) {
+        li.append(smallBtn('▶', '', () => srv({ type: 'music-play', vid: f.vid, title: f.title }), '지금 바로 틀기'));
+        li.append(smallBtn('＋', '', () => srv({ type: 'music-add', vid: f.vid, title: f.title }), '대기열에 넣기'));
+      } else {
+        const r = smallBtn('신청', '', () => srv({ type: 'music-request', vid: f.vid, title: f.title }), '집주인에게 신청하기');
+        r.disabled = !rec; li.append(r);
+      }
+      const hb = smallBtn('🏠', inBgm ? 'in' : '', () => srv({ type: 'music-bgm', ...(inBgm ? { del: f.vid } : { add: f.vid }) }),
+        inBgm ? '우리 집 배경음에서 빼기' : '우리 집 배경음에 넣기');
+      li.append(hb);
+      li.append(smallBtn('✕', '', () => { if (confirm(`'${f.title}'을(를) 즐겨찾기에서 뺄까요?${inBgm ? '\n(배경음에서도 빠져요)' : ''}`)) srv({ type: 'music-fav', op: 'del', vid: f.vid }); }, '즐겨찾기에서 빼기'));
+      ul.append(li);
+    }
+  }
+  function renderBgm() {
+    const my = mine(), b = my.bgm;
+    const tg = $('bgmToggle');
+    tg.textContent = b.on ? '🏠 배경음 켜짐' : '🏠 배경음 꺼짐';
+    tg.classList.toggle('on', b.on);
+    tg.title = b.on ? '누르면 배경음을 꺼요' : '누르면 배경음을 켜요';
+    $('bgmAll').classList.toggle('on', b.mode === 'all');
+    $('bgmOne').classList.toggle('on', b.mode === 'one');
+    const ol = $('musicBgm'); ol.textContent = '';
+    if (!b.list.length) ol.append(el('li', { class: 'note', text: '⭐ 즐겨찾기 탭에서 🏠를 눌러 배경음을 골라요 (여러 곡 가능)' }));
+    b.list.forEach((vid, i) => {
+      const f = my.favs.find((x) => x.vid === vid);
+      const playing = M?.isOwner && M.current?.bgm && M.current.vid === vid;
+      const up = smallBtn('▲', '', () => srv({ type: 'music-bgm', move: { vid, to: i - 1 } }), '한 칸 위로');
+      const dn = smallBtn('▼', '', () => srv({ type: 'music-bgm', move: { vid, to: i + 1 } }), '한 칸 아래로');
+      up.disabled = i === 0; dn.disabled = i === b.list.length - 1;
+      ol.append(el('li', {}, el('span', { class: 't' }, playing ? el('span', { class: 'bgm-tag', text: '▶' }) : null, f ? f.title : vid), up, dn,
+        smallBtn('✕', '', () => srv({ type: 'music-bgm', del: vid }), '배경음에서 빼기')));
+    });
+    $('bgmNote').textContent = '우리 집에 레코드 플레이어가 있으면, 대기열이 비어 있을 때 배경음이 저절로 나와요(앱을 다시 켜도). '
+      + '대기열에 노래가 들어오면(내가 넣거나 친구 신청을 수락하면) 멈추고, 대기열이 다시 비면 이어서 나와요. 놀러 온 친구들도 같이 들어요.'
+      + (M && !M.isOwner ? ' 지금은 친구 집이라, 바꾼 설정은 우리 집에 돌아가면 적용돼요.' : '');
+  }
+  $('bgmToggle').onclick = () => srv({ type: 'music-bgm', on: !mine().bgm.on });
+  $('bgmAll').onclick = () => srv({ type: 'music-bgm', mode: 'all' });
+  $('bgmOne').onclick = () => srv({ type: 'music-bgm', mode: 'one' });
+  // 🔂 🔁 반복 (집주인만 바꿈, 친구는 상태만 봄)
+  function renderRepeat() {
+    const rep = M?.repeat || 'off', own = !!M?.isOwner;
+    $('repOne').hidden = $('repAll').hidden = !own;
+    $('repOne').classList.toggle('on', rep === 'one');
+    $('repAll').classList.toggle('on', rep === 'all');
+    $('repText').textContent = own ? '' : rep === 'one' ? '🔂 집주인이 한 곡 반복 중' : rep === 'all' ? '🔁 집주인이 전체 반복 중' : '';
+    $('musicRepeat').hidden = !own && rep === 'off';
+  }
+  $('repOne').onclick = () => srv({ type: 'music-repeat', mode: M?.repeat === 'one' ? 'off' : 'one' });
+  $('repAll').onclick = () => srv({ type: 'music-repeat', mode: M?.repeat === 'all' ? 'off' : 'all' });
   function render() {
     renderBtn();
     if (!M) return;
@@ -130,15 +206,19 @@
     const np = $('nowPlaying'); np.textContent = '';
     if (cur) {
       const el2 = (serverNow() - cur.startedAt) / 1000;
-      np.append(`▶ ${cur.title}`, el('small', { text: `${cur.owner ? '집주인' : cur.nick + '님 신청'} · ${cur.duration ? `${fmt(el2)} / ${fmt(cur.duration)}` : '재생 중'}` }));
-    } else np.textContent = M.hasRecord ? '대기열이 비었어요. 노래를 넣어 보세요!' : '이 집에는 레코드 플레이어가 없어요.';
+      const who = cur.bgm ? '🏠 집 배경음' : cur.owner ? '집주인' : cur.nick + '님 신청';
+      const rp = cur.bgm ? (M.bgm?.mode === 'one' ? ' · 🔂' : ' · 🔁') : M.repeat === 'one' ? ' · 🔂 한 곡 반복' : M.repeat === 'all' ? ' · 🔁 전체 반복' : '';
+      np.append(`▶ ${cur.title}`, starBtn(cur), el('small', { text: `${who}${rp} · ${cur.duration ? `${fmt(el2)} / ${fmt(cur.duration)}` : '재생 중'}` }));
+    } else np.textContent = M.hasRecord ? '대기열이 비었어요. 노래를 넣어 보세요! (⭐ 즐겨찾기에서 바로 틀 수도 있어요)' : '이 집에는 레코드 플레이어가 없어요.';
     $('musicSkip').hidden = !own || !cur;
     $('musicAddBtn').textContent = own ? '넣기' : '신청';
     $('musicUrl').disabled = !M.hasRecord;
     $('musicHint').textContent = !M.hasRecord ? '레코드 플레이어는 상점 → 가구에서 살 수 있어요. 집에 두면 친구들과 같이 들을 수 있어요.'
       : own ? '집주인이 넣은 노래는 친구들 신청곡보다 먼저 나와요. 대기열은 ⠿를 잡고 끌거나 ▲▼로 순서를 바꿀 수 있어요. 친구 신청은 오른쪽에서 수락하면 대기열에 올라가요.'
         : '유튜브 링크를 넣으면 집주인에게 신청돼요. 수락되면 대기열에 올라가 차례대로 나와요. 볼륨과 소리 끄기는 나한테만 적용돼요.';
+    if (cur?.bgm && own) $('musicHint').textContent = '🏠 지금은 집 배경음이 나오고 있어요. 노래를 넣으면 배경음이 멈추고 그 노래가 나와요. ' + $('musicHint').textContent;
     if (!drag) renderQueue();
+    renderRepeat(); renderFavs(); renderBgm();
     $('pendingTitle').textContent = own ? `📮 친구들 신청 (${M.pending.length})` : '📮 내가 신청한 노래';
     const p = $('musicPending'); p.textContent = '';
     if (!M.pending.length) p.append(el('li', { class: 'note', text: own ? '들어온 신청이 없어요' : '신청한 노래가 없어요' }));
@@ -167,11 +247,13 @@
     if (!M.queue.length) { q.append(el('li', { class: 'note', text: '대기열이 비었어요' })); return; }
     M.queue.forEach((s, i) => {
       const btns = own ? [
+        starBtn(s),
         smallBtn('▲', 'x mv', () => moveSong(s.id, i - 1), '한 칸 위로'),
         smallBtn('▼', 'x mv', () => moveSong(s.id, i + 1), '한 칸 아래로'),
         smallBtn('✕', 'x', () => srv({ type: 'music-remove', id: s.id }), '대기열에서 빼기'),
       ] : [];
-      if (own) { btns[0].disabled = i === 0; btns[1].disabled = i === M.queue.length - 1; }
+      if (!own) btns.push(starBtn(s));
+      if (own) { btns[1].disabled = i === 0; btns[2].disabled = i === M.queue.length - 1; }
       const li = songRow(s, btns);
       if (own && M.queue.length > 1) {
         li.prepend(el('span', { class: 'grip', text: '⠿', title: '끌어서 순서 바꾸기' }));
@@ -216,6 +298,28 @@
   $('musicMute').onclick = () => { muted = !muted; store('musicMuted', muted ? 1 : 0); applyVolume(); };
   $('musicVol').oninput = (e) => { vol = Number(e.target.value); if (vol > 0 && muted) { muted = false; store('musicMuted', 0); } store('musicVol', vol); applyVolume(); };
   $('musicSkip').onclick = () => srv({ type: 'music-skip' });
+  // 링크 → { vid, title } (틀 수 없는 영상이면 null)
+  async function lookUp() {
+    const vid = parseVid($('musicUrl').value);
+    if (!vid) { $('musicHint').textContent = '유튜브 링크를 넣어 주세요. (youtube.com/watch?v=… 또는 youtu.be/…)'; return null; }
+    const info = await buddy.invoke('yt-info', vid).catch(() => null);
+    if (info && info.ok === false && (info.status === 401 || info.status === 403 || info.status === 404)) {
+      $('musicHint').textContent = '이 영상은 다른 곳에서 틀 수 없게 막혀 있거나 없는 영상이에요. 다른 영상을 넣어 주세요.';
+      return null;
+    }
+    return { vid, title: info?.title || `YouTube 영상 (${vid})` };
+  }
+  $('musicFavBtn').onclick = async () => {
+    $('musicFavBtn').disabled = true;
+    const r = await lookUp();
+    $('musicFavBtn').disabled = false;
+    if (!r) return;
+    if (isFav(r.vid)) { H.toast('이미 즐겨찾기에 있는 노래예요'); return; }
+    srv({ type: 'music-fav', op: 'add', vid: r.vid, title: r.title });
+    $('musicUrl').value = '';
+    H.toast(`⭐ 즐겨찾기에 저장했어요: ${r.title}`);
+    showTab('fav');
+  };
   $('musicForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const vid = parseVid($('musicUrl').value);
@@ -248,7 +352,9 @@
       if (code) srv({ type: 'music-get' });
     }
     renderBtn();
+    if (M && !$('musicModal').classList.contains('closed')) render();   // ⭐ 즐겨찾기 · 🏠 배경음 바뀐 것 보여 주기
   });
+  showTab(['queue', 'fav', 'bgm'].includes(tab) ? tab : 'queue');
   applyVolume();
   window.Music = { open, parseVid };
 })();
