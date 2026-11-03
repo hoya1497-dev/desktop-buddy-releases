@@ -12,7 +12,7 @@ const SEND = [
   'join-room', 'open-my-room', 'leave-room', 'send-chat', 'emote', 'home-pos',
   'buy', 'place', 'wall', 'feed', 'pat', 'lock', 'kick',
   'friend-add', 'friend-accept', 'friend-decline', 'friend-remove', 'visit', 'knock', 'knock-answer', 'invite-answer',
-  'skin-set', 'light', 'gift', 'overlay-focus', 'set-theme',
+  'skin-set', 'light', 'gift', 'overlay-focus', 'set-theme', 'set-bubble',
   'update-install', 'update-open', 'update-check', 'srv',
   // 캐릭터 메뉴 · 타이머 · 미니맵
   'char-menu', 'open-home', 'timer-cmd', 'timer-pin', 'mini-pin', 'sticky-pin', 'sticky-save', 'widget-size', 'widget-close', 'timer-sound', 'timer-test', 'fishing-view',

@@ -48,6 +48,14 @@
         set('--card', rgba(c.card, dark ? 0.78 : 0.74));
       } else set('--card', c.card);
     } else delete root.dataset.base;
+    // 0.17 💬 말풍선 색 따로 (글자색은 밝기 보고 자동)
+    for (const v of ['--bubble-mine', '--bubble-mine-ink', '--bubble-theirs', '--bubble-theirs-ink']) root.style.removeProperty(v);
+    const b = (p && p.bubble) || {};
+    if (b.on && /^#[0-9a-f]{6}$/i.test(b.mine || '') && /^#[0-9a-f]{6}$/i.test(b.theirs || '')) {
+      root.style.setProperty('--bubble-mine', b.mine); root.style.setProperty('--bubble-mine-ink', lum(b.mine) > 0.62 ? '#26222b' : '#ffffff');
+      root.style.setProperty('--bubble-theirs', b.theirs); root.style.setProperty('--bubble-theirs-ink', lum(b.theirs) > 0.62 ? '#26222b' : '#ffffff');
+    }
+    window.buddyBubble = b;
     window.buddyTheme = mode;
     window.buddyThemeCustom = c;
     document.dispatchEvent(new CustomEvent('buddy-theme', { detail: mode }));

@@ -58,6 +58,12 @@
   let prof = null;      // 서버에 저장된 내 프로필
   let draft = {};       // 아직 저장 안 한 바뀐 것
   const view = () => ({ ...prof, ...draft });
+  let previewOthers = false;
+  for (const b of document.querySelectorAll('#pfViewToggle button')) b.onclick = () => {
+    previewOthers = b.dataset.v === '1';
+    document.querySelectorAll('#pfViewToggle button').forEach((x) => x.classList.toggle('on', x === b));
+    renderProfile();
+  };
   function renderProfile() {
     const box = $('profilePreview');
     $('profileEdit').hidden = !account;
@@ -65,7 +71,7 @@
     if (!prof) { box.textContent = ''; box.append(el('p', { class: 'note', text: '불러오는 중…' })); return; }
     const v = view();
     box.textContent = '';
-    box.append(ProfileCard.render(v, catalog));
+    box.append(ProfileCard.render(v, catalog, { asOthers: previewOthers }));
     const th = $('pfThemes'); th.textContent = '';
     for (const [k, t] of Object.entries(ProfileCard.THEMES)) {
       const b = el('button', { type: 'button', class: 'pf-theme' + (v.theme === k ? ' on' : ''), title: t.name, onclick: () => { draft.theme = k; dirty(); } });
@@ -102,13 +108,87 @@
   let pickFor = null;
   $('pfAvatarPick').onclick = () => { pickFor = 'avatar'; $('pfFile').value = ''; $('pfFile').click(); };
   $('pfBgPick').onclick = () => { pickFor = 'bg'; $('pfFile').value = ''; $('pfFile').click(); };
+  let cropBack = null;   // 그리기 판에서 '사진 넣기'로 왔으면 끝나고 그리기 판으로
   $('pfFile').onchange = async () => {
     const f = $('pfFile').files[0]; if (!f) return;
-    try {
-      const S = pickFor === 'bg' ? ProfileCard.BG : ProfileCard.AVATAR;
-      draft[pickFor] = await ProfileCard.shrink(f, S.w, S.h, S.max);
-      dirty();
-    } catch (e) { $('pfMsg').textContent = e.message || '그림을 열지 못했어요.'; }
+    try { await openCrop(pickFor, f); }
+    catch (e) { $('pfMsg').textContent = e.message || '그림을 열지 못했어요.'; }
+  };
+
+  // ---------------------------------------------------- ✂️ 사진 맞추기
+  const cc = $('cropCanvas'), cg = cc.getContext('2d');
+  let crop = null;   // { target, img, k, kMin, kMax, ox, oy } — ox/oy: 사진 가운데가 틀 가운데에서 얼마나 (틀 기준 px)
+  async function openCrop(target, file) {
+    if (!/^image\//.test(file.type)) throw new Error('그림 파일만 넣을 수 있어요.');
+    const img = await createImageBitmap(file);
+    const S = target === 'bg' ? ProfileCard.BG : ProfileCard.AVATAR;
+    const DW = target === 'bg' ? 380 : 240, DH = Math.round(DW * S.h / S.w);
+    cc.width = DW * 2; cc.height = DH * 2; cc.style.width = DW + 'px'; cc.style.height = DH + 'px';
+    const cover = Math.max(DW / img.width, DH / img.height), contain = Math.min(DW / img.width, DH / img.height);
+    crop = { target, img, S, DW, DH, cover, contain, kMin: contain * 0.6, kMax: cover * 5, k: cover, ox: 0, oy: 0 };
+    $('cropTitle').textContent = target === 'bg' ? '✂️ 배경 사진 맞추기' : '✂️ 프로필 사진 맞추기';
+    cc.classList.toggle('round', target !== 'bg');
+    syncZoom(); drawCrop();
+    $('cropPad').hidden = false;
+  }
+  const zoomToSlider = (k) => Math.round(1000 * Math.log(k / crop.kMin) / Math.log(crop.kMax / crop.kMin));
+  const sliderToZoom = (v) => crop.kMin * Math.pow(crop.kMax / crop.kMin, v / 1000);
+  function syncZoom() { $('cropZoom').value = zoomToSlider(crop.k); }
+  function paint(g, scale) {   // scale: 틀(화면) → 결과 그림 배율
+    const { img, k, ox, oy, DW, DH } = crop;
+    g.save(); g.scale(scale, scale);
+    g.fillStyle = $('cropFill').value; g.fillRect(0, 0, DW, DH);
+    g.imageSmoothingQuality = 'high';
+    const w = img.width * k, h = img.height * k;
+    g.drawImage(img, DW / 2 + ox - w / 2, DH / 2 + oy - h / 2, w, h);
+    g.restore();
+  }
+  function drawCrop() {
+    cg.setTransform(1, 0, 0, 1, 0, 0); cg.clearRect(0, 0, cc.width, cc.height);
+    paint(cg, 2);
+    if (crop.target !== 'bg') {   // 프로필 사진은 동그랗게 보이니 바깥은 어둡게
+      cg.save(); cg.fillStyle = 'rgba(0,0,0,.45)'; cg.beginPath(); cg.rect(0, 0, cc.width, cc.height);
+      cg.arc(cc.width / 2, cc.height / 2, cc.width / 2 - 2, 0, Math.PI * 2, true); cg.fill('evenodd'); cg.restore();
+    }
+  }
+  function zoomAt(nk, px = crop.DW / 2, py = crop.DH / 2) {   // (px,py) 를 기준으로 크게 · 작게
+    nk = Math.max(crop.kMin, Math.min(crop.kMax, nk));
+    const r = nk / crop.k;
+    crop.ox = (crop.ox - (px - crop.DW / 2)) * r + (px - crop.DW / 2);
+    crop.oy = (crop.oy - (py - crop.DH / 2)) * r + (py - crop.DH / 2);
+    crop.k = nk; syncZoom(); drawCrop();
+  }
+  $('cropZoom').oninput = (e) => zoomAt(sliderToZoom(Number(e.target.value)));
+  cc.addEventListener('wheel', (e) => { e.preventDefault(); const r = cc.getBoundingClientRect(); zoomAt(crop.k * (e.deltaY < 0 ? 1.08 : 1 / 1.08), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+  let dragC = null;
+  cc.addEventListener('pointerdown', (e) => { cc.setPointerCapture(e.pointerId); dragC = { x: e.clientX, y: e.clientY, ox: crop.ox, oy: crop.oy }; });
+  cc.addEventListener('pointermove', (e) => { if (!dragC) return; crop.ox = dragC.ox + e.clientX - dragC.x; crop.oy = dragC.oy + e.clientY - dragC.y; drawCrop(); });
+  for (const ev of ['pointerup', 'pointercancel']) cc.addEventListener(ev, () => { dragC = null; });
+  $('cropCover').onclick = () => { crop.k = crop.cover; crop.ox = crop.oy = 0; syncZoom(); drawCrop(); };
+  $('cropContain').onclick = () => { crop.k = crop.contain; crop.ox = crop.oy = 0; syncZoom(); drawCrop(); };
+  $('cropCenter').onclick = () => { crop.ox = crop.oy = 0; drawCrop(); };
+  $('cropFill').oninput = drawCrop;
+  const closeCrop = () => { $('cropPad').hidden = true; crop?.img.close?.(); crop = null; };
+  $('cropClose').onclick = () => { const back = cropBack; cropBack = null; closeCrop(); if (back) $('drawPad').hidden = false; };
+  function cropResult() {
+    const { S, DW } = crop;
+    const c = document.createElement('canvas'); c.width = S.w; c.height = S.h;
+    paint(c.getContext('2d'), S.w / DW);
+    return c;
+  }
+  $('cropDone').onclick = async () => {
+    const target = crop.target, c = cropResult();
+    if (cropBack) {   // 그리기 판으로 돌아가서 그 위에 계속 그리기
+      cropBack = null; closeCrop();
+      snap(); g.drawImage(c, 0, 0, cv.width, cv.height); $('drawPad').hidden = false; return;
+    }
+    try { draft[target] = await ProfileCard.shrink(c.toDataURL('image/png'), crop.S.w, crop.S.h, crop.S.max); closeCrop(); dirty(); }
+    catch (e) { $('pfMsg').textContent = e.message; }
+  };
+  $('cropDraw').onclick = () => {   // 맞춘 사진을 그리기 판에 올려서 그 위에 그리기
+    const target = crop.target, c = cropResult();
+    closeCrop();
+    openPad(target).then(() => { g.drawImage(c, 0, 0, cv.width, cv.height); });
   };
   $('pfSave').onclick = () => {
     if (!Object.keys(draft).length) return;
@@ -146,6 +226,15 @@
       const src = view()[drawFor];
       if (src) await new Promise((res) => { const i = new Image(); i.onload = () => { g.drawImage(i, 0, 0, cv.width, cv.height); res(); }; i.onerror = res; i.src = src; });
     }
+  };
+  $('drawPhoto').onclick = () => {   // 그리기 판에서 사진 넣기 → 맞추고 → 다시 그리기 판
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp,image/gif,image/bmp';
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      try { cropBack = true; $('drawPad').hidden = true; await openCrop(drawFor, f); }
+      catch (e) { cropBack = null; $('drawPad').hidden = false; $('pfMsg').textContent = e.message; }
+    };
+    inp.click();
   };
   $('pfAvatarDraw').onclick = () => openPad('avatar');
   $('pfBgDraw').onclick = () => openPad('bg');

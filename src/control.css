@@ -201,3 +201,8 @@ input.slot-name:hover, input.slot-name:focus { border-color: var(--line); backgr
 .pf-custom { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 10px; margin-top: 8px; padding: 8px; border: 1px dashed var(--line); border-radius: 10px; }
 .pf-custom label { display: flex; align-items: center; justify-content: space-between; margin: 0; }
 .pf-custom input[type=color] { width: 40px; height: 28px; }
+
+/* ✂️ 사진 맞추기 */
+.crop-stage { display: flex; justify-content: center; padding: 8px; border-radius: 10px; background: repeating-conic-gradient(var(--line) 0 25%, transparent 0 50%) 0 0 / 14px 14px; }
+#cropCanvas { cursor: grab; touch-action: none; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
+#cropCanvas:active { cursor: grabbing; }

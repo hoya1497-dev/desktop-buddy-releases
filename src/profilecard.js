@@ -36,6 +36,12 @@ window.ProfileCard = (() => {
   }
   function themeOf(p) { return p.theme === 'custom' ? customTheme(p.custom) : THEMES[p.theme] || THEMES.cream; }
   function render(p, cat, opts = {}) {
+    // opts.asOthers: 내 프로필을 '친구에게 보이는 모습'으로 (숨긴 도감은 안 보임)
+    if (opts.asOthers && p.self) {
+      p = { ...p, self: false, friend: false };
+      if (!p.showFish) delete p.fish;
+      if (!p.showPets) delete p.pets;
+    }
     const th = themeOf(p);
     const card = el('div', { class: 'pcard', style: `--pc-accent:${th.accent};--pc-ink:${th.ink};--pc-card:${th.card}` });
     const banner = el('div', { class: 'pcard-banner', style: p.bg ? `background-image:url("${p.bg}")` : `background:${th.bg}` });
@@ -57,8 +63,10 @@ window.ProfileCard = (() => {
 
     // 🐟 물고기 도감
     const fishAll = cat && cat.fish ? Object.entries(cat.fish).filter(([, f]) => f.cat !== 'T') : [];
-    const sec = (title, count, hidden, grid) => el('div', { class: 'pcard-sec' },
-      el('div', { class: 'pcard-sec-h' }, el('span', { text: title }), el('small', { text: hidden ? '🔒 비공개' : count })),
+    // onlyMe: 내 프로필인데 숨겨 둔 도감 → 흐리게 + '🔒 숨김 · 나만 보여요'
+    const sec = (title, count, hidden, grid, onlyMe) => el('div', { class: 'pcard-sec' + (onlyMe ? ' only-me' : '') },
+      el('div', { class: 'pcard-sec-h' }, el('span', { text: title }),
+        el('small', { text: hidden ? '🔒 비공개' : onlyMe ? `🔒 숨김 · 나만 보여요 · ${count}` : count })),
       hidden ? null : grid);
     if (p.fish) {
       const got = new Set(p.fish);
@@ -68,7 +76,7 @@ window.ProfileCard = (() => {
       }
       if (!grid.children.length) grid.append(el('span', { class: 'pcard-none', text: '아직 잡은 물고기가 없어요.' }));
       const n = fishAll.length ? fishAll.filter(([code]) => got.has(code)).length : p.fish.length;
-      body.append(sec('🐟 물고기 도감', fishAll.length ? `${n}/${fishAll.length}` : `${n}종`, false, grid));
+      body.append(sec('🐟 물고기 도감', fishAll.length ? `${n}/${fishAll.length}` : `${n}종`, false, grid, p.self && !p.showFish));
     } else body.append(sec('🐟 물고기 도감', '', true));
     if (p.pets) {
       const grid = el('div', { class: 'pcard-grid' });
@@ -78,7 +86,7 @@ window.ProfileCard = (() => {
         grid.append(c);
       }
       if (!p.pets.length) grid.append(el('span', { class: 'pcard-none', text: '아직 키우는 펫이 없어요.' }));
-      body.append(sec('🐾 펫 도감', `${p.pets.length}종`, false, grid));
+      body.append(sec('🐾 펫 도감', `${p.pets.length}종`, false, grid, p.self && !p.showPets));
     } else body.append(sec('🐾 펫 도감', '', true));
     if (opts.extra) body.append(opts.extra);
     card.append(body);

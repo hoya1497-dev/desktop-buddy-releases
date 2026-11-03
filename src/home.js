@@ -1096,9 +1096,22 @@
     $('decoBtn').classList.toggle('on', decorating);
     $('decoBtn').textContent = decorating ? '✅ 꾸미기 끝' : '✏️ 꾸미기';
     $('decoHint').hidden = !decorating;
+    $('decoReset').hidden = !decorating;
     if (!decorating) selected = null;
     if (decorating) { closeComputer(); $('friends').hidden = true; }
     renderSel();
+  };
+  // 0.17 🧹 처음 상태로: 가구는 전부 가방에, 벽지는 기본 (컴퓨터 · 침대처럼 처음 받은 가구만 처음 자리에)
+  $('decoReset').onclick = () => {
+    const v = viewing();
+    if (!v || !v.editable || !catalog) return;
+    const n = layout.filter((it) => !catalog.items[it.item]?.free).length;
+    if (!confirm(`집을 처음 상태로 되돌릴까요?\n\n· 놓은 가구 ${n}개는 전부 가방으로 들어가요 (없어지지 않아요)\n· 1층 · 2층 벽지, 방마다 벽지도 기본 벽지로\n· 컴퓨터 · 침대는 처음 자리로\n\n지금 꾸밈을 남기고 싶으면 먼저 🎒 가방 → 💾 인테리어 슬롯에 저장하세요.`)) return;
+    layout = Object.entries(catalog.items).filter(([, d]) => d.free && d.start).map(([id, d]) => ({ item: id, ...d.start, rot: 0, flip: false }));
+    selected = null; renderSel();
+    saveLayout(true);
+    for (const floor of [1, 2]) if ((v.home['wall' + floor] || 'basic') !== 'basic') buddy.send('wall', { item: 'basic', floor });
+    toast('🧹 처음 상태로 되돌렸어요. 가구는 가방에 있어요');
   };
   for (const b of $('lightBtn').querySelectorAll('button')) b.onclick = () => {
     const v = viewing();
@@ -1127,7 +1140,26 @@
       $('tc-aurora').checked = !!c.aurora;
     }
     $('auroraColors').hidden = !$('tc-aurora').checked;
+    const bub = window.buddyBubble || {};
+    if (!bubEditing) { $('bubOn').checked = !!bub.on; if (bub.mine) $('bubMine').value = bub.mine; if (bub.theirs) $('bubTheirs').value = bub.theirs; }
+    $('bubBox').hidden = !$('bubOn').checked;
   };
+  // 💬 말풍선 색 (0.17)
+  let bubEditing = false, bubTimer = null;
+  const sendBubble = () => {
+    clearTimeout(bubTimer); bubEditing = true;
+    $('bubBox').hidden = !$('bubOn').checked;
+    bubTimer = setTimeout(() => { buddy.send('set-bubble', { on: $('bubOn').checked, mine: $('bubMine').value, theirs: $('bubTheirs').value }); setTimeout(() => { bubEditing = false; }, 300); }, 80);
+  };
+  for (const id of ['bubOn', 'bubMine', 'bubTheirs']) $(id).addEventListener('input', sendBubble);
+  const BUB_PRESETS = { '🍑 복숭아': ['#ff9a7a', '#fff1ea'], '💙 하늘': ['#4a9eff', '#eef4ff'], '💚 민트': ['#3fbf8f', '#ecfbf4'], '💜 라벤더': ['#9b7cf0', '#f3efff'], '🖤 모노': ['#2e2a33', '#f1f0f2'], '🌙 밤': ['#7a6cff', '#2b2d45'] };
+  for (const [name, [m, t]] of Object.entries(BUB_PRESETS)) {
+    const b = document.createElement('button'); b.className = 'ghost small'; b.type = 'button';
+    const i1 = document.createElement('i'); i1.style.background = m; const i2 = document.createElement('i'); i2.style.background = t;
+    b.append(i1, i2, ' ' + name);
+    b.onclick = () => { $('bubMine').value = m; $('bubTheirs').value = t; sendBubble(); };
+    $('bubPresets').append(b);
+  }
   let themeEditing = false, themeTimer = null;
   const readCustom = () => {
     const c = { aurora: $('tc-aurora').checked };
@@ -1309,27 +1341,73 @@
     const close = document.createElement('button'); close.className = 'ghost small'; close.textContent = '닫기';
     close.onclick = () => { $('profileModal').hidden = true; };
     extra.append(close);
-    box.append(ProfileCard.render(m, catalog, { extra }));
+    let asOthers = false;
+    const draw = () => {
+      box.querySelector('.pcard')?.remove();
+      box.append(ProfileCard.render(m, catalog, { extra, asOthers }));
+    };
+    if (m.self) {   // 내 프로필: 숨긴 도감이 정말 숨겨졌는지 '친구에게 보이는 모습'으로 확인
+      const tg = document.createElement('div'); tg.className = 'pcard-view-toggle';
+      for (const [label, v] of [['🙋 내가 보는 모습', false], ['👀 친구에게 보이는 모습', true]]) {
+        const b = document.createElement('button'); b.textContent = label; b.classList.toggle('on', v === asOthers);
+        b.onclick = () => { asOthers = v; tg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); draw(); };
+        tg.append(b);
+      }
+      box.append(tg);
+    }
+    draw();
     $('profileModal').hidden = false;
   });
   $('profileModal').addEventListener('click', (e) => { if (e.target === $('profileModal')) $('profileModal').hidden = true; });
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('profileModal').hidden) $('profileModal').hidden = true; });
 
-  function addMsg(m) {
+  // 0.17 💬 말풍선 채팅: 내가 보낸 건 오른쪽, 남이 보낸 건 왼쪽 (이름은 말풍선 위)
+  // 같은 사람이 이어서 보내면(2분 안) 이름은 한 번만
+  let lastFrom = null, lastAt = 0;
+  const myName = () => (S?.session?.user?.username || '').toLowerCase();
+  const isMine = (m) => !!(m.mine || m.pid === 'me' || (m.username && m.username.toLowerCase() === myName()));
+  function chatShell(m, mine, inner, extraClass = '') {
     const div = document.createElement('div');
-    if (m.system) { div.className = 'msg sys'; div.append(document.createTextNode(m.text), timeTag(m.ts)); }
-    else {
-      div.className = 'msg';
-      const b = nameTag(m);
-      let body = document.createTextNode(m.text);
-      if (m.emote) {   // 그림 이모티콘은 채팅 로그에도 그림으로
-        body = document.createElement('img');
-        body.src = `assets/emotes/${m.emote}.png`;
-        body.style.cssText = 'height:40px;width:auto;vertical-align:middle;margin-left:4px;';
-      }
-      div.append(b, body, timeTag(m.ts));
+    div.className = 'msg ' + (mine ? 'mine' : 'theirs') + (extraClass ? ' ' + extraClass : '');
+    const key = mine ? 'me' : (m.username || m.pid || m.from);
+    const ts = m.ts || Date.now();
+    if (key === lastFrom && ts - lastAt < 120_000) div.classList.add('cont');
+    else if (!mine) { const head = document.createElement('div'); head.className = 'msg-head'; head.append(nameTag(m)); div.append(head); }
+    lastFrom = key; lastAt = ts;
+    const row = document.createElement('div'); row.className = 'msg-row';
+    row.append(inner, timeTag(m.ts));
+    div.append(row);
+    return div;
+  }
+  function addMsg(m) {
+    if (m.system) {
+      const div = document.createElement('div');
+      div.className = 'msg sys'; div.append(document.createTextNode(m.text), timeTag(m.ts));
+      lastFrom = null;
+      appendMsg(div);
+      return;
     }
+    const mine = isMine(m);
+    const bub = document.createElement('div');
+    if (m.emote) {   // 그림 이모티콘은 말풍선 없이 그림만
+      bub.className = 'bubble emote-bubble';
+      const img = document.createElement('img'); img.src = `assets/emotes/${m.emote}.png`; img.alt = '';
+      bub.append(img);
+    } else { bub.className = 'bubble'; bub.textContent = m.text; }
+    appendMsg(chatShell(m, mine, bub));
+  }
+  function photoMsg(m, mine) {
+    const img = document.createElement('img');
+    img.className = 'chat-photo'; img.alt = '사진'; img.src = m.data;
+    img.title = '눌러서 크게 보기';
+    img.onclick = () => openPhoto(m.data, `${m.from || ''} · 이 방에서만 보여요`);
+    img.onload = () => { const log = $('chatLog'); if (log.scrollHeight - log.scrollTop - log.clientHeight < 260) log.scrollTop = log.scrollHeight; };
+    const bub = document.createElement('div'); bub.className = 'bubble photo-bubble'; bub.append(img);
+    const div = chatShell(m, mine, bub, 'photo-msg');
     appendMsg(div);
+    // 너무 많이 쌓이면 오래된 사진부터 빼기 (메모리)
+    if (++photoN > PHOTO_KEEP) dropPhotos(photoN - PHOTO_KEEP);
+    return div;
   }
   function appendMsg(div) {
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
@@ -1376,22 +1454,6 @@
     }
     bmp.close?.();
     throw new Error('사진을 충분히 줄이지 못했어요. 다른 사진으로 해 주세요.');
-  }
-  function photoMsg(m, mine) {
-    const div = document.createElement('div');
-    div.className = 'msg photo-msg';
-    const b = nameTag(m);
-    const img = document.createElement('img');
-    img.className = 'chat-photo'; img.alt = '사진'; img.src = m.data;
-    img.title = '눌러서 크게 보기';
-    img.onclick = () => openPhoto(m.data, `${m.from || ''} · 이 방에서만 보여요`);
-    img.onload = () => { const log = $('chatLog'); if (log.scrollHeight - log.scrollTop - log.clientHeight < 260) log.scrollTop = log.scrollHeight; };
-    div.append(b, timeTag(m.ts), img);
-    if (mine) div.classList.add('mine');
-    appendMsg(div);
-    // 너무 많이 쌓이면 오래된 사진부터 빼기 (메모리)
-    if (++photoN > PHOTO_KEEP) dropPhotos(photoN - PHOTO_KEEP);
-    return div;
   }
   function dropPhotos(n = Infinity, why = '(지난 사진)') {
     for (const img of document.querySelectorAll('#chatLog img.chat-photo, #fishChatLog img.chat-photo')) {

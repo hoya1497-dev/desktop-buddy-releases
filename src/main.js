@@ -43,6 +43,7 @@ const DEFAULT_CONFIG = {
   theme: 'system',   // 'system' | 'light' | 'dark' | 'aurora' | 'custom'
   // 사용자 지정 색: 배경 · 카드 · 글자 · 강조색, 오로라(파스텔 그라데이션)를 켜면 그 3가지 색으로
   themeCustom: { bg: '#f6f3ee', card: '#ffffff', ink: '#26222b', accent: '#e8894a', aurora: false, a1: '#ffd1e8', a2: '#cfc4ff', a3: '#bff0e0' },
+  bubble: { on: false, mine: '#e8894a', theirs: '#ffffff' },   // 0.17 💬 말풍선 색 따로 (꺼 두면 화면 모드 색)
   autoStart: true,
   showPetsDesktop: true,   // 꺼내 둔 펫이 바탕화면에서도 캐릭터를 따라다님
   showAllPets: false,      // 친구들 펫 전부 보기 (꺼내 두지 않은 펫까지)
@@ -882,7 +883,7 @@ const EMOTE_LABEL = { wave: '👋 안녕!', bye: '🚶 잘가!', zzz: '💤 잘�
 const EMOTES = [['wave', '👋 안녕'], ['bye', '🚶 잘가'], ['zzz', '💤 잘자'], ['good', '👍 굿'], ['dislike', '👎 싫어'], ['heart', '💖 좋아'], ['cheer', '🎉 응원']];
 const POSES = ['auto', 'stand', 'sit', 'lie'];
 const THEME_MODES = ['system', 'light', 'dark', 'aurora', 'custom'];
-const themePayload = () => ({ mode: THEME_MODES.includes(config.theme) ? config.theme : 'system', custom: { ...DEFAULT_CONFIG.themeCustom, ...(config.themeCustom || {}) } });
+const themePayload = () => ({ mode: THEME_MODES.includes(config.theme) ? config.theme : 'system', custom: { ...DEFAULT_CONFIG.themeCustom, ...(config.themeCustom || {}) }, bubble: { ...DEFAULT_CONFIG.bubble, ...(config.bubble || {}) } });
 function setPose(v) {
   if (!POSES.includes(v)) return;
   config.pose = v; saveConfig();
@@ -1288,6 +1289,14 @@ function registerIpc() {
   ipcMain.on('update-install', () => { if (updateState.state === 'ready') installUpdate(); });
   ipcMain.on('update-open', () => updater.openDownload());
   ipcMain.on('update-check', () => updater.check());
+  ipcMain.on('set-bubble', (_e, b) => {   // 0.17 💬 말풍선 색 (내 화면에만)
+    const hex = (v, d) => (/^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : d);
+    const d = DEFAULT_CONFIG.bubble;
+    config.bubble = { on: !!(b && b.on), mine: hex(b && b.mine, d.mine), theirs: hex(b && b.theirs, d.theirs) };
+    saveConfig();
+    const p = themePayload();
+    for (const w of [home, control, login, mini, timerWin, stickyWin]) if (w && !w.isDestroyed()) w.webContents.send('theme', p);
+  });
   ipcMain.on('set-theme', (_e, t) => {
     const mode = typeof t === 'string' ? t : t && t.mode;
     if (!THEME_MODES.includes(mode)) return;

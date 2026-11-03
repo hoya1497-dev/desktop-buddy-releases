@@ -18,3 +18,11 @@
 .pcard-grid { display: flex; flex-wrap: wrap; gap: 3px; max-height: 106px; overflow-y: auto; padding: 4px; border-radius: 8px; background: color-mix(in srgb, var(--pc-ink) 5%, transparent); }
 .pcard-grid canvas { image-rendering: pixelated; width: 28px; height: 28px; }
 .pcard-none { font-size: 11px; opacity: .6; padding: 4px; }
+
+.pcard-sec.only-me .pcard-grid { opacity: .45; filter: grayscale(.6); }
+.pcard-sec.only-me .pcard-sec-h small { color: #d65151; opacity: 1; font-weight: 700; }
+.pcard-view-toggle { display: flex; gap: 4px; justify-content: center; margin: 0 0 8px; }
+.pcard-view-toggle button { font-size: 11px; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--input); color: var(--muted); cursor: pointer; }
+.pcard-view-toggle button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pcard .pcard-actions button { color: var(--pc-ink); border-color: color-mix(in srgb, var(--pc-ink) 35%, transparent); background: color-mix(in srgb, var(--pc-ink) 6%, transparent); }
+.pcard .pcard-actions button:hover { border-color: var(--pc-accent); }

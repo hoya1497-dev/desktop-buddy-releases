@@ -346,8 +346,9 @@
       const w = eventWallet(def, u);
       const each = Math.floor((def.price || 0) * rate);
       const evOff = def.event && !c.events?.[def.event]?.on;
-      const canSell = !def.noSell && def.free !== true && def.price != null && !evOff;
-      const why = def.noSell ? '팔 수 없는 가구예요' : evOff ? '이벤트가 끝나서 팔 수 없어요' : !canSell ? '팔 수 없어요' : '';
+      const lastGift = def.free && n <= 1;   // 처음 받은 침대 같은 건 하나는 남김
+      const canSell = !def.noSell && def.free !== true && def.price != null && !evOff && !lastGift;
+      const why = def.noSell ? '팔 수 없는 가구예요' : evOff ? '이벤트가 끝나서 팔 수 없어요' : lastGift ? '처음 받은 건 하나 남겨 둬요' : !canSell ? '팔 수 없어요' : '';
       const sellBtn = ['팔기', !canSell, () => {
         if (!confirm(`${def.name}을(를) ${w.icon}${each.toLocaleString()}에 팔까요?\n(산 값의 ${Math.round(rate * 100)}% · 되돌릴 수 없어요)`)) return;
         srv({ type: 'furn-sell', item: id, n: 1 });

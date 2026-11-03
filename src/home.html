@@ -70,6 +70,22 @@
         </div>
         <p class="note">고르는 즉시 모든 창(집 · 설정 · 타이머 · 메모)에 적용돼요.</p>
       </div>
+      <div class="bubble-set">
+        <h3>💬 채팅 말풍선 색</h3>
+        <label class="check"><input type="checkbox" id="bubOn"> 말풍선 색 따로 정하기 <span class="note-inline">(끄면 화면 모드 색을 따라가요 · 내 화면에만 보여요)</span></label>
+        <div id="bubBox" hidden>
+          <div class="theme-colors">
+            <label>내 말풍선 <input type="color" id="bubMine"></label>
+            <label>친구 말풍선 <input type="color" id="bubTheirs"></label>
+          </div>
+          <div class="bubble-presets" id="bubPresets"><span class="note-inline">빠른 선택:</span></div>
+        </div>
+        <div class="bubble-preview">
+          <div class="msg theirs"><div class="msg-row"><div class="bubble">오늘 낚시 갈래? 🎣</div></div></div>
+          <div class="msg mine"><div class="msg-row"><div class="bubble">좋아! 9시에 들어갈게</div></div></div>
+        </div>
+        <p class="note" style="margin-top:0">글자색은 말풍선이 밝은지 어두운지 보고 알아서 바뀌어요.</p>
+      </div>
     </div>
   </div>
 
@@ -420,6 +436,7 @@
       <div class="toolbar">
         <button id="deskBtn" class="ghost">🖥️ 컴퓨터</button>
         <button id="decoBtn" class="ghost">✏️ 꾸미기</button>
+        <button id="decoReset" class="ghost" hidden title="가구를 전부 가방에 넣고 벽지도 기본으로 (컴퓨터 · 침대만 남아요)">🧹 처음 상태로</button>
         <span id="lightBtn" class="light-group" title="층마다 불을 따로 켜고 꺼요"><button data-floor="2" class="ghost">💡 2층</button><button data-floor="1" class="ghost">💡 1층</button></span>
         <button id="musicBtn" class="ghost" hidden title="레코드 플레이어 (다 같이 노래 듣기)">🎵 레코드</button>
         <button id="leaveFishBtn" class="primary">🏠 낚시터에서 나가기</button>
