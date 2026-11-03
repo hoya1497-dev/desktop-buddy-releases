@@ -17,6 +17,7 @@
       if (b.dataset.tab === 'windows') showGwError();
     };
   });
+  buddy.on('open-tab', (tab) => document.querySelector(`nav button[data-tab="${tab}"]`)?.click());   // 0.17: 집 창에서 '프로필 꾸미기'
 
   // ---------------------------------------------------- 미리보기
   function drawPreview(color) {

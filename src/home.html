@@ -6,6 +6,7 @@
   <title>Desktop Buddy 집</title>
   <link rel="stylesheet" href="control.css">
   <link rel="stylesheet" href="home.css">
+  <link rel="stylesheet" href="profilecard.css">
 </head>
 <body>
   <!-- 미니맵 모드일 때만 보이는 작은 머리띠 (끌어서 옮기기) -->
@@ -80,6 +81,7 @@
     <span class="more">전체 보기 ›</span>
   </div>
   <!-- 🎵 레코드 플레이어: 닫아도 노래가 계속 나오게 화면 밖으로만 옮겨요 -->
+  <div id="profileModal" class="profile-modal" hidden><div id="profileBox"></div></div>
   <div id="photoView" class="photo-view" hidden><img id="photoBig" alt="사진"><p id="photoCap"></p></div>
   <div id="musicModal" class="music-modal closed">
     <div class="music-card">
@@ -435,7 +437,14 @@
         <span id="rotVal" class="mono">0°</span>
         <button id="flipBtn" class="ghost small" title="좌우 뒤집기">↔</button>
         <span id="zoneWalls" class="zone-walls" hidden><span>🎨 왼쪽 방</span><select id="zoneLeft" title="이 가벽 왼쪽 방 벽지"></select><b>│</b><select id="zoneRight" title="이 가벽 오른쪽 방 벽지"></select><span>오른쪽 방</span></span>
+        <button id="selFront" class="ghost small" title="다른 가구보다 앞(위)에 보이게">⬆ 맨 앞</button>
+        <button id="selBack" class="ghost small" title="다른 가구보다 뒤에 보이게">⬇ 맨 뒤</button>
         <button id="bagBtn" class="ghost small">🎒 넣기</button>
+      </div>
+      <div id="furnMenu" class="furn-menu" hidden>
+        <button id="furnFront">⬆️ 맨 앞으로</button>
+        <button id="furnBack">⬇️ 맨 뒤로</button>
+        <button id="furnBag">🎒 가방에 넣기</button>
       </div>
     </section>
 
@@ -455,6 +464,7 @@
       <div class="pane active" id="pane-chat">
         <div id="chatLog"></div>
         <p class="note" id="chatHint"></p>
+        <div id="photoPending" class="photo-pending" hidden><img id="photoPendImg" alt="보낼 사진"><span>보내기를 누르면 사진이 가요</span><button type="button" id="photoPendX" class="ghost" title="사진 빼기">✕</button></div>
         <form id="chatForm" class="row">
           <input id="chatInput" maxlength="200" placeholder="메시지 입력 (사진은 붙여넣기도 돼요)" autocomplete="off">
           <button type="button" id="photoBtn" class="ghost" title="사진 보내기 — 지금 방에 있는 사람만 보고, 저장되지 않아요">📷</button>
@@ -535,8 +545,15 @@
         <div class="bag-sec" data-sec="food" hidden><ul id="bagFood" class="shop"></ul></div>
         <div class="bag-sec" data-sec="acc" hidden><ul id="bagAcc" class="shop"></ul></div>
         <div class="bag-sec" data-sec="furniture" hidden>
+          <details id="homeSlotsBox" class="home-slots">
+            <summary>💾 인테리어 저장 슬롯 <span id="homeSlotsCount" class="note-inline"></span></summary>
+            <p class="note" style="margin:4px 0 6px">지금 집 꾸밈(가구 배치 · 벽지)을 저장해 두고 언제든 불러와요. 판 가구는 빼고 불러와요.</p>
+            <div id="homeSlots" class="slot-grid"></div>
+            <div class="row" style="margin-top:6px"><button id="homeSlotBuy" class="ghost small"></button></div>
+          </details>
           <p class="note" id="bagNote"></p>
-          <ul id="bagItems" class="shop"></ul>
+          <div class="furn-jump" id="bagJump"></div>
+          <div id="bagItems"></div>
         </div>
       </div>
       <div class="pane" id="pane-fishing">
@@ -677,6 +694,7 @@
   <script src="petart.js"></script>
   <script src="emoteart.js"></script>
   <script src="meetscene.js"></script>
+  <script src="profilecard.js"></script>
   <script src="home.js"></script>
   <script src="fishscene.js"></script>
   <script src="home-game.js"></script>

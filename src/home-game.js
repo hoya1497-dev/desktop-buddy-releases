@@ -76,6 +76,22 @@
   $('dexTabs').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { dexFilter = b.dataset.dex; renderDex(); }));
   const openTab = (name) => document.querySelector(`.tabs button[data-tab=${name}]`)?.click();
 
+  // 🛋️ 가구 종류 (상점 · 가방 같이 씀)
+  const FURN_CATS = [
+    ['elec', '📺 가전 · 기계', ['computer', 'tv', 'fridge', 'arcade', 'record', 'speaker']],
+    ['seat', '🛋️ 소파 · 의자', ['sofa', 'chair', 'beanbag', 'cushion', 'barStool']],
+    ['bed', '🛏️ 침대', ['bed', 'bedBlue', 'bedCanopy', 'bedBunk']],
+    ['store', '🗄️ 책상 · 수납 · 테이블', ['desk', 'table', 'wardrobe', 'books', 'tvStand', 'wineCounter', 'mirror']],
+    ['light', '💡 조명', ['lamp', 'moodLamp', 'candles', 'mirrorBall', 'wallLamp', 'pendant', 'fairyLights', 'neon']],
+    ['wall', '🖼️ 벽에 거는 것', ['frame', 'clock', 'poster', 'shelf', 'wineRack', 'window', 'windowBig', 'windowRound', 'curtainWindow']],
+    ['rug', '🟫 러그', ['rug', 'rugRound', 'rugStripe']],
+    ['doll', '🧸 인형', ['teddy', 'bunny', 'catdoll', 'duck']],
+    ['deco', '🪴 식물 · 소품', ['plant', 'cactus', 'tree', 'globe', 'guitar', 'piano', 'cattower']],
+    ['part', '🧱 가벽 <span class="note-inline">방을 나눠요 · 꾸미기에서 가벽을 누르면 방마다 벽지</span>', []],
+    ['tank', '🐟 어항 <span class="note-inline">잡은 물고기를 풀어줄 수 있어요</span>', []],
+  ];
+  const catOf = (id, it) => (FURN_CATS.find(([, , ids]) => ids.includes(id)) || [it.tank ? 'tank' : it.divider ? 'part' : it.wall ? 'wall' : 'deco'])[0];
+
   // ------------------------------------------------------------ 상점
   function renderShop() {
     const u = U(), c = C();
@@ -116,20 +132,6 @@
       items.append(row('🏗️', `집 넓히기 ${lv}/${steps.length - 1}단계`, sub, next ? [['넓히기', u.coins < next.price, () => { if (confirm(`🪙${next.price.toLocaleString()}로 ${next.name}을(를) 할까요?\n집이 가로로 넓어져요. (되돌릴 수 없어요)`)) srv({ type: 'home-expand' }); }]] : [['완료', true, () => {}, 'ghost small']]));
     }
     // 🛋️ 가구는 종류별로 (새 가구가 생겨서 표에 없으면: 어항 · 가벽 · 벽 장식 · 소품으로 알아서)
-    const FURN_CATS = [
-      ['elec', '📺 가전 · 기계', ['computer', 'tv', 'fridge', 'arcade', 'record', 'speaker']],
-      ['seat', '🛋️ 소파 · 의자', ['sofa', 'chair', 'beanbag', 'cushion', 'barStool']],
-      ['bed', '🛏️ 침대', ['bed', 'bedBlue', 'bedCanopy', 'bedBunk']],
-      ['store', '🗄️ 책상 · 수납 · 테이블', ['desk', 'table', 'wardrobe', 'books', 'tvStand', 'wineCounter', 'mirror']],
-      ['light', '💡 조명', ['lamp', 'moodLamp', 'candles', 'mirrorBall', 'wallLamp', 'pendant', 'fairyLights', 'neon']],
-      ['wall', '🖼️ 벽에 거는 것', ['frame', 'clock', 'poster', 'shelf', 'wineRack', 'window', 'windowBig', 'windowRound', 'curtainWindow']],
-      ['rug', '🟫 러그', ['rug', 'rugRound', 'rugStripe']],
-      ['doll', '🧸 인형', ['teddy', 'bunny', 'catdoll', 'duck']],
-      ['deco', '🪴 식물 · 소품', ['plant', 'cactus', 'tree', 'globe', 'guitar', 'piano', 'cattower']],
-      ['part', '🧱 가벽 <span class="note-inline">방을 나눠요 · 꾸미기에서 가벽을 누르면 방마다 벽지</span>', []],
-      ['tank', '🐟 어항 <span class="note-inline">잡은 물고기를 풀어줄 수 있어요</span>', []],
-    ];
-    const catOf = (id, it) => (FURN_CATS.find(([, , ids]) => ids.includes(id)) || [it.tank ? 'tank' : it.divider ? 'part' : it.wall ? 'wall' : 'deco'])[0];
     const groups = $('furnGroups'); groups.textContent = '';
     const jump = $('furnJump'); jump.textContent = '';
     const lists = {};
@@ -320,11 +322,19 @@
     }
     if (!owned.length) ba.append(el('li', { class: 'note', text: '액세서리가 없어요. 상점에서 사거나 출석 7일째에 받아요.' }));
 
-    // 가구
+    // 가구 (0.17: 상점처럼 종류별 + 되팔기)
     const v = H.viewing();
     const bag = $('bagItems'); bag.textContent = '';
     const placed = {};
     for (const it of u.home.items) placed[it.item] = (placed[it.item] || 0) + 1;
+    const rate = c.limits?.sellRate ?? 0.3;
+    const bagLists = {};
+    for (const [key, label] of FURN_CATS) {
+      const h = el('h3', { class: 'bag-cat' }); h.innerHTML = label.replace(/<span.*$/, '');
+      bagLists[key] = el('ul', { class: 'shop' });
+      bagLists[key].dataset.head = '';
+      bag.append(el('div', { class: 'bag-cat-wrap', id: 'bagcat-' + key }, h, bagLists[key]));
+    }
     // 방에 다 놓은 가구는 가방에서 숨김 (꾸미기에서 다시 가방에 넣으면 돌아옴)
     let any = false;
     for (const [id, n] of Object.entries(u.owned)) {
@@ -333,14 +343,75 @@
       any = true;
       const left = n - (placed[id] || 0);
       if (left <= 0) continue;
-      bag.append(H.shopRow(Furniture.thumb(id), def.name, `${left}개 남음${placed[id] ? ` · 방에 ${placed[id]}개` : ''}`, [
-        ['2층에', !v.editable, () => H.placeNew(id, 2), 'ghost small'],
-        ['1층에', !v.editable, () => H.placeNew(id, 1), 'ghost small'],
-      ]));
+      const w = eventWallet(def, u);
+      const each = Math.floor((def.price || 0) * rate);
+      const evOff = def.event && !c.events?.[def.event]?.on;
+      const canSell = !def.noSell && def.free !== true && def.price != null && !evOff;
+      const why = def.noSell ? '팔 수 없는 가구예요' : evOff ? '이벤트가 끝나서 팔 수 없어요' : !canSell ? '팔 수 없어요' : '';
+      const sellBtn = ['팔기', !canSell, () => {
+        if (!confirm(`${def.name}을(를) ${w.icon}${each.toLocaleString()}에 팔까요?\n(산 값의 ${Math.round(rate * 100)}% · 되돌릴 수 없어요)`)) return;
+        srv({ type: 'furn-sell', item: id, n: 1 });
+      }, 'ghost small'];
+      bagLists[catOf(id, def)].append(H.shopRow(Furniture.thumb(id), def.name,
+        `${left}개 남음${placed[id] ? ` · 방에 ${placed[id]}개` : ''} · ${canSell ? `팔면 ${w.icon}${each.toLocaleString()}` : why}`, [
+          ['2층에', !v.editable, () => H.placeNew(id, 2), 'ghost small'],
+          ['1층에', !v.editable, () => H.placeNew(id, 1), 'ghost small'],
+          sellBtn,
+        ]));
     }
-    if (any && !bag.children.length) bag.append(el('li', { class: 'note', text: '가방에 남은 가구가 없어요. 전부 방에 놓았어요!' }));
+    const jump = $('bagJump'); jump.textContent = '';
+    for (const [key, label] of FURN_CATS) {
+      if (!bagLists[key].children.length) { bagLists[key].parentElement.remove(); continue; }
+      const b = el('button', { text: label.replace(/<[^>]+>.*$/, '').trim() });
+      b.onclick = () => document.getElementById('bagcat-' + key)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      jump.append(b);
+    }
+    if (any && !bag.children.length) bag.append(el('p', { class: 'note', text: '가방에 남은 가구가 없어요. 전부 방에 놓았어요!' }));
+    renderHomeSlots();
     $('bagNote').textContent = !any ? '아직 가구가 없어요. 상점에서 사 보세요!' : v.editable ? '놓을 층을 고르세요' : '내 집에서만 놓을 수 있어요';
   }
+  // ------------------------------------------------------------ 💾 인테리어 저장 슬롯 (0.17)
+  let homeSlots = null, slotsAsked = false;
+  const when = (t) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  function renderHomeSlots() {
+    const u = U(); if (!u) return;
+    if (!homeSlots) { if (!slotsAsked) { slotsAsked = true; srv({ type: 'slots-get' }); } return; }
+    const v = H.viewing();
+    const box = $('homeSlots'); box.textContent = '';
+    $('homeSlotsCount').textContent = `${homeSlots.homes.filter(Boolean).length}/${homeSlots.homeN}칸 사용`;
+    homeSlots.homes.forEach((h, i) => {
+      const name = el('input', { class: 'slot-name', maxlength: '16', title: '슬롯 이름 (눌러서 바꾸기)' });
+      name.value = h ? h.name : `인테리어 ${i + 1}`;
+      name.onchange = () => { if (h && name.value.trim()) srv({ type: 'slot-rename', kind: 'home', i, name: name.value.trim() }); };
+      name.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') name.blur(); };
+      const btns = el('div', { class: 'slot-btns' },
+        h ? btn('불러오기', 'primary small', () => {
+          if (!confirm(`'${h.name}' 꾸밈으로 바꿀까요?\n지금 놓인 가구는 가방으로 들어가요. (지금 꾸밈을 남기고 싶으면 먼저 다른 슬롯에 저장하세요)`)) return;
+          srv({ type: 'slot-load', kind: 'home', i });
+        }, !v?.editable, v?.editable ? '' : '내 집에서만 불러올 수 있어요') : null,
+        btn(h ? '덮어쓰기' : '지금 꾸밈 저장', 'ghost small', () => {
+          if (h && !confirm(`'${h.name}' 슬롯에 지금 꾸밈을 덮어쓸까요?`)) return;
+          srv({ type: 'slot-save', kind: 'home', i, name: name.value.trim() || `인테리어 ${i + 1}` });
+        }),
+        h ? btn('비우기', 'link', () => { if (confirm(`'${h.name}' 슬롯을 비울까요? (지금 집은 그대로예요)`)) srv({ type: 'slot-del', kind: 'home', i }); }) : null);
+      box.append(el('div', { class: 'slot-card' + (h ? '' : ' empty') },
+        el('div', { class: 'slot-pic', text: h ? '🏠' : '➕' }),
+        el('div', { class: 'slot-info' }, name, el('div', { class: 'slot-sub', text: h ? `가구 ${h.count}개 · ${when(h.at)} 저장` : '비어 있어요' }), btns)));
+    });
+    const next = homeSlots.homeNext;
+    const b = $('homeSlotBuy');
+    b.textContent = next == null ? `슬롯이 가득 찼어요 (${homeSlots.homeMax}칸)` : `＋ 슬롯 늘리기 🪙${next.toLocaleString()} (${homeSlots.homeN}/${homeSlots.homeMax}칸)`;
+    b.disabled = next == null || u.coins < next;
+    b.onclick = () => { if (next != null && confirm(`🪙${next.toLocaleString()}로 인테리어 슬롯을 한 칸 늘릴까요?`)) srv({ type: 'slot-buy', kind: 'home' }); };
+  }
+  buddy.on('srv', (m) => {
+    if (m.type === 'slots') { homeSlots = m; renderHomeSlots(); }
+    if (m.type === 'slot-done' && m.kind === 'home') {
+      if (m.what === 'save') H.toast(`💾 '${m.name}'에 지금 꾸밈을 저장했어요.`);
+      else H.toast(`🏠 '${m.name}' 꾸밈으로 바꿨어요!${m.skipped ? ` (판 가구 ${m.skipped}개는 빼고)` : ''}`, true);
+    }
+  });
+
   $('sellTrashBtn').onclick = () => {
     const u = U(); let n = 0, coins = 0;
     for (const [code, k] of Object.entries(u.fishInv)) if (FISH()[code]?.cat === 'T' && k > 0) { srv({ type: 'fish-sell', code, n: k }); n += k; coins += k * FISH()[code].price; }

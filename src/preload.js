@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const SEND = [
   // 오버레이
-  'set-ignore', 'pet-menu', 'open-control', 'poke', 'overlay-error',
+  'set-ignore', 'pet-menu', 'open-control', 'poke', 'overlay-error', 'alive',
   // 로그인
   'auth', 'offline-mode',
   // 설정
@@ -24,7 +24,7 @@ const ON = [
   'init', 'config', 'self', 'windows', 'peers', 'chat', 'emote', 'summon', 'peer-pos',
   'login-state', 'login-error', 'account',
   'home-state', 'reward', 'toast', 'focus-chat', 'skins', 'skin-saved', 'theme', 'update', 'srv',
-  'timers', 'snack', 'alarm', 'open-dm', 'sticky-data',
+  'timers', 'snack', 'alarm', 'open-dm', 'sticky-data', 'open-tab',
 ];
 
 contextBridge.exposeInMainWorld('buddy', {

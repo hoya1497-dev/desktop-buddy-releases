@@ -246,15 +246,13 @@
     }
     drawSeatLabels(seat) {
       const h = Math.round(MEET_H * seat.scale);
-      const line2 = this.profile.username ? '@' + this.profile.username : '';
-      const top = pill([this.profile.nickname, ''], seat.scale < 1 ? '' : line2, seat.cx, seat.bottom - h - 6, this.isMe, this.profile) - 4;
+      const top = pill(this.profile.nickname, '', seat.cx, seat.bottom - h - 6, this.isMe, this.profile) - 4;
       if (this.bubble) bubble(this.bubble.text, seat.cx, top);
     }
     drawLabels() {
       const crown = showCrown(this.profile.username) ? '👑 ' : '';
-      const name = crown + this.profile.nickname, tail = this.profile.status ? ' · ' + this.profile.status : '';
-      const line2 = this.profile.username ? '@' + this.profile.username : '';
-      const top = pill([name, tail], line2, this.x, this.y - PET_H - 6, this.isMe, this.profile) - 4;
+      // 0.17: 아이디는 이름표에서 빼고(이름을 누르면 프로필에 있어요), 상태는 닉네임 위 작은 줄로
+      const top = pill(crown + this.profile.nickname, this.profile.status || '', this.x, this.y - PET_H - 6, this.isMe, this.profile) - 4;
       if (this.bubble) bubble(this.bubble.text, this.x, top);
       this.emotes.forEach((e, i) => {
         ctx.globalAlpha = Math.min(1, e.t * 2);
@@ -286,22 +284,20 @@
     if (username !== ownerName) return false;
     return S.room.isOwner ? (S.peers || []).length > 0 : true;   // 놀러 온 사람 입장에선 항상 주인이 있으니 보임
   }
-  function pill(text, sub, cx, bottom, mine, profile) {
-    const [name, tail] = Array.isArray(text) ? text : [text, ''];
-    text = name + tail;
+  // 이름표: (상태 — 작게) 위 줄 + 닉네임 아래 줄 (0.17: 예전엔 '닉네임 · 상태' 한 줄 + @아이디)
+  function pill(name, status, cx, bottom, mine, profile) {
     ctx.font = `600 11px ${FONT}`;
-    let w = ctx.measureText(text).width;
-    if (sub) { ctx.font = `10px ${FONT}`; w = Math.max(w, ctx.measureText(sub).width); }
-    w = Math.min(200, w) + 14;
-    const h = sub ? 29 : 18;
+    let w = ctx.measureText(name).width;
+    if (status) { ctx.font = `10px ${FONT}`; w = Math.max(w, ctx.measureText(status).width); }
+    w = Math.min(160, w) + 14;
+    const h = status ? 29 : 18;
     const x = Math.round(clamp(cx - w / 2, 2, RW - w - 2)), y = Math.round(bottom - h);
     ctx.fillStyle = mine ? 'rgba(30,30,40,0.72)' : 'rgba(40,60,110,0.82)';
     ctx.beginPath(); ctx.roundRect(x, y, w, h, 9); ctx.fill();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const t = performance.now() / 1000;
+    if (status) { ctx.font = `10px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.78)'; ctx.fillText(status, x + w / 2, y + 9, w - 10); }
     ctx.font = `600 11px ${FONT}`;
-    NickFX.drawNameLine(ctx, name, tail, x + w / 2, y + (sub ? 10 : h / 2 + 0.5), w - 10, profile, t);
-    if (sub) { ctx.font = `10px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.72)'; ctx.fillText(sub, x + w / 2, y + 21, w - 10); }
+    NickFX.drawNameLine(ctx, name, '', x + w / 2, y + (status ? 20 : h / 2 + 0.5), w - 10, profile, performance.now() / 1000);
     ctx.textBaseline = 'alphabetic';
     return y;
   }
@@ -586,13 +582,32 @@
     if (fishingMode()) { HomeGame.drawFishing(ctx, RW, RH, MINI); return; }
     drawHouse();
     const safeDraw = (fn) => { try { fn(); } catch (e) { reportLoopError(e); } };
-    const flat = layout.filter((it) => isFlat(it.item));
-    flat.forEach((it) => safeDraw(() => drawItem(it)));
-    const things = layout.filter((it) => !isFlat(it.item) && !isStructure(it.item)).map((it) => ({ y: it.y, draw: () => drawItem(it) }));
-    for (const p of pets.values()) things.push({ y: p.sortY(), draw: () => p.draw() });
-    if (foodDrop) things.push({ y: foodDrop.y, draw: () => { ctx.font = `26px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.fillText(foodDrop.icon, foodDrop.x, foodDrop.y); } });
-    if (window.HomeGame) HomeGame.addThings(ctx, things);   // 키우는 동물
-    things.sort((a, b) => a.y - b.y).forEach((t) => safeDraw(t.draw));
+    // 0.17 가구는 놓은 순서대로 쌓여요 (나중에 놓은 게 위). 꾸미기에서 우클릭 → 맨 앞으로 / 맨 뒤로.
+    // 층: 러그 → 벽에 거는 것 → 바닥 가구(+캐릭터 · 펫) → 가벽 · 미러볼
+    const G = layerGroups();
+    G.flat.forEach((it) => safeDraw(() => drawItem(it)));
+    G.wall.forEach((it) => safeDraw(() => drawItem(it)));
+    const movers = [];
+    for (const p of pets.values()) movers.push({ y: p.sortY(), x: p.x, w: 40, draw: () => p.draw() });
+    if (foodDrop) movers.push({ y: foodDrop.y, x: foodDrop.x, w: 26, draw: () => { ctx.font = `26px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.fillText(foodDrop.icon, foodDrop.x, foodDrop.y); } });
+    if (window.HomeGame) HomeGame.addThings(ctx, movers);   // 키우는 동물
+    // 캐릭터 · 펫은 '자기 앞에 서 있고 겹치는 가구' 중 가장 먼저 그리는 것 바로 앞에 끼워 그림 (그래야 소파 뒤로 지나가면 가려짐)
+    const before = new Map();
+    const tail = [];
+    for (const mv of movers.sort((a, b) => a.y - b.y)) {
+      const hit = G.floor.find((it) => {
+        if (it.y <= mv.y) return false;
+        if (mv.x == null) return true;
+        const g = geom(it);
+        return Math.abs(mv.x - g.cx) < g.w / 2 + (mv.w || 30) / 2;
+      });
+      if (hit) { if (!before.has(hit)) before.set(hit, []); before.get(hit).push(mv); } else tail.push(mv);
+    }
+    for (const it of G.floor) {
+      for (const mv of before.get(it) || []) safeDraw(mv.draw);
+      safeDraw(() => drawItem(it));
+    }
+    tail.forEach((mv) => safeDraw(mv.draw));
     safeDraw(drawStructures);   // 🧱 가벽은 캐릭터 앞 (지나가면 뒤로 가려짐) · 🪩 미러볼
     drawDarkness();
     safeDraw(() => drawBalls(true));   // 🪩 반짝이는 어둠 위에 (빛이니까)
@@ -656,7 +671,15 @@
     lastPosSend = t; lastPosSent = snap;
     buddy.send('home-pos', snap);
   }
+  let frames = 0;
+  // 확인창(confirm 등)이 떠 있는 동안은 화면이 멈춘 게 아니니 다시 불러오지 않게 알려 줌
+  for (const k of ['confirm', 'alert', 'prompt']) {
+    const orig = window[k].bind(window);
+    window[k] = (...a) => { try { buddy.send('alive', 'pause'); } catch {} try { return orig(...a); } finally { try { buddy.send('alive', frames); } catch {} } };
+  }
+  setInterval(() => { try { buddy.send('alive', frames); } catch {} }, 2000);   // 0.17: 화면이 멈추면 메인이 다시 불러옴
   function loop(t) {
+    frames++;
     try {
       const dt = Math.min(0.05, (t - last) / 1000); last = t;
       for (const p of pets.values()) p.update(dt);
@@ -672,10 +695,23 @@
   }
 
   // ------------------------------------------------------------ 마우스
+  // 0.17 그리는 순서대로 묶기 (같은 묶음 안에서는 layout 배열 순서 = 놓은 순서)
+  function layerGroups() {
+    const G = { flat: [], wall: [], floor: [], top: [] };
+    for (const it of layout) {
+      if (isFlat(it.item)) G.flat.push(it);
+      else if (isStructure(it.item)) G.top.push(it);
+      else if (defOf(it.item).wall) G.wall.push(it);
+      else G.floor.push(it);
+    }
+    return G;
+  }
   function itemAt(p) {
-    for (let i = layout.length - 1; i >= 0; i--) {
-      const g = geom(layout[i]);
-      if (Math.abs(p.x - g.cx) <= g.w / 2 + 3 && Math.abs(p.y - g.cy) <= g.h / 2 + 3) return layout[i];
+    const G = layerGroups();
+    const order = [...G.flat, ...G.wall, ...G.floor, ...G.top];   // 맨 위에 그린 것부터 고름
+    for (let i = order.length - 1; i >= 0; i--) {
+      const g = geom(order[i]);
+      if (Math.abs(p.x - g.cx) <= g.w / 2 + 3 && Math.abs(p.y - g.cy) <= g.h / 2 + 3) return order[i];
     }
     return null;
   }
@@ -761,6 +797,17 @@
   // 친구 캐릭터 우클릭: 간식 나눠먹기 · 이모트 · 대결 신청 메뉴
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
+    if (decorating && !meetingMode()) {   // 0.17 🛋️ 가구 우클릭: 맨 앞으로 · 맨 뒤로
+      const it = itemAt(toRoom(e));
+      if (!it) { hideFurnMenu(); return; }
+      selected = it; renderSel();
+      const m = $('furnMenu');
+      m.hidden = false;
+      const r = m.getBoundingClientRect();
+      m.style.left = Math.min(e.clientX, innerWidth - r.width - 6) + 'px';
+      m.style.top = Math.min(e.clientY, innerHeight - r.height - 6) + 'px';
+      return;
+    }
     if (decorating || meetingMode()) return;
     const pet = petAt(toRoom(e));
     if (pet) buddy.send('char-menu', { id: pet.id });   // 내 캐릭터: 자세 · 상태 메뉴, 친구: 간식 · 대결 메뉴
@@ -775,6 +822,24 @@
     renderSel(); saveLayout();
   }, { passive: false });
 
+  // 0.17 쌓는 순서 바꾸기: 배열 맨 끝 = 맨 앞(위), 맨 처음 = 맨 뒤
+  function restack(it, toFront) {
+    const i = layout.indexOf(it);
+    if (i < 0) return;
+    layout.splice(i, 1);
+    if (toFront) layout.push(it); else layout.unshift(it);
+    saveLayout(true);
+    toast(toFront ? '⬆️ 맨 앞으로 보냈어요' : '⬇️ 맨 뒤로 보냈어요');
+  }
+  function hideFurnMenu() { $('furnMenu').hidden = true; }
+  $('furnFront').onclick = () => { if (selected) restack(selected, true); hideFurnMenu(); };
+  $('furnBack').onclick = () => { if (selected) restack(selected, false); hideFurnMenu(); };
+  $('furnBag').onclick = () => { hideFurnMenu(); $('bagBtn').click(); };
+  $('selFront').onclick = () => { if (selected) restack(selected, true); };
+  $('selBack').onclick = () => { if (selected) restack(selected, false); };
+  addEventListener('mousedown', (e) => { if (!$('furnMenu').contains(e.target)) hideFurnMenu(); }, true);
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') hideFurnMenu(); });
+
   // ------------------------------------------------------------ 가구 회전 · 뒤집기 · 넣기
   function renderSel() {
     $('selBar').hidden = !(decorating && selected);
@@ -785,7 +850,7 @@
     $('rotVal').textContent = (selected.rot || 0) + '°';
     $('bagBtn').hidden = !!(def && def.required);
     const st = isStructure(selected.item);   // 가벽 · 미러볼은 돌리거나 뒤집지 않음
-    for (const id of ['rotL', 'rotRange', 'rotR', 'rotVal', 'flipBtn']) $(id).hidden = st;
+    for (const id of ['rotL', 'rotRange', 'rotR', 'rotVal', 'flipBtn', 'selFront', 'selBack']) $(id).hidden = st;
     renderZoneWalls();
   }
   // 🎨 가벽을 고르면: 왼쪽 방 · 오른쪽 방 벽지 고르기 (가지고 있는 벽지만)
@@ -1210,21 +1275,59 @@
     if (ts) t.title = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'long', timeStyle: 'medium' }).format(new Date(ts)) + ' (한국 시간)';
     return t;
   }
+  // 0.17 🪪 채팅 이름: 아이디는 안 보이고, 이름을 누르면 프로필 카드(아이디 포함)가 떠요
+  function nameTag(m) {
+    const b = document.createElement('b'); b.textContent = m.from || '?'; b.style.marginRight = '3px';
+    b.className = 'chat-name ' + NickFX.domClass(m); b.style.cssText += ';' + NickFX.domStyle(m, m.color);
+    if (m.username) { b.dataset.user = m.username; b.title = '눌러서 프로필 보기'; }
+    if (m.pid) b.dataset.pid = m.pid;
+    return b;
+  }
+  let wantProfile = null;
+  function openProfile(username, pid) {
+    if (!username) return;
+    wantProfile = username.toLowerCase();
+    const peer = pid === 'me' ? null : pid && pets.has(pid) ? pid : null;
+    buddy.send('srv', { type: 'profile-get', ...(peer ? { peer } : {}), username, ...(username.toLowerCase() === (S?.session?.user?.username || '').toLowerCase() ? { self: true } : {}) });
+  }
+  for (const box of [$('chatLog'), $('fishChatLog')].filter(Boolean)) {
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('.chat-name');
+      if (b && b.dataset.user) openProfile(b.dataset.user, b.dataset.pid);
+    });
+  }
+  buddy.on('srv', (m) => {
+    if (m.type !== 'profile-card' || !wantProfile || String(m.username).toLowerCase() !== wantProfile) return;
+    wantProfile = null;
+    const box = $('profileBox'); box.textContent = '';
+    const extra = document.createElement('div'); extra.className = 'pcard-actions';
+    if (m.self) {
+      const ed = document.createElement('button'); ed.className = 'ghost small'; ed.textContent = '✏️ 프로필 꾸미기';
+      ed.onclick = () => { $('profileModal').hidden = true; buddy.send('open-settings', 'profile'); };
+      extra.append(ed);
+    }
+    const close = document.createElement('button'); close.className = 'ghost small'; close.textContent = '닫기';
+    close.onclick = () => { $('profileModal').hidden = true; };
+    extra.append(close);
+    box.append(ProfileCard.render(m, catalog, { extra }));
+    $('profileModal').hidden = false;
+  });
+  $('profileModal').addEventListener('click', (e) => { if (e.target === $('profileModal')) $('profileModal').hidden = true; });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('profileModal').hidden) $('profileModal').hidden = true; });
+
   function addMsg(m) {
     const div = document.createElement('div');
     if (m.system) { div.className = 'msg sys'; div.append(document.createTextNode(m.text), timeTag(m.ts)); }
     else {
       div.className = 'msg';
-      const b = document.createElement('b'); b.textContent = m.from; b.style.marginRight = '3px';
-      b.className = NickFX.domClass(m); b.style.cssText += ';' + NickFX.domStyle(m, m.color);
-      const id = document.createElement('small'); id.textContent = m.username ? '@' + m.username : '';
+      const b = nameTag(m);
       let body = document.createTextNode(m.text);
       if (m.emote) {   // 그림 이모티콘은 채팅 로그에도 그림으로
         body = document.createElement('img');
         body.src = `assets/emotes/${m.emote}.png`;
         body.style.cssText = 'height:40px;width:auto;vertical-align:middle;margin-left:4px;';
       }
-      div.append(b, id, body, timeTag(m.ts));
+      div.append(b, body, timeTag(m.ts));
     }
     appendMsg(div);
   }
@@ -1277,15 +1380,13 @@
   function photoMsg(m, mine) {
     const div = document.createElement('div');
     div.className = 'msg photo-msg';
-    const b = document.createElement('b'); b.textContent = m.from || '?'; b.style.marginRight = '3px';
-    b.className = NickFX.domClass(m); b.style.cssText += ';' + NickFX.domStyle(m, m.color);
-    const id = document.createElement('small'); id.textContent = m.username ? '@' + m.username : '';
+    const b = nameTag(m);
     const img = document.createElement('img');
     img.className = 'chat-photo'; img.alt = '사진'; img.src = m.data;
     img.title = '눌러서 크게 보기';
-    img.onclick = () => openPhoto(m.data, `${m.from || ''}${m.username ? ' (@' + m.username + ')' : ''} · 이 방에서만 보여요`);
+    img.onclick = () => openPhoto(m.data, `${m.from || ''} · 이 방에서만 보여요`);
     img.onload = () => { const log = $('chatLog'); if (log.scrollHeight - log.scrollTop - log.clientHeight < 260) log.scrollTop = log.scrollHeight; };
-    div.append(b, id, timeTag(m.ts), img);
+    div.append(b, timeTag(m.ts), img);
     if (mine) div.classList.add('mine');
     appendMsg(div);
     // 너무 많이 쌓이면 오래된 사진부터 빼기 (메모리)
@@ -1307,24 +1408,42 @@
     const p = pets.get(id)?.profile || (S?.peers || []).find((x) => x.id === id) || {};
     return { from: p.nickname, username: p.username, color: p.color, nameColor: p.nameColor, nameEffect: p.nameEffect };
   }
-  async function sendPhoto(file) {
+  // 0.17: 사진은 고르거나 붙여넣으면 바로 가지 않고, 입력칸 위에 올려 두었다가 [보내기]를 누르면 가요
+  let pendingPhoto = null;
+  function clearPending() { pendingPhoto = null; $('photoPending').hidden = true; $('photoPendImg').removeAttribute('src'); }
+  async function stagePhoto(file) {
     if (!S?.room) { toast('방에 있을 때만 사진을 보낼 수 있어요. (내 집이나 친구 집)'); return; }
-    if (S.net !== 'online') { toast('서버와 연결돼 있을 때만 보낼 수 있어요.'); return; }
     let r;
     try { $('photoBtn').disabled = true; r = await shrinkPhoto(file); }
     catch (e) { toast(e.message || '사진을 열지 못했어요.'); return; }
     finally { $('photoBtn').disabled = false; }
+    pendingPhoto = r;
+    $('photoPendImg').src = r.data; $('photoPending').hidden = false;
+    $('chatInput').focus();
+  }
+  function sendPending() {
+    const r = pendingPhoto;
+    if (!r) return false;
+    if (!S?.room) { toast('방에 있을 때만 사진을 보낼 수 있어요. (내 집이나 친구 집)'); clearPending(); return false; }
+    if (S.net !== 'online') { toast('서버와 연결돼 있을 때만 보낼 수 있어요.'); return false; }
     buddy.send('srv', { type: 'photo', data: r.data, w: r.w, h: r.h });
     const me = S.self || {};
     photoMsg({ from: me.nickname, username: S.session?.user?.username, color: me.color, nameColor: me.nameColor, nameEffect: S.session?.user?.nameEffect, data: r.data, ts: Date.now() }, true);
     pets.get('me')?.say('📷 사진');
+    clearPending();
+    return true;
+  }
+  $('photoPendX').onclick = clearPending;
+  {
+    const textSubmit = $('chatForm').onsubmit;
+    $('chatForm').onsubmit = (e) => { e.preventDefault(); sendPending(); textSubmit(e); };
   }
   $('photoBtn').onclick = () => { $('photoFile').value = ''; $('photoFile').click(); };
-  $('photoFile').onchange = () => { const f = $('photoFile').files[0]; if (f) sendPhoto(f); };
+  $('photoFile').onchange = () => { const f = $('photoFile').files[0]; if (f) stagePhoto(f); };
   // 붙여넣기 (캡처한 화면을 Ctrl+V)
   $('chatInput').addEventListener('paste', (e) => {
     const f = [...(e.clipboardData?.items || [])].find((it) => it.kind === 'file' && /^image\//.test(it.type))?.getAsFile();
-    if (f) { e.preventDefault(); sendPhoto(f); }
+    if (f) { e.preventDefault(); stagePhoto(f); }
   });
   // 채팅 칸에 끌어다 놓기
   const chatLogEl = $('chatLog');
@@ -1333,7 +1452,7 @@
   chatLogEl.addEventListener('drop', (e) => {
     chatLogEl.classList.remove('drop-photo');
     const f = [...(e.dataTransfer?.files || [])].find((x) => /^image\//.test(x.type));
-    if (f) { e.preventDefault(); sendPhoto(f); }
+    if (f) { e.preventDefault(); stagePhoto(f); }
   });
   buddy.on('srv', (m) => {
     if (m.type !== 'photo' || typeof m.data !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/.test(m.data)) return;
@@ -1406,6 +1525,8 @@
     else if (r.reason === 'gift' || r.reason === 'admin') { me?.emote('🎁'); }
     else if (r.reason === 'skin') toast('캐릭터 그림을 바꿨어요!');
     else if (r.reason === 'expand') toast(`🏗️ ${r.name} 완료! 집이 넓어졌어요`, true);
+    else if (r.reason === 'furn-sell') toast(`🛋️ ${catalog?.items?.[r.item]?.name || '가구'}을(를) 팔아서 ${r.event ? catalog?.events?.[r.event]?.coin?.icon || '🎫' : '🪙'}${r.amount.toLocaleString()}을 받았어요`, true);   // 0.17
+    else if (r.reason === 'slot') toast(`💾 저장 슬롯을 한 칸 늘렸어요 (🪙${(-r.amount).toLocaleString()})`);
     else if (r.reason === 'pet-sell') toast(`🐾 '${r.name}'을(를) 되팔아서 🪙${r.amount}을 돌려받았어요`, true);
     else if (r.reason === 'snack-sent') toast(`${catalog?.foods[r.food]?.icon || '🍪'} ${r.to}님과 간식을 나눠 먹었어요!`);
     else if (r.reason === 'snack-got') me?.emote('😋');
@@ -1431,7 +1552,7 @@
       if (R && R.floors) { RH = R.h; FLOORS = R.floors; }
     }
     if (roomChanged && decorating) $('decoBtn').click();
-    if (roomChanged && !MINI) dropPhotos(Infinity, '(방을 나와서 사진은 안 보여요)');   // 📷 사진은 그 방에 있는 동안만
+    if (roomChanged && !MINI) { dropPhotos(Infinity, '(방을 나와서 사진은 안 보여요)'); clearPending(); }   // 📷 사진은 그 방에 있는 동안만
     $('offlineCover').hidden = st.net === 'online' || !st.session;
     $('offlineText').textContent = st.net === 'reconnecting' || st.net === 'connecting' ? '서버와 연결이 끊겼어요' : '오프라인이에요';
     const wasMeeting = document.body.classList.contains('meeting-mode');

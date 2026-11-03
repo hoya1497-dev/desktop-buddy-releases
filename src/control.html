@@ -5,6 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
   <title>Desktop Buddy</title>
   <link rel="stylesheet" href="control.css">
+  <link rel="stylesheet" href="profilecard.css">
 </head>
 <body>
   <header>
@@ -17,6 +18,7 @@
 
   <nav>
     <button data-tab="me" class="active">내 캐릭터</button>
+    <button data-tab="profile">🪪 프로필</button>
     <button data-tab="windows">상태</button>
     <button data-tab="account">계정</button>
   </nav>
@@ -65,6 +67,13 @@
       </div>
       <p id="skinMsg" class="note"></p>
     </div>
+    <div class="card">
+      <h2>💾 캐릭터 저장 슬롯</h2>
+      <p class="note" style="margin:0 0 6px">지금 캐릭터 그림을 슬롯에 저장해 두고, 언제든 불러와서 바꿔 입어요. 닉네임 색 · 효과는 저장되지 않아요.</p>
+      <div id="charSlots" class="slot-grid"></div>
+      <div class="row" style="margin-top:8px"><button id="charSlotBuy" class="ghost small"></button><span id="charSlotInfo" class="note-inline"></span></div>
+      <p id="charSlotMsg" class="note"></p>
+    </div>
 
     <div class="card">
       <h2>상태 표시</h2>
@@ -90,6 +99,57 @@
   </section>
 
   <!-- 창 · 상태 -->
+  <section id="tab-profile" class="tab">
+    <div class="card">
+      <h2>🪪 내 프로필 <span class="hint">채팅에서 내 이름을 누르면 이렇게 보여요</span></h2>
+      <div id="profilePreview" class="pf-preview"><p class="note">로그인하면 프로필을 꾸밀 수 있어요.</p></div>
+    </div>
+    <div class="card" id="profileEdit">
+      <h2>사진</h2>
+      <div class="pf-row"><span>프로필 사진</span>
+        <button class="ghost small" id="pfAvatarPick">📁 사진 고르기</button>
+        <button class="ghost small" id="pfAvatarDraw">🖌️ 그리기</button>
+        <button class="link" id="pfAvatarDel">지우기</button></div>
+      <div class="pf-row"><span>배경 사진</span>
+        <button class="ghost small" id="pfBgPick">📁 사진 고르기</button>
+        <button class="ghost small" id="pfBgDraw">🖌️ 그리기</button>
+        <button class="link" id="pfBgDel">지우기</button></div>
+      <input type="file" id="pfFile" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden>
+      <h2 style="margin-top:12px">테마</h2>
+      <div id="pfThemes" class="pf-themes"></div>
+      <div id="pfCustom" class="pf-custom" hidden>
+        <label>배경 왼쪽 <input type="color" data-c="bg1"></label>
+        <label>배경 오른쪽 <input type="color" data-c="bg2"></label>
+        <label>포인트 <input type="color" data-c="accent"></label>
+        <label>카드 <input type="color" data-c="card"></label>
+      </div>
+      <h2 style="margin-top:12px">자기소개 <span class="hint" id="pfBioCount">0/100</span></h2>
+      <textarea id="pfBio" rows="3" maxlength="100" placeholder="나를 한 줄로 소개해 보세요 (100자까지)" style="font-family:inherit;font-size:13px"></textarea>
+      <h2 style="margin-top:12px">도감 보여 주기</h2>
+      <label class="check"><input type="checkbox" id="pfShowFish"> 🐟 물고기 도감을 다른 사람도 볼 수 있게</label>
+      <label class="check"><input type="checkbox" id="pfShowPets"> 🐾 펫 도감을 다른 사람도 볼 수 있게</label>
+      <div class="row" style="margin-top:10px"><button id="pfSave" class="primary small" disabled>저장하기</button><span id="pfMsg" class="note-inline"></span></div>
+    </div>
+  </section>
+
+  <!-- 🖌️ 그림 그리기 (프로필 사진 · 배경) -->
+  <div id="drawPad" class="draw-pad" hidden>
+    <div class="draw-box">
+      <div class="row between"><b id="drawTitle">그림 그리기</b><button class="ghost small" id="drawClose">닫기</button></div>
+      <canvas id="drawCanvas"></canvas>
+      <div class="draw-tools">
+        <div id="drawColors" class="row"></div>
+        <input type="color" id="drawColor" value="#333333" title="다른 색">
+        <select id="drawSize" title="굵기"><option value="3">가늘게</option><option value="8" selected>보통</option><option value="18">굵게</option><option value="40">아주 굵게</option></select>
+        <button class="ghost small" id="drawEraser">🧽 지우개</button>
+        <button class="ghost small" id="drawFill" title="배경을 지금 색으로 칠해요">🪣 배경 칠하기</button>
+        <button class="ghost small" id="drawUndo">↩ 되돌리기</button>
+        <button class="ghost small" id="drawClear">🗑️ 처음부터</button>
+      </div>
+      <div class="row between"><label class="check" style="margin:0"><input type="checkbox" id="drawOnPhoto"> 지금 사진 위에 그리기</label><button class="primary small" id="drawDone">이 그림 쓰기</button></div>
+    </div>
+  </div>
+
   <section id="tab-windows" class="tab">
     <!-- 0.15.1: '캐릭터가 올라갈 창'(창 위 걷기)은 없앴어요. 버디는 화면 아래에서만 돌아다녀요. -->
     <div class="card">
@@ -150,6 +210,10 @@
   <script src="nickfx.js"></script>
   <script src="sprites.js"></script>
   <script src="skins.js"></script>
+  <script src="fishart.js"></script>
+  <script src="petart.js"></script>
+  <script src="profilecard.js"></script>
   <script src="control.js"></script>
+  <script src="control-extra.js"></script>
 </body>
 </html>

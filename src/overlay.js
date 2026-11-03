@@ -342,13 +342,13 @@
       }
 
       // 이름/상태 표시
-      // 닉네임(굵게) 아래에 @아이디(작게). 내 캐릭터는 마우스를 올렸을 때만 이름 표시.
+      // 상태(작게) 아래에 닉네임(굵게). 내 캐릭터는 마우스를 올렸을 때만 이름 표시 (상태는 늘 보임).
       let labelTop = (this.dw ? this.y - this.h * 1.15 : top) - 6;
       const showName = !this.isMe || hovered;
+      // 0.17: 아이디는 빼고, 상태는 닉네임 위 작은 줄로 (이름표가 옆으로 길어지지 않게)
       const name = showName ? this.profile.nickname : '';
-      const tail = this.profile.status ? (name ? ' · ' : '') + this.profile.status : '';
-      const line2 = showName && this.profile.username ? '@' + this.profile.username : '';
-      if (name || tail) labelTop = drawPill([name, tail], this.x, labelTop, this.isMe, line2, this.profile) - 6;
+      const status = this.profile.status || '';
+      if (name || status) labelTop = drawPill(name, status, this.x, labelTop, this.isMe, this.profile) - 6;
 
       if (this.bubble) drawBubble(this.bubble.text, this.x, labelTop);
 
@@ -425,25 +425,26 @@
   }
 
   // ------------------------------------------------------------ 말풍선 / 라벨
-  function drawPill(text, cx, bottom, mine, sub, profile) {
-    const [name, tail] = Array.isArray(text) ? text : [text, ''];
-    text = name + tail;
+  // 이름표: 상태(작게) 위 줄 + 닉네임(굵게) 아래 줄. 이름을 안 보일 땐 상태만 한 줄
+  function drawPill(name, status, cx, bottom, mine, profile) {
     ctx.font = `600 12px ${FONT}`;
-    let w = ctx.measureText(text).width;
-    if (sub) { ctx.font = `10px ${FONT}`; w = Math.max(w, ctx.measureText(sub).width); }
-    w = Math.min(220, w) + 16;
-    const h = sub ? 32 : 20;
+    let w = name ? ctx.measureText(name).width : 0;
+    if (status) { ctx.font = `${name ? 10 : 11}px ${FONT}`; w = Math.max(w, ctx.measureText(status).width); }
+    w = Math.min(180, w) + 16;
+    const two = !!(name && status);
+    const h = two ? 32 : 20;
     const x = Math.round(cx - w / 2), y = Math.round(bottom - h);
     ctx.fillStyle = mine ? 'rgba(30,30,40,0.72)' : 'rgba(40,60,110,0.82)';
     ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const t = performance.now() / 1000;
-    ctx.font = `600 12px ${FONT}`;
-    NickFX.drawNameLine(ctx, name, tail, cx, y + (sub ? 11 : h / 2 + 0.5), w - 12, profile, t);
-    if (sub) {
-      ctx.font = `10px ${FONT}`;
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.fillText(sub, cx, y + 24, w - 12);
+    if (status) {
+      ctx.font = `${name ? 10 : 11}px ${FONT}`;
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fillText(status, cx, two ? y + 10 : y + h / 2 + 0.5, w - 12);
+    }
+    if (name) {
+      ctx.font = `600 12px ${FONT}`;
+      NickFX.drawNameLine(ctx, name, '', cx, two ? y + 22 : y + h / 2 + 0.5, w - 12, profile, performance.now() / 1000);
     }
     ctx.textBaseline = 'alphabetic';
     return y;
@@ -721,10 +722,23 @@
   addEventListener('error', (e) => report(e.error || e.message));
 
   // ------------------------------------------------------------ 루프
-  let last = performance.now();
+  let last = performance.now(), frames = 0;
+  // 0.17: 메인에 '살아 있어요' 알림 (오래 멈추면 메인이 다시 불러옴)
+  setInterval(() => { try { buddy.send('alive', frames); } catch {} }, 2000);
+  // 0.17: 버디가 화면 밖으로 나가거나 위치가 망가지면(모니터 바뀜 등) 화면 안으로 다시 데려옴
+  function rescue(p) {
+    if (p.dragging) return;
+    const bad = !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.vx) || !Number.isFinite(p.vy);
+    if (!bad && p.x > -60 && p.x < W + 60 && p.y > -300 && p.y < H + 200) return;
+    p.x = clamp(Number.isFinite(p.x) ? p.x : W / 2, 80, Math.max(120, W - 80));
+    p.y = (p.h || 40) + 10; p.vx = 0; p.vy = 0;
+    p.fall(0, 0);
+  }
   function loop(now) {
+    frames++;
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    for (const p of pets.values()) { try { rescue(p); } catch (e) { report(e); } }
     // 캐릭터 하나에서 오류가 나도 화면 전체가 멈추지 않게 (멈추면 끌기 · 말풍선 입력이 안 됨)
     for (const p of pets.values()) { try { p.update(dt); } catch (e) { report(e); } }
     try { updateFollowers(dt); } catch (e) { report(e); }

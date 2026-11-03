@@ -262,6 +262,9 @@ function keepOverlayOnTop() {
     if (!overlay.isVisible()) overlay.showInactive();
     if (!overlay.isAlwaysOnTop()) overlay.setAlwaysOnTop(true, 'screen-saver');
     if (process.platform === 'win32') overlay.moveTop();
+    // 0.17: 주 모니터가 바뀌었는데(듀얼 모니터) 오버레이가 예전 자리에 남아 있으면 다시 맞춤
+    const b = overlay.getBounds(), d = displayInfo().bounds;
+    if (b.x !== d.x || b.y !== d.y || b.width !== d.width || b.height !== d.height) { overlay.setBounds(d); sendInit(); }
   } catch (e) { console.error('keepOverlayOnTop', e); }
 }
 function refitScreens() {
@@ -270,10 +273,10 @@ function refitScreens() {
   keepOverlayOnTop();
 }
 
-function showControl() {
+function showControl(tab = null) {
   if (!control || control.isDestroyed()) control = makeWindow('control.html', { width: 440, height: 720, minWidth: 380, minHeight: 520, title: 'Desktop Buddy 설정' });
-  if (control.webContents.isLoading()) control.webContents.once('did-finish-load', () => showWin(control));
-  else { showWin(control); control.webContents.send('account', session ? { username: session.user.username, code: session.user.code } : null); }
+  if (control.webContents.isLoading()) control.webContents.once('did-finish-load', () => { showWin(control); if (tab) control.webContents.send('open-tab', tab); });
+  else { showWin(control); control.webContents.send('account', session ? { username: session.user.username, code: session.user.code } : null); if (tab) control.webContents.send('open-tab', tab); }
 }
 function showHome(focusChat = false, dmWith = null) {
   if (!session) { showLogin(); return; }
@@ -281,6 +284,10 @@ function showHome(focusChat = false, dmWith = null) {
     // 레코드 플레이어 노래가 누르지 않아도 바로 나오게 (autoplay)
     home = makeWindow('home.html', { width: 1220, height: 720, minWidth: 720, minHeight: 560, title: `${BETA_TAG}🏠 Desktop Buddy 집`, webPreferences: webPreferences({ autoplayPolicy: 'no-user-gesture-required', backgroundThrottling: false }) });
     for (const ev of ['show', 'hide', 'minimize', 'restore']) home.on(ev, () => setTimeout(updateWidgets, 50));
+    // 0.17: 집 창을 다시 불러온 뒤(화면 멈춤 · 그래픽 오류 복구) 바로 지금 상태를 다시 보내 줌 (예전엔 다음 소식이 올 때까지 빈 화면)
+    home.webContents.on('did-finish-load', () => { pushHome(); pushTimers(); pushSkins(); });
+    // 0.17: 모니터를 옮기거나(배율이 다른 화면) 다시 보일 때 화면이 빈 채로 남지 않게 한 번 더 그리게 함
+    for (const ev of ['moved', 'show', 'restore', 'focus']) home.on(ev, () => { if (!home.isDestroyed()) home.webContents.invalidate(); });
   }
   const go = () => { showWin(home); pushHome(); pushTimers(); if (focusChat) home.webContents.send('focus-chat'); if (dmWith) home.webContents.send('open-dm', dmWith); updateWidgets(); };
   if (home.webContents.isLoading()) home.webContents.once('did-finish-load', go); else go();
@@ -726,9 +733,16 @@ function handleServer(m, sock) {
       home?.webContents.send('toast', text);
       break;
     }
+    case 'slots':          // 0.17 💾 저장 슬롯
+    case 'slot-done':
+    case 'profile-card':   // 0.17 🪪 프로필
+    case 'profile-saved':
+      for (const w of [home, control]) if (w && !w.isDestroyed()) w.webContents.send('srv', m);
+      break;
     case 'error':
       addChat({ system: true, text: m.message });
       home?.webContents.send('toast', m.message);
+      if (control && !control.isDestroyed()) control.webContents.send('srv', m);   // 0.17: 설정 창(슬롯 · 프로필)에도 알려 줌
       if (/그림/.test(m.message)) control?.webContents.send('skin-saved', m.message);
       break;
     default: break;
@@ -1119,6 +1133,13 @@ function updateWidgets() {
 // ---------------------------------------------------------------- IPC
 function registerIpc() {
   // 오버레이
+  ipcMain.on('alive', (e, frames) => {
+    const t = Date.now(), id = e.sender.id, a = alive.get(id);
+    if (frames === 'pause') { alive.set(id, { t: Infinity, frames: -1, since: Infinity, reloaded: a?.reloaded || 0 }); return; }   // 확인창이 떠 있음
+    const n = Number(frames) || 0;
+    if (!a || n !== a.frames) alive.set(id, { t, frames: n, since: t, reloaded: a?.reloaded || 0 });
+    else a.t = t;
+  });
   ipcMain.on('set-ignore', (_e, v) => overlay?.setIgnoreMouseEvents(!!v, { forward: true }));
   // 바탕화면 캐릭터 화면에서 난 오류를 파일로 남김 (버그 찾을 때 씀)
   ipcMain.on('overlay-error', (_e, msg) => {
@@ -1185,6 +1206,7 @@ function registerIpc() {
     config, presets: PRESETS, self: selfProfile(), gwError, platform: process.platform,
     account: session ? { username: session.user.username, code: session.user.code } : null,
     blocked: friends.blocked || [],
+    catalog: session ? { fish: session.catalog.fish, pets: session.catalog.pets } : null,   // 0.17 🪪 프로필 미리보기 도감용
   }));
   ipcMain.handle('list-windows', async () => {
     await pollWindows();
@@ -1251,11 +1273,15 @@ function registerIpc() {
     'board-get', 'board-add', 'board-del', 'board-clear', 'board-edit', 'board-style', 'dm-send', 'dm-get', 'dm-read', 'mail-get', 'mail-send', 'mail-reply', 'mail-read', 'mail-del', 'fish-sell-many', 'fish-show', 'invite-fof', 'friend-add-peer', 'notices-get', 'notice-post', 'notice-edit', 'notice-del', 'invite',
     'home-expand', 'music-get', 'music-add', 'music-request', 'music-answer', 'music-skip', 'music-remove', 'music-move', 'music-duration', 'music-error',
     'music-play', 'music-fav', 'music-bgm', 'music-repeat',
-    'photo']);   // 0.15.1: 📷 방 안 사진   // 0.15: ⭐ 즐겨찾기 · 🏠 배경음 · 🔁 반복
+    'photo',   // 0.15.1: 📷 방 안 사진
+    'slots-get', 'slot-buy', 'slot-save', 'slot-load', 'slot-del', 'slot-rename', 'furn-sell', 'profile-set', 'profile-get']);   // 0.17: 💾 슬롯 · 🛋️ 되팔기 · 🪪 프로필
+    // 0.15: ⭐ 즐겨찾기 · 🏠 배경음 · 🔁 반복
+  // 0.17: 📷 사진이 여기서 4000자에 걸려 조용히 버려지던 버그 → 그림이 들어가는 메시지는 크기를 따로 정함
+  const SRV_BIG = { 'board-add': 90_000, 'board-edit': 90_000, 'notice-post': 16_000, 'notice-edit': 16_000, photo: 400_000, 'profile-set': 320_000 };
   ipcMain.on('srv', (_e, m) => {
     if (!m || typeof m !== 'object' || !SRV_TYPES.has(m.type)) return;
     const json = JSON.stringify(m);
-    if (json.length > (m.type === 'board-add' || m.type === 'board-edit' ? 90_000 : /^notice-(post|edit)$/.test(m.type) ? 16_000 : 4000)) return;   // 화이트보드 그림만 크게 허용
+    if (json.length > (SRV_BIG[m.type] || 4000)) return;   // 그림이 들어가는 것만 크게 허용
     wsSend(JSON.parse(json));
   });
   ipcMain.handle('get-update', () => ({ ...updateState, current: app.getVersion() }));
@@ -1279,7 +1305,7 @@ function registerIpc() {
   ipcMain.on('pat', () => wsSend({ type: 'pat' }));
   ipcMain.on('lock', (_e, locked) => wsSend({ type: 'lock', locked: !!locked }));
   ipcMain.on('kick', (_e, id) => wsSend({ type: 'kick', id: String(id) }));
-  ipcMain.on('open-settings', () => showControl());
+  ipcMain.on('open-settings', (_e, tab) => showControl(typeof tab === 'string' ? tab : null));   // 0.17: 탭 바로 열기 (🪪 프로필)
   ipcMain.on('friend-add', (_e, q) => wsSend({ type: 'friend-add', query: String(q || '') }));
   ipcMain.on('friend-accept', (_e, u) => wsSend({ type: 'friend-accept', username: String(u) }));
   ipcMain.on('friend-decline', (_e, u) => wsSend({ type: 'friend-decline', username: String(u) }));
@@ -1305,6 +1331,37 @@ function registerIpc() {
     else if (d) wsSend({ type: 'skin-set', stand: d.stand, sit: d.sit, walk: d.walk, lie: d.lie || undefined, fall: d.fall || undefined, faces: d.faces });
   });
   ipcMain.handle('get-skins', () => Object.fromEntries(skins));
+}
+
+// ---------------------------------------------------------------- 0.17 화면 · 버디 사라짐 대비
+// 다른 모니터에서 창 모드 게임을 오래 하면 집 화면 · 버디가 사라지던 문제.
+// Windows 의 Chromium 은 '다른 창에 가려졌다'고 판단한 창(투명한 오버레이 포함)은 그리기를 멈추는데,
+// 다시 보일 때 안 돌아오는 경우가 있음 → 가려짐 계산 · 뒤로 간 창 늦추기를 끔
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+// 화면마다 2초마다 '살아 있어요(그린 장면 수)'를 보냄 → 오래 멈춰 있으면 그 창만 다시 불러옴
+const alive = new Map();   // webContents id → { t, frames, since }
+function watchWindows() {
+  const t = Date.now();
+  for (const w of [overlay, home, mini]) {
+    if (!w || w.isDestroyed() || w.webContents.isLoading()) continue;
+    const showing = w === overlay || (w.isVisible() && !w.isMinimized());
+    const a = alive.get(w.webContents.id);
+    if (!a) { alive.set(w.webContents.id, { t, frames: -1, since: t }); continue; }
+    if (!showing) { a.since = t; continue; }
+    const limit = w === overlay ? 12_000 : 20_000;
+    // 그림이 멈춘 것(since)은 사람이 컴퓨터를 쓰고 있을 때만 봐요: 자리를 비워 모니터가 꺼지면 원래 그림을 안 그려서
+    let idle = 0; try { idle = powerMonitor.getSystemIdleTime(); } catch {}
+    const hung = t - a.t > limit;                       // 소식이 아예 없음 (확인창이 떠 있으면 Infinity 라 건너뜀)
+    const frozen = idle < 30 && t - a.since > limit;    // 소식은 오는데 장면이 안 바뀜
+    if ((hung || frozen) && t - (a.reloaded || 0) > 60_000) {
+      console.error('화면이 멈춰서 다시 불러옴:', w.getTitle?.(), hung ? 'hung' : 'frozen');
+      alive.set(w.webContents.id, { t, frames: -1, since: t, reloaded: t });
+      w.webContents.reload();
+    }
+  }
 }
 
 // ---------------------------------------------------------------- 시작
@@ -1336,6 +1393,7 @@ if (!app.requestSingleInstanceLock()) {
     // 절전에서 깨어나거나 화면 잠금을 풀면 다시 맨 위로
     for (const ev of ['resume', 'unlock-screen']) powerMonitor.on(ev, () => setTimeout(refitScreens, 1500));
     setInterval(keepOverlayOnTop, 4000);
+    setInterval(watchWindows, 5000);
 
     token = loadToken();
     if (token) connect();   // 자동 로그인 (창은 띄우지 않음)
