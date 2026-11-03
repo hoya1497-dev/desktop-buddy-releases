@@ -17,7 +17,7 @@
 
   <nav>
     <button data-tab="me" class="active">내 캐릭터</button>
-    <button data-tab="windows">창 · 상태</button>
+    <button data-tab="windows">상태</button>
     <button data-tab="account">계정</button>
   </nav>
 
@@ -46,7 +46,7 @@
     </div>
     <div class="card">
       <h2>캐릭터 그림 바꾸기</h2>
-      <p class="note">서 있는 · 앉은 · 걷는 그림 3장은 꼭 골라 주세요. 누운 그림(잘 때)과 떨어지는 그림(창에서 떨어지거나 잡아서 들 때)은 넣고 싶을 때만 넣어요. 없으면 앉기 · 서 있기 그림으로 대신해요. 배경이 투명한 PNG가 가장 예뻐요. 그림은 128px로 줄여서 올라가고, 친구 화면에도 보여요.</p>
+      <p class="note">서 있는 · 앉은 · 걷는 그림 3장은 꼭 골라 주세요. 누운 그림(잘 때)과 떨어지는 그림(잡아서 들 때)은 넣고 싶을 때만 넣어요. 없으면 앉기 · 서 있기 그림으로 대신해요. 배경이 투명한 PNG가 가장 예뻐요. 그림은 128px로 줄여서 올라가고, 친구 화면에도 보여요.</p>
       <div class="skin-grid">
         <label class="skin-slot"><span>서 있기</span><canvas id="pv-stand" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="stand"></label>
         <label class="skin-slot"><span>앉기</span><canvas id="pv-sit" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="sit"></label>
@@ -91,18 +91,10 @@
 
   <!-- 창 · 상태 -->
   <section id="tab-windows" class="tab">
-    <div class="card">
-      <div class="row between">
-        <h2>캐릭터가 올라갈 창</h2>
-        <button id="refreshWins" class="ghost small">새로고침</button>
-      </div>
-      <p class="note">체크한 프로그램의 창 윗면을 캐릭터가 걸어 다니고, 창을 움직이면 같이 따라가요.</p>
-      <p id="gwError" class="warn" hidden></p>
-      <ul id="winList" class="checklist"></ul>
-      <label class="check"><input id="occlusion" type="checkbox"> 다른 창에 가려진 부분은 밟지 않기</label>
-    </div>
+    <!-- 0.15.1: '캐릭터가 올라갈 창'(창 위 걷기)은 없앴어요. 버디는 화면 아래에서만 돌아다녀요. -->
     <div class="card">
       <h2>자동 상태 규칙</h2>
+      <p id="gwError" class="warn" hidden></p>
       <p class="note">한 줄에 하나씩 <span class="mono">키워드 = 상태</span>. 프로그램 이름이나 창 제목에 키워드가 들어 있으면 그 상태가 돼요. 위에 있는 줄이 먼저예요.</p>
       <textarea id="statusRules" rows="9" spellcheck="false"></textarea>
       <button id="saveRules" class="primary small">규칙 저장</button>

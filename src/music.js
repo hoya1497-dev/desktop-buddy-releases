@@ -356,5 +356,5 @@
   });
   showTab(['queue', 'fav', 'bgm'].includes(tab) ? tab : 'queue');
   applyVolume();
-  window.Music = { open, parseVid };
+  window.Music = { open, parseVid, playing: () => !!M?.current };   // 🪩 미러볼이 노래 나올 때만 돌게
 })();

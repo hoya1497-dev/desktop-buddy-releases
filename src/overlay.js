@@ -2,6 +2,10 @@
 (() => {
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d');
+  // 0.15.1: 그래픽 카드가 초기화되어 캔버스가 비고 다시 안 살아나면 버디가 안 보였음 → 5초 안에 안 살아나면 다시 불러옴
+  let lostTimer = null;
+  canvas.addEventListener('contextlost', (e) => { e.preventDefault(); clearTimeout(lostTimer); lostTimer = setTimeout(() => location.reload(), 5000); });
+  canvas.addEventListener('contextrestored', () => { clearTimeout(lostTimer); for (const m of [window.Sprites, window.PetArt, window.Skins]) { try { m && m.clearCache && m.clearCache(); } catch {} } });
   let W = innerWidth, H = innerHeight, DPR = devicePixelRatio || 1;
 
   const G = 2200;          // 중력 (px/s²)

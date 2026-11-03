@@ -2,7 +2,7 @@
 // 오버레이(바탕화면 캐릭터) · 집 · 로그인 · 설정 창, 트레이, 창 목록, 자동 상태, 서버 연결
 
 const {
-  app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut, safeStorage, shell, Notification, session: electronSession, net,
+  app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut, safeStorage, shell, Notification, session: electronSession, net, powerMonitor,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -156,6 +156,10 @@ function secure(win) {
     if (win.isDestroyed()) return;
     win.webContents.reload();
   });
+  // 0.15.1: 화면이 멈춰서(응답 없음) 하얗게 굳는 경우 → 15초 넘게 안 풀리면 그 창만 다시 불러옴
+  let hang = null;
+  win.on('unresponsive', () => { clearTimeout(hang); hang = setTimeout(() => { if (!win.isDestroyed()) { console.error('unresponsive → reload', win.getTitle?.()); win.webContents.forcefullyCrashRenderer(); win.webContents.reload(); } }, 15_000); });
+  win.on('responsive', () => clearTimeout(hang));
 }
 
 // GPU 프로세스가 죽으면(그래픽 드라이버 문제 등) 모든 창의 화면이 한꺼번에 깜빡이고,
@@ -228,7 +232,43 @@ function makeWindow(file, opts) {
   win.on('close', (e) => { if (!quitting) { e.preventDefault(); win.hide(); } });
   return win;
 }
-function showWin(win) { win.show(); win.focus(); }
+// 0.15.1 '집 화면이 아예 안 보여요': 최소화된 창은 show() 만으로 안 돌아오고, 모니터를 빼거나 해상도가 바뀌면
+// 창이 화면 밖에 남아서 열어도 안 보였음 → 최소화를 풀고, 화면 밖이면 가운데로 데려와서 보여 줌
+function ensureOnScreen(win) {
+  if (!win || win.isDestroyed() || win === overlay) return;
+  const b = win.getBounds();
+  const seen = screen.getAllDisplays().some(({ workArea: a }) => {
+    const w = Math.min(b.x + b.width, a.x + a.width) - Math.max(b.x, a.x);
+    const h = Math.min(b.y + b.height, a.y + a.height) - Math.max(b.y, a.y);
+    return w >= 120 && h >= 80 && b.y >= a.y - 10;   // 제목줄이 화면 위로 넘어가도 못 잡으니 같이 확인
+  });
+  if (seen) return;
+  const a = screen.getPrimaryDisplay().workArea;
+  const width = Math.min(b.width, a.width), height = Math.min(b.height, a.height);
+  win.setBounds({ x: Math.round(a.x + (a.width - width) / 2), y: Math.round(a.y + (a.height - height) / 2), width, height });
+}
+function showWin(win) {
+  if (win.isMinimized()) win.restore();
+  ensureOnScreen(win);
+  win.show(); win.focus();
+}
+// 0.15.1 '버디가 다른 창에 가려져요': Windows 에서는 전체 화면 게임 · 작업 관리자 같은 '맨 위' 창이 뜨거나,
+// 절전에서 깨어나거나, Win+D(바탕화면 보기)를 누르면 버디 오버레이가 맨 위에서 밀려나거나 숨겨지고 안 돌아올 때가 있음
+// → 몇 초마다 '맨 위 + 보이기'를 다시 걸어 줌 (오버레이는 투명하고 클릭이 통과돼서 다른 창 쓰는 데 방해 안 됨)
+function keepOverlayOnTop() {
+  if (!overlay || overlay.isDestroyed()) return;
+  try {
+    if (overlay.isMinimized()) overlay.restore();
+    if (!overlay.isVisible()) overlay.showInactive();
+    if (!overlay.isAlwaysOnTop()) overlay.setAlwaysOnTop(true, 'screen-saver');
+    if (process.platform === 'win32') overlay.moveTop();
+  } catch (e) { console.error('keepOverlayOnTop', e); }
+}
+function refitScreens() {
+  if (overlay && !overlay.isDestroyed()) { overlay.setBounds(displayInfo().bounds); sendInit(); }
+  for (const w of liveWindows) if (!w.isDestroyed() && w.isVisible()) ensureOnScreen(w);
+  keepOverlayOnTop();
+}
 
 function showControl() {
   if (!control || control.isDestroyed()) control = makeWindow('control.html', { width: 440, height: 720, minWidth: 380, minHeight: 520, title: 'Desktop Buddy 설정' });
@@ -299,7 +339,11 @@ function toOverlayRect(b) {
   const ob = displayInfo().bounds;
   return { x: r.x - ob.x, y: r.y - ob.y, w: r.width, h: r.height };
 }
+// 0.15.1: 버디가 다른 창 위를 걸어 다니던 기능(창 위 걷기)은 없앴어요. 창 목록은 더 이상 읽지 않고,
+// 오버레이에는 빈 목록만 한 번 보내요. (자동 상태는 지금 보고 있는 창 하나만 2초마다 확인 → pollActive)
+const WINDOW_WALK = false;
 async function pollWindows() {
+  if (!WINDOW_WALK) { overlay?.webContents.send('windows', []); return; }
   if (!gw) return;
   try {
     const list = await gw.openWindows();
@@ -594,11 +638,15 @@ function handleServer(m, sock) {
       for (const w of homes()) w.webContents.send('emote', { from: m.id, kind: m.kind, target: m.target ? (m.target === myPeerId ? 'me' : m.target) : null });
       if (!m.target && EMOTE_LABEL[m.kind]) {   // 💬 이모티콘도 채팅 로그에 남김
         const p = peers.get(m.id);
-        addChat({ pid: m.id, from: p ? p.nickname : '?', username: p?.username, color: p?.color, nameColor: p?.nameColor, nameEffect: p?.nameEffect, text: EMOTE_LABEL[m.kind] });
+        addChat({ pid: m.id, from: p ? p.nickname : '?', username: p?.username, color: p?.color, nameColor: p?.nameColor, nameEffect: p?.nameEffect, text: '', emote: m.kind });   // 그림만 (글자 · 말풍선 없음)
       }
       break;
     case 'peer-pos':   // 🧍 친구가 보낸 집 안 위치 → 내 화면의 그 친구 캐릭터도 같은 자리로
       for (const w of homes()) w.webContents.send('peer-pos', { id: m.id, x: m.x, y: m.y, state: m.state, dir: m.dir, inBed: m.inBed });
+      break;
+    case 'photo':   // 📷 방 안 사진: 채팅 기록(chatLog)에는 안 남기고 집 창에만 바로 보여 줌
+      home?.webContents.send('srv', m);
+      overlay?.webContents.send('chat', { id: m.id, text: '📷 사진' });
       break;
     case 'fish-peer':   // 미니맵에도 같이 낚시하는 친구가 보이게
     case 'fish-show':   // 🐟 잡은 물고기 자랑
@@ -809,8 +857,8 @@ function sendChat(text) {
 function sendEmote(kind, target = null) {
   overlay?.webContents.send('emote', { from: 'me', kind, target, fromName: config.nickname });
   for (const w of homes()) w.webContents.send('emote', { from: 'me', kind, target });
-  if (!target && EMOTE_LABEL[kind]) {   // 💬 내가 보낸 이모티콘도 채팅 로그에 남김
-    addChat({ pid: 'me', from: config.nickname, username: session?.user.username, color: config.color, nameColor: config.nameColor, nameEffect: session?.user.nameEffect, text: EMOTE_LABEL[kind], mine: true });
+  if (!target && EMOTE_LABEL[kind]) {   // 💬 내가 보낸 이모티콘도 채팅 로그에 남김 — 그림만 (0.15.1: 예전엔 '👋 안녕!' 글자가 같이 가고 말풍선도 떴음)
+    addChat({ pid: 'me', from: config.nickname, username: session?.user.username, color: config.color, nameColor: config.nameColor, nameEffect: session?.user.nameEffect, text: '', emote: kind, mine: true });
   }
   if (room && !room.meeting) wsSend({ type: 'emote', kind, target: target || undefined });   // 회의장에서는 이모트를 안 보냄
 }
@@ -1202,7 +1250,8 @@ function registerIpc() {
     'fish-here', 'share-snack', 'mg-invite', 'mg-answer', 'mg-move', 'mg-quit', 'rod-equip', 'pet-sell', 'pet-private',
     'board-get', 'board-add', 'board-del', 'board-clear', 'board-edit', 'board-style', 'dm-send', 'dm-get', 'dm-read', 'mail-get', 'mail-send', 'mail-reply', 'mail-read', 'mail-del', 'fish-sell-many', 'fish-show', 'invite-fof', 'friend-add-peer', 'notices-get', 'notice-post', 'notice-edit', 'notice-del', 'invite',
     'home-expand', 'music-get', 'music-add', 'music-request', 'music-answer', 'music-skip', 'music-remove', 'music-move', 'music-duration', 'music-error',
-    'music-play', 'music-fav', 'music-bgm', 'music-repeat']);   // 0.15: ⭐ 즐겨찾기 · 🏠 배경음 · 🔁 반복
+    'music-play', 'music-fav', 'music-bgm', 'music-repeat',
+    'photo']);   // 0.15.1: 📷 방 안 사진   // 0.15: ⭐ 즐겨찾기 · 🏠 배경음 · 🔁 반복
   ipcMain.on('srv', (_e, m) => {
     if (!m || typeof m !== 'object' || !SRV_TYPES.has(m.type)) return;
     const json = JSON.stringify(m);
@@ -1276,17 +1325,17 @@ if (!app.requestSingleInstanceLock()) {
     startUpdater();
 
     globalShortcut.register('CommandOrControl+Shift+B', () => showHome(true));
-    setInterval(pollWindows, process.platform === 'darwin' ? 700 : 250);
+    if (WINDOW_WALK) setInterval(pollWindows, process.platform === 'darwin' ? 700 : 250);
     setInterval(pollActive, 2000);
     pollActive();
     setInterval(tickTimers, 1000);
     updateWidgets();
 
-    screen.on('display-metrics-changed', () => {
-      if (!overlay) return;
-      overlay.setBounds(displayInfo().bounds);
-      sendInit();
-    });
+    // 모니터를 꽂거나 빼거나 해상도가 바뀌면: 오버레이 크기 맞추고, 화면 밖으로 나간 창은 데려옴
+    for (const ev of ['display-metrics-changed', 'display-added', 'display-removed']) screen.on(ev, () => setTimeout(refitScreens, 300));
+    // 절전에서 깨어나거나 화면 잠금을 풀면 다시 맨 위로
+    for (const ev of ['resume', 'unlock-screen']) powerMonitor.on(ev, () => setTimeout(refitScreens, 1500));
+    setInterval(keepOverlayOnTop, 4000);
 
     token = loadToken();
     if (token) connect();   // 자동 로그인 (창은 띄우지 않음)

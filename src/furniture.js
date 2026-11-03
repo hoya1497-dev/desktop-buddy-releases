@@ -1931,7 +1931,7 @@ window.Furniture = (() => {
   const cache = new Map();
   const probes = new Map();   // 캐시 키 -> 반드시 색이 있어야 하는 칸 [x, y]
   const cpuCtx = (c) => c.getContext('2d', { willReadFrequently: true });
-  function clearCache() { cache.clear(); probes.clear(); }
+  function clearCache() { cache.clear(); probes.clear(); partCache.clear(); }
   // 캐시 그림마다 '있어야 할 점' 하나가 투명해졌는지 확인 (CPU 캔버스라 1점 읽기는 아주 가벼움) → 하나라도 비었으면 전부 다시 그림
   function verifyCache() {
     for (const [k, pr] of probes) {
@@ -1993,7 +1993,7 @@ window.Furniture = (() => {
   const size = (id, scale) => { const bm = bitmap(id); return bm ? { w: bm.width * scale, h: bm.height * scale } : { w: 40, h: 40 }; };
 
   /** 작은 미리보기 (상점 목록용) */
-  function thumb(id, side = 34) {
+  let thumb = function (id, side = 34) {
     const bm = bitmap(id);
     const c = document.createElement('canvas');
     c.width = side; c.height = side;
@@ -2003,7 +2003,7 @@ window.Furniture = (() => {
     g.imageSmoothingEnabled = false;
     g.drawImage(bm, Math.floor((side - bm.width * k) / 2), Math.floor((side - bm.height * k) / 2), bm.width * k, bm.height * k);
     return c;
-  }
+  };
 
   // ---------------------------------------------------------------- 벽지 · 바닥 테마
   // 한 층을 그림: 벽 영역(x0..x1, top..wallBottom), 바닥 영역(wallBottom..bottom)
@@ -2649,5 +2649,122 @@ window.Furniture = (() => {
     }
   }
 
-  return { ART, PAL, GLOW, THEMES, TANK_WATER, draw, size, thumb, bitmap, sky, drawFloorArea , clearCache, verifyCache };
+
+  // ---------------------------------------------------------------- 0.16 🧱 가벽 · 🪩 미러볼
+  // 가벽: 그 층 천장부터 바닥 앞까지 꽉 차게 서요 (층마다 높이가 달라서 그릴 때 높이에 맞춰 줄을 만들어요)
+  const PARTS = {
+    partWhite: { w: 4, pal: { o: '#6b5a4a', a: '#fbf6ee', b: '#e9dccb', t: '#d8c7ad', k: '#b89b78' },
+      row: (y, H) => (y === 0 || y === H - 1 ? 'oooo' : y === 1 ? 'otto' : y >= H - 5 ? 'okko' : 'oabo') },
+    partWood: { w: 4, pal: { o: '#3a2416', a: '#b57a45', b: '#8a5631', l: '#c98f58', k: '#5c3a22' },
+      row: (y, H) => (y === 0 || y === H - 1 ? 'oooo' : y === 1 ? 'ollo' : (y % 11 === 0 || y >= H - 5) ? 'okko' : 'oabo') },
+  };
+  const partRows = (id, H) => Array.from({ length: H }, (_, y) => PARTS[id].row(y, H));
+  // 상점 그림용 (짧은 가벽)
+  for (const id of Object.keys(PARTS)) ART[id] = { pal: PARTS[id].pal, rows: partRows(id, 20) };
+  const partWidth = (id, scale = 4) => (PARTS[id] ? PARTS[id].w * scale : 16);
+  const partCache = new Map();
+  function drawPartition(ctx, id, cx, top, bottom, scale = 4) {
+    const p = PARTS[id]; if (!p) return;
+    const H = Math.max(6, Math.round((bottom - top) / scale)), key = id + ':' + H;
+    let c = partCache.get(key);
+    if (!c) {
+      c = document.createElement('canvas'); c.width = p.w; c.height = H;
+      const g = cpuCtx(c), rows = partRows(id, H);
+      for (let y = 0; y < H; y++) for (let x = 0; x < p.w; x++) { const ch = rows[y][x]; if (ch !== '.') { g.fillStyle = p.pal[ch]; g.fillRect(x, y, 1, 1); } }
+      partCache.set(key, c);
+    }
+    const w = p.w * scale, x0 = Math.round(cx - w / 2);
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(c, x0, top, w, H * scale);
+    ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(x0 + w, top, 3, H * scale);   // 오른쪽에 살짝 그림자
+    ctx.restore();
+  }
+
+  // 미러볼: 하루가 준 그림(assets/furniture/mirrorBall.png)을 그대로 써요. 줄 끝이 천장에 닿게 매달림.
+  // 노래가 나오면: 공 위로 빛줄기가 천천히 지나가고(도는 느낌), 거울 조각에 작은 별이 반짝.
+  const BALL_IMG = new Image();
+  let ballReady = false;
+  BALL_IMG.onload = () => { ballReady = true; };
+  BALL_IMG.src = 'assets/furniture/mirrorBall.png';   // 112×168 (원본 519×780 을 줄임)
+  const BALL = { w: 56, h: 84, cy: 0.669, r: 0.497 };   // 화면 크기 · 공 중심 높이 비율 · 반지름(가로 비율)
+  const ballGeom = (cx, ceilY) => { const R = BALL.w * BALL.r, cy = ceilY + BALL.h * BALL.cy; return { cx, cy, R, w: BALL.w, h: BALL.h, top: ceilY }; };
+  const STAR_COLORS = ['#7fb2ff', '#c58cff', '#ff8fd8', '#8fe6ff'];
+  function star(ctx, x, y, s, color, a) {   // ✦ 십자 별 (가운데 하얗게)
+    ctx.globalAlpha = a;
+    ctx.fillStyle = color; ctx.fillRect(x - s, y - 1, s * 2 + 1, 3); ctx.fillRect(x - 1, y - s, 3, s * 2 + 1);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x - s + 1, y, s * 2 - 1, 1); ctx.fillRect(x, y - s + 1, 1, s * 2 - 1);
+    ctx.globalAlpha = 1;
+  }
+  function drawMirrorBall(ctx, cx, ceilY, t, spin) {
+    const g = ballGeom(cx, ceilY), x0 = Math.round(cx - BALL.w / 2);
+    ctx.save();
+    if (ballReady) { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(BALL_IMG, x0, ceilY, BALL.w, BALL.h); }
+    else { ctx.fillStyle = '#b9a7e6'; ctx.beginPath(); ctx.arc(cx, g.cy, g.R, 0, 7); ctx.fill(); }
+    if (spin) {
+      // 도는 느낌: 공 안에서만 옅은 빛줄기가 왼쪽 → 오른쪽으로
+      ctx.beginPath(); ctx.arc(cx, g.cy, g.R - 2, 0, Math.PI * 2); ctx.clip();
+      const band = ((t * 0.35) % 1.6) - 0.3, bx = cx - g.R + band * g.R * 2;
+      const gr = ctx.createLinearGradient(bx - 10, 0, bx + 10, 0);
+      gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.32)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = gr; ctx.fillRect(cx - g.R, g.cy - g.R, g.R * 2, g.R * 2);
+      ctx.restore(); ctx.save();
+      // 거울 조각에 작은 별이 번갈아 반짝 (한 번에 2~3개)
+      for (let k = 0; k < 5; k++) {
+        const cyc = t * 0.8 + k * 0.37, n = Math.floor(cyc), life = cyc - n;
+        const h = Math.abs(Math.sin((n * 5 + k) * 12.9898) * 43758.5453) % 1, h2 = Math.abs(Math.sin((n * 5 + k) * 78.233) * 12543.21) % 1;
+        const ang = h * Math.PI * 2, rr = Math.sqrt(h2) * g.R * 0.82;
+        const a = Math.sin(life * Math.PI);
+        if (a > 0.15) star(ctx, Math.round(cx + Math.cos(ang) * rr), Math.round(g.cy + Math.sin(ang) * rr), 3, STAR_COLORS[(n + k) % 4], a * 0.95);
+      }
+    }
+    ctx.restore();
+  }
+  // 상점 그림: 그림이 불러와지면 그 그림으로
+  const thumbBase = thumb;
+  thumb = function (id, side = 34) {
+    if (id !== 'mirrorBall' || !ballReady) return thumbBase(id, side);
+    const c = document.createElement('canvas'); c.width = side; c.height = side;
+    const g = c.getContext('2d'), k = side / BALL.h;
+    g.imageSmoothingEnabled = true; g.drawImage(BALL_IMG, (side - BALL.w * k) / 2, 0, BALL.w * k, side);
+    return c;
+  };
+  ART.mirrorBall = { pal: { o: '#2a1d3a', a: '#efe9ff', b: '#c7b5f0', c: '#9a86d6', d: '#6b5aa8' }, rows: [
+    '....oo....', '....oo....', '...oooo...', '..oabbco..', '.oabacbbo.', 'oabcbabcbo', 'obcbabcbco', 'ocbcbcbcdo', '.ocdcbcdo.', '..odddco..', '...oooo...',
+  ] };
+  // 반짝이 점: 미러볼 둘레(방 넓이의 2/3) 벽 · 바닥을 천천히 옆으로 — 하루 그림처럼 알록달록한 네모 · 별, 과하지 않게
+  const SPARK = [
+    { c: '#6f9cff', in: '#eaf2ff' }, { c: '#a66be0', in: '#f6eaff' }, { c: '#e46cc8', in: '#ffeefa' }, { c: '#4cb8ff', in: '#e8f8ff' }, { c: '#8a7cf0', in: '#f0eeff' },
+  ];
+  function makeSpecks(n, seed = 7) {
+    let q = seed; const r = () => ((q = (q * 16807) % 2147483647) / 2147483647);
+    return Array.from({ length: n }, () => ({ u: r(), v: r(), star: r() < 0.3, sz: r() < 0.35 ? 4 : 3, ph: r() * 6.28, sp: 0.6 + r() * 1.4, k: Math.floor(r() * SPARK.length) }));
+  }
+  function drawSpecks(ctx, specks, area, t, dark, fade = 1) {
+    const { x0, x1, top, bottom } = area, W = x1 - x0;
+    const base = (dark ? 0.85 : 0.62) * fade;
+    for (const p of specks) {
+      const u = (p.u + t * 0.028) % 1;
+      const x = Math.round(x0 + u * W), y = Math.round(top + 8 + p.v * (bottom - top - 16));
+      const a = base * Math.min(1, u * 8, (1 - u) * 8) * (0.5 + 0.5 * Math.sin(t * p.sp + p.ph));
+      if (a < 0.04) continue;
+      const col = SPARK[p.k];
+      {   // 반짝이마다 같은 색으로 옅은 빛무리 (불 끄면 조금 더 크고 진하게)
+        const R = p.sz * (dark ? 3.6 : 2.8);
+        const gr = ctx.createRadialGradient(x, y, 0, x, y, R);
+        gr.addColorStop(0, col.c + (dark ? '66' : '40')); gr.addColorStop(1, col.c + '00');
+        ctx.globalAlpha = a; ctx.fillStyle = gr; ctx.fillRect(x - R, y - R, R * 2, R * 2); ctx.globalAlpha = 1;
+      }
+      if (p.star) star(ctx, x, y, p.sz, col.c, a);
+      else {   // 속이 밝은 작은 네모 (테두리만 색)
+        const s = p.sz;
+        ctx.globalAlpha = a;
+        ctx.fillStyle = col.c; ctx.fillRect(x - s / 2 | 0, y - s / 2 | 0, s, s);
+        ctx.fillStyle = col.in; ctx.fillRect((x - s / 2 | 0) + 1, (y - s / 2 | 0) + 1, s - 2, s - 2);
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  return { ART, PAL, GLOW, THEMES, TANK_WATER, draw, size, thumb, bitmap, sky, drawFloorArea , clearCache, verifyCache,
+    PARTS, partWidth, drawPartition, ballGeom, drawMirrorBall, makeSpecks, drawSpecks };
 })();

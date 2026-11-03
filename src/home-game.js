@@ -63,6 +63,7 @@
         nav.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
         const pane = nav.parentElement;
         pane.querySelectorAll('.' + secClass).forEach((s) => { s.hidden = s.dataset.sec !== b.dataset[attr]; });
+        if (navId === 'shopTabs') pane.scrollTop = 0;   // 다른 상점으로 가면 맨 위부터
         if (attr === 'dex') renderDex();
       };
     });
@@ -83,8 +84,8 @@
     $('shopNote').textContent = `오늘 접속 코인 🪙${c.limits.onlinePerDay - (u.onlineLeft ?? 0)}/${c.limits.onlinePerDay} 받음 · 친구와 대화하면 30초마다 🪙30`
       + (activeEvents ? ` · 🎉 ${activeEvents} 이벤트 진행 중! '🎉 이벤트' 탭을 확인해 보세요` : '');
     const row = H.shopRow;
-    const items = $('shopItems'), tanks = $('shopTanks'), wallItems = $('shopWallItems');
-    items.textContent = ''; tanks.textContent = ''; wallItems.textContent = '';
+    const items = $('shopItems');   // 맨 위: 🏗️ 집 넓히기 (가구는 아래 종류별 목록)
+    items.textContent = '';
     // 🎉 이벤트 상점: 켜진 이벤트의 전용 벽지·가구·펫은 일반 탭이 아니라 여기에만 나옴
     const evBox = $('shopEvent'); evBox.textContent = '';
     const evOn = Object.entries(c.events || {}).filter(([, e]) => e.on);
@@ -114,14 +115,40 @@
       const sub = next ? `지금 ${steps[lv].name} (가로 ${steps[lv].w}) → ${next.name} (가로 ${next.w}) · 🪙 ${next.price.toLocaleString()}` : `가장 넓은 집이에요 (가로 ${steps[lv].w})`;
       items.append(row('🏗️', `집 넓히기 ${lv}/${steps.length - 1}단계`, sub, next ? [['넓히기', u.coins < next.price, () => { if (confirm(`🪙${next.price.toLocaleString()}로 ${next.name}을(를) 할까요?\n집이 가로로 넓어져요. (되돌릴 수 없어요)`)) srv({ type: 'home-expand' }); }]] : [['완료', true, () => {}, 'ghost small']]));
     }
+    // 🛋️ 가구는 종류별로 (새 가구가 생겨서 표에 없으면: 어항 · 가벽 · 벽 장식 · 소품으로 알아서)
+    const FURN_CATS = [
+      ['elec', '📺 가전 · 기계', ['computer', 'tv', 'fridge', 'arcade', 'record', 'speaker']],
+      ['seat', '🛋️ 소파 · 의자', ['sofa', 'chair', 'beanbag', 'cushion', 'barStool']],
+      ['bed', '🛏️ 침대', ['bed', 'bedBlue', 'bedCanopy', 'bedBunk']],
+      ['store', '🗄️ 책상 · 수납 · 테이블', ['desk', 'table', 'wardrobe', 'books', 'tvStand', 'wineCounter', 'mirror']],
+      ['light', '💡 조명', ['lamp', 'moodLamp', 'candles', 'mirrorBall', 'wallLamp', 'pendant', 'fairyLights', 'neon']],
+      ['wall', '🖼️ 벽에 거는 것', ['frame', 'clock', 'poster', 'shelf', 'wineRack', 'window', 'windowBig', 'windowRound', 'curtainWindow']],
+      ['rug', '🟫 러그', ['rug', 'rugRound', 'rugStripe']],
+      ['doll', '🧸 인형', ['teddy', 'bunny', 'catdoll', 'duck']],
+      ['deco', '🪴 식물 · 소품', ['plant', 'cactus', 'tree', 'globe', 'guitar', 'piano', 'cattower']],
+      ['part', '🧱 가벽 <span class="note-inline">방을 나눠요 · 꾸미기에서 가벽을 누르면 방마다 벽지</span>', []],
+      ['tank', '🐟 어항 <span class="note-inline">잡은 물고기를 풀어줄 수 있어요</span>', []],
+    ];
+    const catOf = (id, it) => (FURN_CATS.find(([, , ids]) => ids.includes(id)) || [it.tank ? 'tank' : it.divider ? 'part' : it.wall ? 'wall' : 'deco'])[0];
+    const groups = $('furnGroups'); groups.textContent = '';
+    const jump = $('furnJump'); jump.textContent = '';
+    const lists = {};
+    for (const [key, label] of FURN_CATS) {
+      const h = el('h3', {}); h.innerHTML = label; h.id = 'furn-' + key;
+      lists[key] = el('ul', { class: 'shop' });
+      groups.append(h, lists[key]);
+      const b = el('button', { text: label.replace(/<[^>]+>.*$/, '').trim() }); b.onclick = () => h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      jump.append(b);
+    }
     for (const [id, it] of Object.entries(c.items)) {
       if (it.free === true) continue;
       const own = u.owned[id] || 0;
       const w = eventWallet(it, u);
       const sub = `${w.icon} ${it.price.toLocaleString()}${own ? ` · ${own}개 있음` : ''}${it.tank ? ` · ${it.tank.cap}마리 · ${it.tank.allow.includes('M') ? '작은·중간' : '작은'} 물고기` : ''}${it.wall && it.event ? ' · 벽에 거는 장식' : ''}`;
-      const r = row(Furniture.thumb(id), it.name, sub, [['사기', w.bal < it.price, () => srv({ type: 'buy', item: id })]]);
+      const full = it.max && own >= it.max;   // 레코드 · 미러볼처럼 하나만 가질 수 있는 가구
+      const r = row(Furniture.thumb(id), it.name, full ? `${sub} · 하나만 가질 수 있어요` : sub, [[full ? '있음' : '사기', full || w.bal < it.price, () => srv({ type: 'buy', item: id })]]);
       if (it.event) { evLists[it.event]?.furn.append(r); continue; }
-      (it.tank ? tanks : it.wall ? wallItems : items).append(r);
+      lists[catOf(id, it)].append(r);
     }
     const foods = $('shopFoods'); foods.textContent = '';
     for (const [id, f] of Object.entries(c.foods)) {
@@ -132,7 +159,9 @@
     }
     const pf = $('shopPetFoods'); pf.textContent = '';
     for (const [id, f] of Object.entries(c.petFoods)) {
-      const who = f.tank ? '어항 · 아쿠아리움 물고기' : Object.entries(c.pets).filter(([, p]) => p.likes.includes(id)).map(([, p]) => p.name).join('·') + '가 좋아해요';
+      // 좋아하는 펫: 상점에서 그냥 살 수 있는 펫만 (비밀 펫 · 이벤트 펫 이름은 안 보여 줌)
+      const fans = Object.entries(c.pets).filter(([, p]) => !p.secret && !p.event && p.likes.includes(id)).map(([, p]) => p.name);
+      const who = f.tank ? '어항 · 아쿠아리움 물고기' : fans.length ? fans.join('·') + '가 좋아해요' : '펫 먹이';
       pf.append(row(f.icon, f.name, `🪙 ${f.price} · ${who}${u.food[id] ? ` · ${u.food[id]}개 있음` : ''}`, [
         ['1개', u.coins < f.price, () => srv({ type: 'buy', item: id, n: 1 })],
         ['5개', u.coins < f.price * 5, () => srv({ type: 'buy', item: id, n: 5 }), 'ghost small'],
@@ -915,6 +944,9 @@
 
   // ------------------------------------------------------------ 펫 (관리 탭)
   const petRename = { id: null, draft: null }; // 이름 고치는 중인 펫 (화면이 새로 그려져도 유지)
+  // 펫마다 마지막으로 고른 밥 (이 컴퓨터에 기억)
+  const feedPick = new Map((() => { try { return Object.entries(JSON.parse(localStorage.getItem('feedPick') || '{}')); } catch { return []; } })());
+  const saveFeedPick = () => { try { localStorage.setItem('feedPick', JSON.stringify(Object.fromEntries(feedPick))); } catch {} };
   function renderPets() {
     const u = U(), c = C();
     if (!u || !c) return;
@@ -932,6 +964,9 @@
         const liked = kind.likes.includes(id);
         sel.append(el('option', { value: id, text: `${c.petFoods[id].icon} ${c.petFoods[id].name} ×${u.food[id]}${liked ? ' ❤' : ''}` }));
       }
+      // 고른 밥 기억 (밥을 주고 나서 목록을 다시 그려도 첫 번째 밥으로 안 돌아감, 다 떨어지면 첫 번째)
+      if (feedPick.get(p.id) && myPetFoods.includes(feedPick.get(p.id))) sel.value = feedPick.get(p.id);
+      sel.onchange = () => { feedPick.set(p.id, sel.value); saveFeedPick(); };
       const acts = el('div', { class: 'acts' });
       if (p.out) acts.append(btn('🏠 집 안으로 넣기', 'ghost small', () => srv({ type: 'pet-out', id: p.id, out: false })));
       else {
@@ -941,7 +976,7 @@
       // 공개 / 나만 보기
       acts.append(btn(p.private ? '🔒 나만 보기' : '👀 친구들에게 공개', p.private ? 'ghost small private-on' : 'ghost small', () => srv({ type: 'pet-private', id: p.id, private: !p.private }), false,
         p.private ? '지금은 나만 봐요. 누르면 친구들에게도 보여요' : '지금은 친구들도 봐요. 누르면 나만 보게 바뀌어요'));
-      if (myPetFoods.length) { acts.append(sel); acts.append(btn('밥 주기', 'primary small', () => srv({ type: 'feed', food: sel.value, target: p.id }), p.full >= 98)); }
+      if (myPetFoods.length) { acts.append(sel); acts.append(btn('밥 주기', 'primary small', () => { feedPick.set(p.id, sel.value); saveFeedPick(); srv({ type: 'feed', food: sel.value, target: p.id }); }, p.full >= 98)); }
       else acts.append(el('span', { class: 'note-inline', text: '먹이가 없어요 (상점 → 음식)' }));
       // 되팔기: 산 값의 절반 (운영자 펫은 안 됨)
       if (kind.secret) acts.append(el('span', { class: 'note-inline', text: '✨ 운영자 펫' }));

@@ -326,8 +326,16 @@
   function drawHouse() {
     const v = viewing();
     const home = v ? v.home : {};
-    Furniture.drawFloorArea(ctx, home.wall2 || 'basic', 0, FLOORS[2].top, RW, FLOORS[2].wall, FLOORS[2].bottom, 7);
-    Furniture.drawFloorArea(ctx, home.wall1 || 'basic', 0, FLOORS[1].top, RW, FLOORS[1].wall, FLOORS[1].bottom, 3);
+    for (const [f, seed] of [[2, 7], [1, 3]]) {
+      const base = home['wall' + f] || 'basic', F = FLOORS[f];
+      Furniture.drawFloorArea(ctx, base, 0, F.top, RW, F.wall, F.bottom, seed);
+      for (const z of zonesOf(f, home)) {   // 🎨 가벽으로 나눈 방마다 다른 벽지 · 바닥
+        if (z.theme === base) continue;
+        ctx.save(); ctx.beginPath(); ctx.rect(z.l, F.top, z.r - z.l, F.bottom - F.top); ctx.clip();
+        Furniture.drawFloorArea(ctx, z.theme, 0, F.top, RW, F.wall, F.bottom, seed);
+        ctx.restore();
+      }
+    }
     // 층 사이 바닥판
     const slabTop = FLOORS[2].bottom, slabH = FLOORS[1].top - FLOORS[2].bottom;
     ctx.fillStyle = '#5c3a26'; ctx.fillRect(0, slabTop, RW, slabH);
@@ -352,8 +360,43 @@
 
   // 러그처럼 바닥에 까는 것: 맨 먼저 그리고 그림자 없음
   const isFlat = (id) => /^rug|Rug$/.test(id);
+  // 🧱 가벽(divider): 그 층 천장~바닥 앞까지 꽉 차게, 캐릭터보다 앞에 그려서 지나가면 뒤로 가려짐 · 빛은 못 넘어감
+  // 🪩 천장 가구(ceiling, 미러볼): 그 층 천장에 매달림 (y 는 몇 층인지만 정함)
+  const defOf = (id) => (catalog && catalog.items[id]) || {};
+  const isDivider = (id) => !!defOf(id).divider;
+  const isCeiling = (id) => !!defOf(id).ceiling;
+  const isStructure = (id) => isDivider(id) || isCeiling(id);
+  // x 가 들어 있는 '방' = 같은 층 양옆 가벽 사이
+  function sectionOf(x, f) {
+    let l = 0, r = RW;
+    for (const it of layout) {
+      if (!isDivider(it.item) || floorOf(it.y) !== f) continue;
+      const hw = Furniture.partWidth(it.item, itemScale(it.item)) / 2;
+      if (it.x <= x) l = Math.max(l, it.x + hw); else r = Math.min(r, it.x - hw);
+    }
+    return { l, r: Math.max(l + 1, r) };
+  }
+  // 🎨 방마다 벽지: 가벽마다 '오른쪽 방 벽지(wall)'를 가지고 있어요. 맨 왼쪽 방은 그 층 벽지.
+  // 가벽에 벽지가 없으면 왼쪽 방 벽지를 그대로 이어 써요. 경계는 가벽 한가운데 (가벽이 이음매를 덮음)
+  const floorDividers = (f) => layout.filter((it) => isDivider(it.item) && floorOf(it.y) === f).sort((a, b) => a.x - b.x);
+  function zonesOf(f, home) {
+    let theme = (home && home['wall' + f]) || 'basic', l = 0;
+    const out = [];
+    for (const d of floorDividers(f)) { out.push({ l, r: d.x, theme }); l = d.x; theme = d.wall || theme; }
+    out.push({ l, r: RW, theme });
+    return out;
+  }
+  const themeAt = (x, f, home) => (zonesOf(f, home).find((z) => x >= z.l && x < z.r) || { theme: 'basic' }).theme;
   // 가구 크기 · 회전 중심
   function geom(it) {
+    if (isDivider(it.item)) {
+      const fl = FLOORS[floorOf(it.y)], w = Furniture.partWidth(it.item, itemScale(it.item)), h = fl.bottom - fl.top;
+      return { cx: it.x, cy: fl.top + h / 2, w, h, r: h / 2 };
+    }
+    if (isCeiling(it.item)) {
+      const b = Furniture.ballGeom(it.x, FLOORS[floorOf(it.y)].top, itemScale(it.item));
+      return { cx: it.x, cy: b.top + b.h / 2, w: b.w, h: b.h, r: b.h / 2 };
+    }
     const sz = Furniture.size(it.item, itemScale(it.item));
     return { cx: it.x, cy: it.y - sz.h / 2, w: sz.w, h: sz.h, r: Math.max(sz.w, sz.h) / 2 };
   }
@@ -376,6 +419,14 @@
   const darkCanvas = document.createElement('canvas');
   // 층마다 따로 (light1 · light2), 예전 집은 light 하나로
   const lightOn = (home, f) => (home['light' + f] !== undefined ? home['light' + f] !== false : home.light !== false);
+  const darkTheme = (id) => { const t = Furniture.THEMES[id] || Furniture.THEMES.basic; return (t.kind === 'room' || t.kind === 'event') && !t.outdoor; };
+  // 그 자리(방)가 불을 끄면 어두워지는지 (방마다 벽지가 다를 수 있어서 자리로 봐요)
+  function darkAt(v, x, f) { return !!v && !lightOn(v.home, f) && darkTheme(themeAt(x, f, v.home)); }
+  // 빛은 그 가구가 있는 방(가벽 사이) 안에서만
+  function clipToRoom(g, x, f) {
+    const sec = sectionOf(x, f), fl = FLOORS[f];
+    g.beginPath(); g.rect(sec.l, fl.top, sec.r - sec.l, (f === 2 ? FLOORS[1].top : fl.bottom) - fl.top); g.clip();
+  }
   function drawDarkness() {
     const v = viewing();
     if (!v || ![1, 2].some((f) => !lightOn(v.home, f))) return;
@@ -383,24 +434,22 @@
     if (dc.width !== RW) { dc.width = RW; dc.height = RH; }
     // 실내 벽지(room)와 이벤트 벽지(event)는 불을 끄면 어두워져요.
     // 초원 · 옥상, 그리고 바깥 풍경인 이벤트 벽지(outdoor: 설경 · 불꽃놀이)는 그대로.
-    const darkFloor = (f) => {
-      if (lightOn(v.home, f)) return false;
-      const theme = Furniture.THEMES[v.home['wall' + f]] || Furniture.THEMES.basic;
-      return (theme.kind === 'room' || theme.kind === 'event') && !theme.outdoor;
-    };
-    if (!darkFloor(1) && !darkFloor(2)) return;
+    const zones = { 1: zonesOf(1, v.home), 2: zonesOf(2, v.home) };
+    const darkZone = (f, z) => !lightOn(v.home, f) && darkTheme(z.theme);
+    if (![1, 2].some((f) => zones[f].some((z) => darkZone(f, z)))) return;
+    const darkFloor = (f, x) => darkAt(v, x, f);
     const g = dc.getContext('2d');
     g.clearRect(0, 0, RW, RH);
     g.globalCompositeOperation = 'source-over';
-    for (const f of [1, 2]) {
-      if (!darkFloor(f)) continue;
+    for (const f of [1, 2]) for (const z of zones[f]) {
+      if (!darkZone(f, z)) continue;
       g.fillStyle = 'rgba(10,12,32,0.62)';
       // 2층은 아래 바닥판(층 사이)까지 같이 어둡게: 사이에 밝은 줄이 안 생기게
-      g.fillRect(0, FLOORS[f].top, RW, (f === 2 ? FLOORS[1].top : FLOORS[f].bottom) - FLOORS[f].top);
+      g.fillRect(z.l, FLOORS[f].top, z.r - z.l, (f === 2 ? FLOORS[1].top : FLOORS[f].bottom) - FLOORS[f].top);
     }
     g.globalCompositeOperation = 'destination-out';
     for (const it of layout) {
-      if (!darkFloor(floorOf(it.y))) continue;
+      if (!darkFloor(floorOf(it.y), it.x)) continue;
       const glow = Furniture.GLOW[it.item];
       const isWindow = /window/i.test(it.item);
       if (!glow && !isWindow) continue;
@@ -412,13 +461,16 @@
       const grad = g.createRadialGradient(cx, cy, 4, cx, cy, r);
       grad.addColorStop(0, isWindow ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.95)');
       grad.addColorStop(1, 'rgba(0,0,0,0)');
+      g.save(); clipToRoom(g, it.x, floorOf(it.y));   // 🧱 가벽 너머로는 빛이 안 감
       g.fillStyle = grad;
       g.fillRect(cx - r, cy - r, r * 2, r * 2);
+      g.restore();
     }
     // ✨ 이벤트 가구는 스스로 은은하게 빛나요: 가구 모양만큼 어둠을 걷어 내고 + 둘레에 시즌 색 빛무리
-    const glowing = layout.filter((it) => isEventItem(it.item) && darkFloor(floorOf(it.y)));
+    const glowing = layout.filter((it) => isEventItem(it.item) && darkFloor(floorOf(it.y), it.x));
     for (const it of glowing) {
       const gm = geom(it), r = Math.max(gm.w, gm.h) * 0.75 + 6;
+      g.save(); clipToRoom(g, it.x, floorOf(it.y));
       g.globalCompositeOperation = 'destination-out';
       const halo = g.createRadialGradient(gm.cx, gm.cy, 2, gm.cx, gm.cy, r);
       halo.addColorStop(0, 'rgba(0,0,0,0.5)'); halo.addColorStop(1, 'rgba(0,0,0,0)');
@@ -430,9 +482,57 @@
       const tint = g.createRadialGradient(gm.cx, gm.cy, 2, gm.cx, gm.cy, r);
       tint.addColorStop(0, EVENT_GLOW[eventOf(it.item)] || EVENT_GLOW.other); tint.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = tint; g.fillRect(gm.cx - r, gm.cy - r, r * 2, r * 2);
+      g.restore();
     }
     g.globalCompositeOperation = 'source-over';
     ctx.drawImage(dc, 0, 0, RW, RH);
+  }
+  // 🧱 가벽 · 🪩 미러볼 그리기 (가벽은 캐릭터 · 가구보다 앞에)
+  const selBox = (it) => {
+    if (!(decorating && it === selected)) return;
+    const g = geom(it);
+    ctx.strokeStyle = 'rgba(232,137,74,0.95)'; ctx.setLineDash([5, 4]); ctx.lineWidth = 2;
+    ctx.strokeRect(g.cx - g.w / 2 - 4, g.cy - g.h / 2 - 4, g.w + 8, g.h + 8); ctx.setLineDash([]);
+  };
+  function drawStructures() {
+    for (const it of layout) {
+      if (!isDivider(it.item)) continue;
+      const fl = FLOORS[floorOf(it.y)];
+      Furniture.drawPartition(ctx, it.item, it.x, fl.top, fl.bottom, itemScale(it.item));
+      selBox(it);
+    }
+    drawBalls(false);
+  }
+  // 미러볼: 레코드에서 노래가 나오면 돌면서 그 방 전체(가벽 사이, 가벽이 없으면 그 층 전체)를 은은하게 반짝반짝
+  const specks = Furniture.makeSpecks(120, 7);
+  const musicOn = () => { try { return !!(window.Music && window.Music.playing && window.Music.playing()); } catch { return false; } };
+  function drawBalls(after) {
+    const v = viewing();
+    if (!v) return;
+    const t = performance.now() / 1000, spin = musicOn();
+    for (const it of layout) {
+      if (!isCeiling(it.item)) continue;
+      const f = floorOf(it.y), fl = FLOORS[f], sc = itemScale(it.item), dark = darkAt(v, it.x, f);
+      if (!after) { Furniture.drawMirrorBall(ctx, it.x, fl.top, t, spin, sc); selBox(it); continue; }
+      if (!spin) continue;
+      const sec = sectionOf(it.x, f), W = sec.r - sec.l, x0 = sec.l;
+      const n = Math.round(clamp(W / 12, 16, specks.length));   // 넓이에 맞춰 개수도 (너무 빽빽하지 않게)
+      ctx.save(); clipToRoom(ctx, it.x, f);
+      // 🪩 미러볼 빛은 다른 가구와 다르게 알록달록: 라벤더 · 분홍 · 하늘색이 천천히 돌아가며 은은하게 (불 끄면 더 또렷)
+      {
+        const b = Furniture.ballGeom(it.x, fl.top, sc), R = b.R * (dark ? 3.4 : 2.6), k = dark ? 1 : 0.45;
+        const COLS = [[190, 150, 255], [255, 150, 220], [140, 200, 255]];
+        COLS.forEach((c, i) => {
+          const ang = t * 0.5 + i * 2.094, ox = Math.cos(ang) * b.R * 0.6, oy = Math.sin(ang) * b.R * 0.35;
+          const gl = ctx.createRadialGradient(b.cx + ox, b.cy + oy, 2, b.cx + ox, b.cy + oy, R);
+          gl.addColorStop(0, `rgba(${c},${0.28 * k})`); gl.addColorStop(0.5, `rgba(${c},${0.1 * k})`); gl.addColorStop(1, `rgba(${c},0)`);
+          ctx.fillStyle = gl; ctx.fillRect(b.cx + ox - R, b.cy + oy - R, R * 2, R * 2);
+        });
+      }
+      Furniture.drawSpecks(ctx, specks.slice(0, n), { x0, x1: x0 + W, top: fl.top, bottom: fl.bottom }, t, dark);
+      ctx.restore();
+      if (dark) Furniture.drawMirrorBall(ctx, it.x, fl.top, t, true, sc);   // 불 꺼도 도는 공은 밝게
+    }
   }
   // 이벤트 가구인지: 카탈로그에 event 표시가 있거나 이름이 hw · xmas · ny 로 시작
   const eventOf = (id) => (catalog.items[id] && catalog.items[id].event)
@@ -471,7 +571,7 @@
     e.preventDefault();
     const st = (gridStep || 1) * (e.shiftKey ? 4 : 1);
     selected.x = clamp(snap(selected.x + dir[0] * st), 10, RW - 10);
-    selected.y = clamp(snap(selected.y + dir[1] * st), 40, RH - 4);
+    if (!isStructure(selected.item)) selected.y = clamp(snap(selected.y + dir[1] * st), 40, RH - 4);   // 🧱 가벽 · 🪩 미러볼은 양옆으로만
     saveLayout();
   });
 
@@ -488,12 +588,14 @@
     const safeDraw = (fn) => { try { fn(); } catch (e) { reportLoopError(e); } };
     const flat = layout.filter((it) => isFlat(it.item));
     flat.forEach((it) => safeDraw(() => drawItem(it)));
-    const things = layout.filter((it) => !isFlat(it.item)).map((it) => ({ y: it.y, draw: () => drawItem(it) }));
+    const things = layout.filter((it) => !isFlat(it.item) && !isStructure(it.item)).map((it) => ({ y: it.y, draw: () => drawItem(it) }));
     for (const p of pets.values()) things.push({ y: p.sortY(), draw: () => p.draw() });
     if (foodDrop) things.push({ y: foodDrop.y, draw: () => { ctx.font = `26px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.fillText(foodDrop.icon, foodDrop.x, foodDrop.y); } });
     if (window.HomeGame) HomeGame.addThings(ctx, things);   // 키우는 동물
     things.sort((a, b) => a.y - b.y).forEach((t) => safeDraw(t.draw));
+    safeDraw(drawStructures);   // 🧱 가벽은 캐릭터 앞 (지나가면 뒤로 가려짐) · 🪩 미러볼
     drawDarkness();
+    safeDraw(() => drawBalls(true));   // 🪩 반짝이는 어둠 위에 (빛이니까)
     drawGrid();
     for (const p of pets.values()) p.drawLabels();
   }
@@ -536,8 +638,10 @@
   function resetArtCaches() {
     for (const m of [window.Furniture, window.Sprites, window.PetArt, window.FishArt, window.RodArt]) { try { m && m.clearCache && m.clearCache(); } catch {} }
   }
-  canvas.addEventListener('contextrestored', resetArtCaches);
-  canvas.addEventListener('contextlost', (e) => e.preventDefault());
+  // 0.15.1: 집 캔버스 자체가 그래픽 카드 초기화로 사라졌는데 다시 안 살아나면 집이 텅 빈 채로 남았음 → 5초 안에 안 살아나면 창을 다시 불러옴
+  let lostTimer = null;
+  canvas.addEventListener('contextrestored', () => { clearTimeout(lostTimer); resetArtCaches(); });
+  canvas.addEventListener('contextlost', (e) => { e.preventDefault(); clearTimeout(lostTimer); lostTimer = setTimeout(() => location.reload(), 5000); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && window.Furniture?.verifyCache && Furniture.verifyCache()) resetArtCaches(); });
   setInterval(() => { try { if (window.Furniture?.verifyCache && Furniture.verifyCache()) resetArtCaches(); } catch {} }, 4000);
   let last = performance.now();
@@ -579,7 +683,7 @@
   let saveTimer = null;
   function saveLayout(now = false) {
     clearTimeout(saveTimer);
-    const go = () => buddy.send('place', layout.map(({ item, x, y, rot, flip, uid }) => ({ item, x, y, rot: rot || 0, flip: !!flip, ...(uid ? { uid } : {}) })));
+    const go = () => buddy.send('place', layout.map(({ item, x, y, rot, flip, uid, wall }) => ({ item, x, y, rot: rot || 0, flip: !!flip, ...(uid ? { uid } : {}), ...(wall ? { wall } : {}) })));
     if (now) go(); else saveTimer = setTimeout(go, 350);
   }
 
@@ -601,7 +705,7 @@
     const p = toRoom(e);
     if (mouse && mouse.kind === 'item') {
       mouse.item.x = clamp(snap(p.x - mouse.ox), 10, RW - 10);
-      mouse.item.y = clamp(snap(p.y - mouse.oy), 40, RH - 4);
+      if (!isStructure(mouse.item.item)) mouse.item.y = clamp(snap(p.y - mouse.oy), 40, RH - 4);   // 🧱 가벽 · 🪩 미러볼은 양옆으로만 (다른 층은 가방에 넣었다 꺼내기)
       mouse.moved = true;
       return;
     }
@@ -680,7 +784,34 @@
     $('rotRange').value = selected.rot || 0;
     $('rotVal').textContent = (selected.rot || 0) + '°';
     $('bagBtn').hidden = !!(def && def.required);
+    const st = isStructure(selected.item);   // 가벽 · 미러볼은 돌리거나 뒤집지 않음
+    for (const id of ['rotL', 'rotRange', 'rotR', 'rotVal', 'flipBtn']) $(id).hidden = st;
+    renderZoneWalls();
   }
+  // 🎨 가벽을 고르면: 왼쪽 방 · 오른쪽 방 벽지 고르기 (가지고 있는 벽지만)
+  function renderZoneWalls() {
+    const box = $('zoneWalls');
+    box.hidden = !(selected && isDivider(selected.item));
+    if (box.hidden) return;
+    const v = viewing(), f = floorOf(selected.y), owned = S.session.user.owned || {};
+    const ids = Object.keys(catalog.walls || {}).filter((id) => id === 'basic' || owned[id]);
+    const zs = zonesOf(f, v.home), i = floorDividers(f).indexOf(selected);
+    const fill = (sel, cur) => {
+      sel.textContent = '';
+      for (const id of ids) { const o = document.createElement('option'); o.value = id; o.textContent = catalog.walls[id].name; o.selected = id === cur; sel.append(o); }
+    };
+    if (document.activeElement !== $('zoneLeft')) fill($('zoneLeft'), zs[i]?.theme);
+    if (document.activeElement !== $('zoneRight')) fill($('zoneRight'), zs[i + 1]?.theme);
+  }
+  $('zoneRight').onchange = (e) => { if (!selected) return; selected.wall = e.target.value; saveLayout(true); renderZoneWalls(); };
+  $('zoneLeft').onchange = (e) => {
+    if (!selected) return;
+    const f = floorOf(selected.y), ds = floorDividers(f), prev = ds[ds.indexOf(selected) - 1];
+    if (prev) { prev.wall = e.target.value; saveLayout(true); }        // 왼쪽 방 = 앞 가벽의 오른쪽 방
+    else buddy.send('wall', { item: e.target.value, floor: f });       // 맨 왼쪽 방 = 그 층 벽지
+    renderZoneWalls();
+  };
+  for (const id of ['zoneLeft', 'zoneRight']) $(id).addEventListener('keydown', (e) => e.stopPropagation());
   const rotate = (d) => { if (!selected) return; selected.rot = (((selected.rot || 0) + d) % 360 + 360) % 360; renderSel(); saveLayout(); };
   $('rotL').onclick = () => rotate(-15);
   $('rotR').onclick = () => rotate(15);
@@ -1052,7 +1183,8 @@
     const max = catalog.limits?.furnitureMax || 60;
     if (layout.length >= max) { toast(`가구는 한 집에 ${max}개까지 놓을 수 있어요. 다른 가구를 가방에 넣고 놓아 주세요.`); return; }
     const fl = FLOORS[floor];
-    const y = def.wall ? Math.round(fl.top + (fl.wall - fl.top) * 0.6) : Math.round(rand(band(floor).min + 10, band(floor).max));
+    const y = def.ceiling ? fl.top + 40 : def.divider ? band(floor).max
+      : def.wall ? Math.round(fl.top + (fl.wall - fl.top) * 0.6) : Math.round(rand(band(floor).min + 10, band(floor).max));
     const it = { item: id, x: Math.round(rand(140, LADDER_X - 80)), y, rot: 0, flip: false };
     layout.push(it);
     saveLayout(true);
@@ -1094,6 +1226,9 @@
       }
       div.append(b, id, body, timeTag(m.ts));
     }
+    appendMsg(div);
+  }
+  function appendMsg(div) {
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
     log.append(div);
     if (atBottom) log.scrollTop = log.scrollHeight;    // 낚시 탭에도 같은 채팅을 보여 줌
@@ -1105,13 +1240,106 @@
       if (fb) flog.scrollTop = flog.scrollHeight;
     }
   }
-  buddy.on('chat', (m) => { addMsg(m); if (m.pid) pets.get(m.pid)?.say(m.text); });
+  buddy.on('chat', (m) => { addMsg(m); if (m.pid && m.text && !m.emote) pets.get(m.pid)?.say(m.text); });   // 이모티콘은 말풍선 없이 그림만
   $('chatForm').onsubmit = (e) => {
     e.preventDefault();
     const t = $('chatInput').value.trim();
     if (t) buddy.send('send-chat', t);
     $('chatInput').value = '';
   };
+
+  // ------------------------------------------------------------ 📷 방 안 사진 (0.15.1)
+  // 서버에 저장하지 않아요: 지금 같은 방에 있는 사람에게만 바로 보이고, 방을 나가면 내 화면에서도 사진이 빠져요.
+  const PHOTO_MAX = 360 * 1024, PHOTO_SIDE = 1280, PHOTO_KEEP = 30;
+  let photoN = 0;
+  // 보내기 전에 줄이기: 긴 변 1280px, JPEG 로 (투명한 부분은 흰색)
+  async function shrinkPhoto(file) {
+    if (!file || !/^image\//.test(file.type)) throw new Error('그림 파일만 보낼 수 있어요.');
+    if (file.size > 40 * 1024 * 1024) throw new Error('사진 파일이 너무 커요. (40MB까지)');
+    const bmp = await createImageBitmap(file);
+    let side = PHOTO_SIDE;
+    for (let tries = 0; tries < 6; tries++) {
+      const k = Math.min(1, side / Math.max(bmp.width, bmp.height));
+      const w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k));
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+      g.drawImage(bmp, 0, 0, w, h);
+      for (const q of [0.85, 0.75, 0.62, 0.5]) {
+        const data = c.toDataURL('image/jpeg', q);
+        if (data.length <= PHOTO_MAX) { bmp.close?.(); return { data, w, h }; }
+      }
+      side = Math.round(side * 0.75);
+    }
+    bmp.close?.();
+    throw new Error('사진을 충분히 줄이지 못했어요. 다른 사진으로 해 주세요.');
+  }
+  function photoMsg(m, mine) {
+    const div = document.createElement('div');
+    div.className = 'msg photo-msg';
+    const b = document.createElement('b'); b.textContent = m.from || '?'; b.style.marginRight = '3px';
+    b.className = NickFX.domClass(m); b.style.cssText += ';' + NickFX.domStyle(m, m.color);
+    const id = document.createElement('small'); id.textContent = m.username ? '@' + m.username : '';
+    const img = document.createElement('img');
+    img.className = 'chat-photo'; img.alt = '사진'; img.src = m.data;
+    img.title = '눌러서 크게 보기';
+    img.onclick = () => openPhoto(m.data, `${m.from || ''}${m.username ? ' (@' + m.username + ')' : ''} · 이 방에서만 보여요`);
+    img.onload = () => { const log = $('chatLog'); if (log.scrollHeight - log.scrollTop - log.clientHeight < 260) log.scrollTop = log.scrollHeight; };
+    div.append(b, id, timeTag(m.ts), img);
+    if (mine) div.classList.add('mine');
+    appendMsg(div);
+    // 너무 많이 쌓이면 오래된 사진부터 빼기 (메모리)
+    if (++photoN > PHOTO_KEEP) dropPhotos(photoN - PHOTO_KEEP);
+    return div;
+  }
+  function dropPhotos(n = Infinity, why = '(지난 사진)') {
+    for (const img of document.querySelectorAll('#chatLog img.chat-photo, #fishChatLog img.chat-photo')) {
+      if (n-- <= 0) break;
+      const note = document.createElement('span'); note.className = 'photo-gone'; note.textContent = `📷 ${why}`;
+      img.replaceWith(note);
+    }
+    photoN = document.querySelectorAll('#chatLog img.chat-photo').length;
+  }
+  function openPhoto(src, cap) { $('photoBig').src = src; $('photoCap').textContent = cap; $('photoView').hidden = false; }
+  $('photoView').onclick = () => { $('photoView').hidden = true; $('photoBig').removeAttribute('src'); };
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('photoView').hidden) $('photoView').click(); });
+  function profileOf(id) {
+    const p = pets.get(id)?.profile || (S?.peers || []).find((x) => x.id === id) || {};
+    return { from: p.nickname, username: p.username, color: p.color, nameColor: p.nameColor, nameEffect: p.nameEffect };
+  }
+  async function sendPhoto(file) {
+    if (!S?.room) { toast('방에 있을 때만 사진을 보낼 수 있어요. (내 집이나 친구 집)'); return; }
+    if (S.net !== 'online') { toast('서버와 연결돼 있을 때만 보낼 수 있어요.'); return; }
+    let r;
+    try { $('photoBtn').disabled = true; r = await shrinkPhoto(file); }
+    catch (e) { toast(e.message || '사진을 열지 못했어요.'); return; }
+    finally { $('photoBtn').disabled = false; }
+    buddy.send('srv', { type: 'photo', data: r.data, w: r.w, h: r.h });
+    const me = S.self || {};
+    photoMsg({ from: me.nickname, username: S.session?.user?.username, color: me.color, nameColor: me.nameColor, nameEffect: S.session?.user?.nameEffect, data: r.data, ts: Date.now() }, true);
+    pets.get('me')?.say('📷 사진');
+  }
+  $('photoBtn').onclick = () => { $('photoFile').value = ''; $('photoFile').click(); };
+  $('photoFile').onchange = () => { const f = $('photoFile').files[0]; if (f) sendPhoto(f); };
+  // 붙여넣기 (캡처한 화면을 Ctrl+V)
+  $('chatInput').addEventListener('paste', (e) => {
+    const f = [...(e.clipboardData?.items || [])].find((it) => it.kind === 'file' && /^image\//.test(it.type))?.getAsFile();
+    if (f) { e.preventDefault(); sendPhoto(f); }
+  });
+  // 채팅 칸에 끌어다 놓기
+  const chatLogEl = $('chatLog');
+  chatLogEl.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); chatLogEl.classList.add('drop-photo'); } });
+  chatLogEl.addEventListener('dragleave', () => chatLogEl.classList.remove('drop-photo'));
+  chatLogEl.addEventListener('drop', (e) => {
+    chatLogEl.classList.remove('drop-photo');
+    const f = [...(e.dataTransfer?.files || [])].find((x) => /^image\//.test(x.type));
+    if (f) { e.preventDefault(); sendPhoto(f); }
+  });
+  buddy.on('srv', (m) => {
+    if (m.type !== 'photo' || typeof m.data !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/.test(m.data)) return;
+    photoMsg({ ...profileOf(m.id), data: m.data, ts: m.ts || Date.now() }, false);
+    pets.get(m.id)?.say('📷 사진');
+  });
   if ($('fishChatForm')) {
     $('fishChatInput').addEventListener('keydown', (e) => e.stopPropagation());
     $('fishChatForm').onsubmit = (e) => {
@@ -1147,8 +1375,7 @@
     if (!pet || (kind === 'poke' && from === 'me')) return;
     if (kind === 'poke') pet.hopT = 0.45;   // 누가 콕 찌르면 모두의 화면에서 폴짝
     if (window.EmoteArt && EmoteArt.has(kind)) {
-      pet.emote(kind);
-      if (kind !== 'poke') addMsg({ ...pet.profile, from: pet.profile.nickname, text: '', emote: kind, ts: Date.now() });
+      pet.emote(kind);   // 채팅 로그의 그림은 main.js 가 한 번만 남김 (예전엔 그림 줄 + 글자 줄이 둘 다 생겼음)
     } else if (EMOTE_ICON[kind]) pet.emote(EMOTE_ICON[kind]);
     pet.happyT = 0.6;
   });
@@ -1204,6 +1431,7 @@
       if (R && R.floors) { RH = R.h; FLOORS = R.floors; }
     }
     if (roomChanged && decorating) $('decoBtn').click();
+    if (roomChanged && !MINI) dropPhotos(Infinity, '(방을 나와서 사진은 안 보여요)');   // 📷 사진은 그 방에 있는 동안만
     $('offlineCover').hidden = st.net === 'online' || !st.session;
     $('offlineText').textContent = st.net === 'reconnecting' || st.net === 'connecting' ? '서버와 연결이 끊겼어요' : '오프라인이에요';
     const wasMeeting = document.body.classList.contains('meeting-mode');

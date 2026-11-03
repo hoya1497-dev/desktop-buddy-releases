@@ -14,7 +14,7 @@
     b.onclick = () => {
       document.querySelectorAll('nav button').forEach((x) => x.classList.toggle('active', x === b));
       document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.id === 'tab-' + b.dataset.tab));
-      if (b.dataset.tab === 'windows') loadWindows();
+      if (b.dataset.tab === 'windows') showGwError();
     };
   });
 
@@ -217,40 +217,12 @@
   $('showAllPets').checked = !!config.showAllPets;
   $('showAllPets').onchange = (e) => save({ showAllPets: e.target.checked });
 
-  // ---------------------------------------------------- 창 목록
-  async function loadWindows() {
-    const { apps, gwError } = await buddy.invoke('list-windows');
-    $('gwError').hidden = !gwError;
-    $('gwError').textContent = gwError + (state.platform === 'darwin'
+  // ---------------------------------------------------- 자동 상태 (0.15.1: 창 위 걷기 목록은 없앴어요)
+  function showGwError() {
+    $('gwError').hidden = !state.gwError;
+    $('gwError').textContent = (state.gwError || '') + (state.platform === 'darwin'
       ? ' (시스템 설정 → 개인정보 보호 및 보안 → 화면 기록에서 이 앱을 허용해 주세요)' : '');
-    const ul = $('winList'); ul.textContent = '';
-    const selected = new Set(config.targets);
-    const names = new Set(apps.map((a) => a.owner));
-    const rows = [...apps, ...config.targets.filter((t) => !names.has(t)).map((t) => ({ owner: t, titles: [], closed: true }))];
-    for (const a of rows) {
-      const li = document.createElement('li');
-      const lab = document.createElement('label'); lab.className = 'check';
-      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = selected.has(a.owner);
-      cb.onchange = () => {
-        const set = new Set(config.targets);
-        if (cb.checked) set.add(a.owner); else set.delete(a.owner);
-        save({ targets: [...set] });
-      };
-      const name = document.createElement('span'); name.textContent = a.owner;
-      lab.append(cb, name);
-      if (a.closed) { const s = document.createElement('span'); s.className = 'closed'; s.textContent = '(지금 열려 있지 않음)'; lab.append(s); }
-      li.append(lab);
-      if (a.titles.length) {
-        const t = document.createElement('div'); t.className = 'titles'; t.textContent = a.titles.join(' / ');
-        li.append(t);
-      }
-      ul.append(li);
-    }
-    if (!rows.length) ul.innerHTML = '<li class="note">열린 창을 찾지 못했어요.</li>';
   }
-  $('refreshWins').onclick = loadWindows;
-  $('occlusion').checked = config.occlusion;
-  $('occlusion').onchange = (e) => save({ occlusion: e.target.checked });
   // ---------------------------------------------------- 계정
   function renderAccount(acc) {
     $('accountLine').textContent = acc ? `@${acc.username} 로 로그인됨` : '로그인하지 않았어요 (혼자 놀기 모드)';
