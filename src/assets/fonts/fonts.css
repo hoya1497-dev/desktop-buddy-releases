@@ -1,0 +1,7 @@
+/* 🏅 칭호 글씨체 (0.17.2) — 모두 SIL Open Font License 1.1 (무료, 앱에 넣어도 돼요). 라이선스 전문: LICENSES.txt
+   Google Fonts 원본(github.com/google/fonts) 한 파일씩 → woff2 (예전엔 조각 파일 466개라 GitHub 웹 업로드 한도(100개)에 걸렸음) */
+@font-face { font-family: 'Black Han Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url(./BlackHanSans-Regular.woff2) format('woff2'); }
+@font-face { font-family: 'Jua'; font-style: normal; font-weight: 400; font-display: swap; src: url(./Jua-Regular.woff2) format('woff2'); }
+@font-face { font-family: 'Nanum Pen Script'; font-style: normal; font-weight: 400; font-display: swap; src: url(./NanumPenScript-Regular.woff2) format('woff2'); }
+@font-face { font-family: 'Do Hyeon'; font-style: normal; font-weight: 400; font-display: swap; src: url(./DoHyeon-Regular.woff2) format('woff2'); }
+@font-face { font-family: 'Yeon Sung'; font-style: normal; font-weight: 400; font-display: swap; src: url(./YeonSung-Regular.woff2) format('woff2'); }

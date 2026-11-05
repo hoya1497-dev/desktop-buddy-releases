@@ -26,3 +26,8 @@
 .pcard-view-toggle button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pcard .pcard-actions button { color: var(--pc-ink); border-color: color-mix(in srgb, var(--pc-ink) 35%, transparent); background: color-mix(in srgb, var(--pc-ink) 6%, transparent); }
 .pcard .pcard-actions button:hover { border-color: var(--pc-accent); }
+
+.pcard-nick.titled { max-width: 260px; overflow: visible; }
+.pcard .title-name { display: inline-flex; align-items: center; gap: 3px; }
+.pcard .title-name .title-icon { font-size: 18px; }
+.pcard .title-name img { display: block; }

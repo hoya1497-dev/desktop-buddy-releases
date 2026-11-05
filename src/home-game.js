@@ -193,17 +193,7 @@
       if (p.event) evLists[p.event]?.pets.append(pr); else pets.append(pr);
     }
     if (full) pets.append(el('li', { class: 'note', text: `펫은 ${c.limits.petsMax}마리까지 키울 수 있어요.` }));
-    const acc = $('shopAcc'); acc.textContent = '';
-    for (const [id, a] of Object.entries(c.accessories)) {
-      const own = u.acc.owned[id];
-      if (a.secret) { // 운영자 전용: 안 가졌으면 ??? 로
-        acc.append(row(own ? accThumb(id) : secretThumb(), own ? a.name : '???', own ? `${a.code} · ✨ 운영자 보상 · 가지고 있음` : `${a.code} · 🔒 비밀 액세서리 · 살 수 없어요`,
-          [[own ? '있음' : '구매 불가', true, () => {}]]));
-        continue;
-      }
-      const sub = `${a.code} · ` + (a.price == null ? '📅 출석 7일째 선물로만 나와요' : `🪙 ${a.price}`);
-      acc.append(row(accThumb(id), a.name, own ? `${a.code} · 가지고 있음` : sub, [[own ? '있음' : a.price == null ? '출석 전용' : '사기', own || a.price == null || u.coins < a.price, () => srv({ type: 'buy', item: id })]]));
-    }
+    renderTitleShop(u, c);   // 🏅 0.17.2 (액세서리 자리)
     const walls = $('shopWalls'); walls.textContent = '';
     for (const [id, w] of Object.entries(c.walls)) {
       const own = id === 'basic' || u.owned[id];
@@ -238,6 +228,60 @@
     g.fillStyle = '#f4cf4f'; g.font = 'bold 22px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText('?', 17, 18);
     return c;
+  }
+  // ------------------------------------------------------------ 🏅 칭호 (0.17.2)
+  function titleShowcase(id, u, c) {   // 내 닉네임으로 미리보기 (이모지 + 꾸민 글자)
+    const box = el('div', { class: 'title-show' });
+    box.append(Titles.element(id, u.nickname || u.username, 14, null, c.titles[id].icon));
+    return box;
+  }
+  function titleCard(id, u, c, buttons, note) {
+    const d = c.titles[id], st = u.titles?.list?.[id] || {};
+    const card = el('div', { class: 'title-card' + (st.owned ? ' owned' : st.ok ? ' open' : ' locked') + (u.titles?.eq === id ? ' on' : '') });
+    const head = el('div', { class: 'title-head' }, el('b', { text: `${d.icon} ${d.name}` }), el('small', { text: note }));
+    card.append(head, titleShowcase(id, u, c));
+    if (!st.owned && !st.ok && st.need > 1) {
+      const k = Math.min(1, (st.have || 0) / st.need);
+      card.append(el('div', { class: 'title-prog' }, el('i', { style: `width:${Math.round(k * 100)}%` }), el('span', { text: `${(st.have || 0).toLocaleString()} / ${st.need.toLocaleString()}` })));
+    }
+    if (buttons.length) card.append(el('div', { class: 'title-btns' }, ...buttons));
+    return card;
+  }
+  function renderTitleShop(u, c) {
+    const box = $('shopAcc'); box.textContent = '';
+    if (!c.titles || !u.titles) { box.append(el('p', { class: 'note', text: '서버를 업데이트하면 칭호가 보여요.' })); return; }
+    const groups = [['기념일 (가입한 날부터)', (d) => d.need && 'days' in d.need], ['활동', (d) => d.need && !('days' in d.need) && !d.event], ['시즌 이벤트', (d) => d.event], ['운영자 전용', (d) => d.secret]];
+    for (const [label, pick] of groups) {
+      const ids = Object.keys(c.titles).filter((id) => pick(c.titles[id]) && (!c.titles[id].secret || u.titles.list[id]));
+      if (!ids.length) continue;
+      box.append(el('h3', { text: label }));
+      const grid = el('div', { class: 'title-grid' });
+      for (const id of ids) {
+        const d = c.titles[id], st = u.titles.list[id] || {};
+        const evOn = d.event ? !!c.events?.[d.event]?.on : true;
+        const w = d.event ? { icon: c.events[d.event]?.coin?.icon || '🎫', bal: evCoins(u)[d.event] || 0 } : { icon: '🪙', bal: u.coins };
+        let note, btns = [];
+        if (st.owned) { note = u.titles.eq === id ? '✓ 달고 있어요' : '가지고 있어요'; btns = [btn(u.titles.eq === id ? '떼기' : '달기', u.titles.eq === id ? 'ghost small' : 'primary small', () => srv({ type: 'title-equip', id: u.titles.eq === id ? null : id }))]; }
+        else if (d.secret) note = '운영자만 줄 수 있어요';
+        else if (st.ok) { note = `🔓 열림 · ${w.icon} ${d.price.toLocaleString()}`; btns = [btn('사기', 'primary small', () => { if (confirm(`${d.icon} ${d.name} 칭호를 ${w.icon}${d.price.toLocaleString()}에 살까요?`)) srv({ type: 'title-buy', id }); }, !evOn || w.bal < d.price, !evOn ? '이벤트 때만 살 수 있어요' : '')]; if (!evOn) note = '🔓 열림 · 이벤트 때만 살 수 있어요'; }
+        else note = `🔒 ${st.text || ''}`;
+        grid.append(titleCard(id, u, c, btns, note));
+      }
+      box.append(grid);
+    }
+  }
+  function renderTitleBag(u, c) {
+    const box = $('bagAcc'); box.textContent = '';
+    if (!c.titles || !u.titles) return;
+    const own = Object.keys(c.titles).filter((id) => u.titles.list[id]?.owned);
+    $('bagTitleNote').textContent = own.length ? '칭호는 한 번에 하나만 달 수 있어요. 채팅 · 머리 위 이름표 · 프로필에 보여요.' : '아직 가진 칭호가 없어요. 🛒 상점 → 🏅 칭호에서 열린 칭호를 사 보세요.';
+    if (u.nameEffectOwned) $('bagTitleNote').textContent += ` · 운영자 닉네임 효과는 ⚙️ 설정에서 켜고 끌 수 있어요 (켜면 글자 색은 효과로).`;
+    const grid = el('div', { class: 'title-grid' });
+    for (const id of own) {
+      const on = u.titles.eq === id;
+      grid.append(titleCard(id, u, c, [btn(on ? '떼기' : '달기', on ? 'ghost small' : 'primary small', () => srv({ type: 'title-equip', id: on ? null : id }))], on ? '✓ 달고 있어요' : ''));
+    }
+    box.append(grid);
   }
   function accThumb(id) {
     const c = el('canvas', { width: 34, height: 34 });
@@ -312,15 +356,7 @@
     if (!foodIds.length) bf.append(el('li', { class: 'note', text: '음식이 없어요. 🛒 상점 → 음식에서 살 수 있어요.' }));
 
     // 액세서리
-    const ba = $('bagAcc'); ba.textContent = '';
-    const owned = Object.keys(u.acc.owned).filter((k) => u.acc.owned[k] && c.accessories[k]);
-    const SLOT = { head: '머리', face: '얼굴', neck: '목' };
-    for (const id of owned) {
-      const a = c.accessories[id];
-      const on = u.acc.eq[a.slot] === id;
-      ba.append(H.shopRow(accThumb(id), a.name, `${a.code} · ${SLOT[a.slot]}${on ? ' · 쓰고 있음' : ''}`, [[on ? '벗기' : '쓰기', false, () => srv({ type: 'acc-equip', slot: a.slot, id: on ? null : id }), on ? 'ghost small' : 'primary small']]));
-    }
-    if (!owned.length) ba.append(el('li', { class: 'note', text: '액세서리가 없어요. 상점에서 사거나 출석 7일째에 받아요.' }));
+    renderTitleBag(u, c);   // 🏅 0.17.2 (액세서리 자리)
 
     // 가구 (0.17: 상점처럼 종류별 + 되팔기)
     const v = H.viewing();
@@ -392,11 +428,18 @@
         }, !v?.editable, v?.editable ? '' : '내 집에서만 불러올 수 있어요') : null,
         btn(h ? '덮어쓰기' : '지금 꾸밈 저장', 'ghost small', () => {
           if (h && !confirm(`'${h.name}' 슬롯에 지금 꾸밈을 덮어쓸까요?`)) return;
-          srv({ type: 'slot-save', kind: 'home', i, name: name.value.trim() || `인테리어 ${i + 1}` });
+          let shot = null;   // 📸 지금 방 사진을 같이 저장 (대표 이미지 기본값)
+          try { const c = v?.editable && H.snapshot(240, 180); if (c) shot = Cropper.toData(c, 60_000); } catch {}
+          srv({ type: 'slot-save', kind: 'home', i, name: name.value.trim() || `인테리어 ${i + 1}`, ...(shot ? { shot } : {}) });
         }),
+        h ? btn('🖼️ 이미지', 'ghost small', () => pickHomeThumb(i)) : null,
+        h && h.custom ? btn('방 사진으로', 'link', () => srv({ type: 'slot-thumb', kind: 'home', i, reset: true })) : null,
         h ? btn('비우기', 'link', () => { if (confirm(`'${h.name}' 슬롯을 비울까요? (지금 집은 그대로예요)`)) srv({ type: 'slot-del', kind: 'home', i }); }) : null);
+      const pic = el('div', { class: 'slot-pic home-pic' + (h?.thumb ? ' photo' : '') });
+      if (h?.thumb) pic.append(el('img', { src: h.thumb, alt: '' })); else pic.textContent = h ? '🏠' : '➕';
+      if (h?.thumb) { pic.title = '눌러서 크게 보기'; pic.onclick = () => H.openPhoto?.(h.thumb, h.name); }
       box.append(el('div', { class: 'slot-card' + (h ? '' : ' empty') },
-        el('div', { class: 'slot-pic', text: h ? '🏠' : '➕' }),
+        pic,
         el('div', { class: 'slot-info' }, name, el('div', { class: 'slot-sub', text: h ? `가구 ${h.count}개 · ${when(h.at)} 저장` : '비어 있어요' }), btns)));
     });
     const next = homeSlots.homeNext;
@@ -404,6 +447,17 @@
     b.textContent = next == null ? `슬롯이 가득 찼어요 (${homeSlots.homeMax}칸)` : `＋ 슬롯 늘리기 🪙${next.toLocaleString()} (${homeSlots.homeN}/${homeSlots.homeMax}칸)`;
     b.disabled = next == null || u.coins < next;
     b.onclick = () => { if (next != null && confirm(`🪙${next.toLocaleString()}로 인테리어 슬롯을 한 칸 늘릴까요?`)) srv({ type: 'slot-buy', kind: 'home' }); };
+  }
+  function pickHomeThumb(i) {   // 🖼️ 인테리어 슬롯 대표 이미지: 사진 고르기 → 맞추기(4:3)
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp,image/gif,image/bmp';
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      try {
+        const r = await Cropper.open({ source: f, w: 240, h: 180, title: '✂️ 인테리어 슬롯 대표 이미지 맞추기' });
+        if (r) srv({ type: 'slot-thumb', kind: 'home', i, img: Cropper.toData(r.canvas, 60_000) });
+      } catch (e) { H.toast(e.message || '그림을 열지 못했어요.'); }
+    };
+    inp.click();
   }
   buddy.on('srv', (m) => {
     if (m.type === 'slots') { homeSlots = m; renderHomeSlots(); }
@@ -756,7 +810,26 @@
       fishing.state = 'reeling'; fishing.t = 0;
       updateCastBtn();
     }
+    watchFishing();
   };
+  // 0.17.2 '감는 중…'에서 멈춤 막기: 서버 대답이 4초 안에 안 오면 한 번 더 보내고, 9초면 처음으로 되돌림
+  let fishWatch = null;
+  function watchFishing() {
+    clearTimeout(fishWatch);
+    const st = fishing.state;
+    if (st !== 'casting' && st !== 'reeling') return;
+    const msg = st === 'casting' ? 'fish-cast' : 'fish-reel';
+    fishWatch = setTimeout(() => {
+      if (fishing.state !== st) return;
+      srv({ type: msg });   // 한 번 더 (중간에 버려졌을 수 있어서)
+      fishWatch = setTimeout(() => {
+        if (fishing.state !== st) return;
+        fishing.state = 'idle'; fishing.t = 0;
+        fishing.msg = '서버 대답이 없어서 처음으로 돌렸어요. 다시 던져 주세요 🎣'; fishing.msgT = 4;
+        updateCastBtn();
+      }, 5000);
+    }, 4000);
+  }
   function updateCastBtn() {
     const b = $('castBtn');
     const u = U();
@@ -766,6 +839,7 @@
     if (u) $('castInfo').textContent = u.castsLeft >= 9999 ? '횟수 제한 없음 🎣' : `오늘 ${u.castsLeft}번 남음`;
   }
   function onFishCast(m) {
+    clearTimeout(fishWatch);
     fishing.state = 'waiting';
     fishing.t = 0;
     fishing.biteAt = performance.now() + m.wait;
@@ -773,9 +847,12 @@
     updateCastBtn();
   }
   function onFishResult(m) {
+    // 이미 결과를 받았으면(한 번 더 보낸 '당기기'의 대답 등) 무시
+    if (!['casting', 'waiting', 'bite', 'reeling'].includes(fishing.state)) return;
+    clearTimeout(fishWatch);
     fishing.state = 'result'; fishing.t = 0; fishing.splash = 1; fishing.kind = m.kind;
     if (m.kind === 'catch') fishing.pop = { code: m.code, t: 1.6 };
-    const text = { early: '너무 빨랐어요! 물고기가 도망갔어요 💨', late: '앗, 놓쳤어요… 😢', nothing: '꽝! 아무것도 없어요 🫥' }[m.kind];
+    const text = { early: '너무 빨랐어요! 물고기가 도망갔어요 💨', late: '앗, 놓쳤어요… 😢', nothing: '꽝! 아무것도 없어요 🫥', lost: '찌가 사라졌어요 (연결이 잠깐 끊겼어요). 다시 던져 주세요 🎣' }[m.kind];
     if (text) { fishing.msg = text; fishing.msgT = 3; }
     if (m.kind === 'catch') showCatch(m);
     updateCastBtn();

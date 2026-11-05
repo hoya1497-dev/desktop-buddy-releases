@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://i.ytimg.com; frame-src https://www.youtube-nocookie.com https://www.youtube.com">
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
   <title>Desktop Buddy 집</title>
   <link rel="stylesheet" href="control.css">
   <link rel="stylesheet" href="home.css">
@@ -501,7 +502,7 @@
           <button data-shop="furniture" class="active">가구</button>
           <button data-shop="food">음식</button>
           <button data-shop="pet">펫</button>
-          <button data-shop="acc">액세서리</button>
+          <button data-shop="acc">🏅 칭호</button>
           <button data-shop="wall">벽지</button>
           <button data-shop="rod">🎣 낚싯대</button>
           <button data-shop="event" id="shopEventTab" class="event-tab" hidden>🎉 이벤트</button>
@@ -519,7 +520,7 @@
           <h3>펫 <span class="note-inline">집에서 키워요</span></h3><ul id="shopPets" class="shop"></ul>
         </div>
         <div class="shop-sec" data-sec="acc" hidden>
-          <h3>액세서리 <span class="note-inline">출석 7일째에만 나오는 것도 있어요</span></h3><ul id="shopAcc" class="shop"></ul>
+          <p class="note" style="margin:0 0 6px">🏅 칭호는 닉네임 앞 이모지 + 글씨체 + 꾸밈 세트예요. 조건을 채우면 열리고, 사면 가방 → 🏅 칭호에서 하나 달 수 있어요.</p><div id="shopAcc"></div>
         </div>
         <div class="shop-sec" data-sec="rod" hidden>
           <h3>낚싯대 <span class="note-inline">좋은 낚싯대일수록 희귀한 물고기가 잘 걸리고 꽝 · 쓰레기가 줄어요</span></h3><ul id="shopRods" class="shop"></ul>
@@ -540,7 +541,7 @@
         <div class="subtabs" id="bagTabs">
           <button data-bag="fish" class="active">물고기</button>
           <button data-bag="food">음식</button>
-          <button data-bag="acc">액세서리</button>
+          <button data-bag="acc">🏅 칭호</button>
           <button data-bag="furniture">가구</button>
         </div>
         <div class="bag-sec" data-sec="fish">
@@ -560,7 +561,7 @@
           <ul id="bagFish" class="fishgrid"></ul>
         </div>
         <div class="bag-sec" data-sec="food" hidden><ul id="bagFood" class="shop"></ul></div>
-        <div class="bag-sec" data-sec="acc" hidden><ul id="bagAcc" class="shop"></ul></div>
+        <div class="bag-sec" data-sec="acc" hidden><p class="note" id="bagTitleNote" style="margin:0 0 6px"></p><div id="bagAcc"></div></div>
         <div class="bag-sec" data-sec="furniture" hidden>
           <details id="homeSlotsBox" class="home-slots">
             <summary>💾 인테리어 저장 슬롯 <span id="homeSlotsCount" class="note-inline"></span></summary>
@@ -703,6 +704,7 @@
 
   <script src="theme.js"></script>
   <script src="nickfx.js"></script>
+  <script src="titles.js"></script>
   <script src="sprites.js"></script>
   <script src="skins.js"></script>
   <script src="furniture.js"></script>
@@ -712,6 +714,7 @@
   <script src="emoteart.js"></script>
   <script src="meetscene.js"></script>
   <script src="profilecard.js"></script>
+  <script src="cropper.js"></script>
   <script src="home.js"></script>
   <script src="fishscene.js"></script>
   <script src="home-game.js"></script>

@@ -44,11 +44,17 @@
     $('selfLine').textContent = `${p.nickname}${p.status ? ' · ' + p.status : ''}`;
     drawPreview(p.color);
     const note = $('nameEffectNote');
-    if (p.nameEffect) { note.hidden = false; note.textContent = `✨ 운영자가 닉네임에 '${(window.NickFX && NickFX.LABEL[p.nameEffect]) || p.nameEffect}' 효과를 줬어요!${p.nameEffect === 'neon' ? ' (빛 색은 아래 글자색으로 바꿀 수 있어요)' : ''}`; }
+    const owned = p.nameEffectOwned || p.nameEffect;   // 0.17.2: 꺼 두면 nameEffect 는 비어 있고 owned 에 남아요
+    if (owned) { note.hidden = false; note.textContent = `✨ 운영자가 닉네임에 '${(window.NickFX && NickFX.LABEL[owned]) || owned}' 효과를 줬어요!${owned === 'neon' ? ' (빛 색은 아래 글자색으로 바꿀 수 있어요)' : ''}`; }
     else note.hidden = true;
+    $('nameEffectRow').hidden = !owned;
+    $('nameEffectOn').checked = p.nameEffectOn !== false;
+    $('nameEffectOn').disabled = !!p.nameEffectLocked;   // 🌈 무지개는 끌 수 없어요
+    $('nameEffectLockNote').hidden = !p.nameEffectLocked;
   }
   renderSelf(state.self);
   buddy.on('self', renderSelf);
+  $('nameEffectOn').onchange = (e) => buddy.send('srv', { type: 'name-effect-toggle', on: e.target.checked });   // 0.17.2
 
   // ---------------------------------------------------- 내 캐릭터
   $('nickname').value = config.nickname;

@@ -613,3 +613,31 @@ body.meeting-mode #room { cursor: default !important; }
 .bubble-presets { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 4px; }
 .bubble-presets button { display: inline-flex; gap: 3px; align-items: center; }
 .bubble-presets i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.15); }
+
+/* 0.17.2 인테리어 슬롯 대표 이미지 */
+.home-slots .slot-pic.home-pic { width: 88px; height: 66px; }
+.home-slots .slot-pic.home-pic.photo { cursor: zoom-in; }
+.home-slots .slot-pic.photo img { width: 100%; height: 100%; object-fit: cover; image-rendering: auto; max-width: none; max-height: none; }
+
+/* 🏅 0.17.2 칭호 닉네임 */
+.title-name { display: inline-flex; align-items: center; gap: 2px; vertical-align: middle; }
+.title-name .title-icon { font-size: 14px; line-height: 1; }
+.title-name img { display: block; }
+.msg-head .chat-name.titled { display: inline-block; }
+
+/* 🏅 칭호 상점 · 가방 */
+.title-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.title-card { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: var(--card); display: flex; flex-direction: column; gap: 6px; }
+.title-card.locked { opacity: .78; }
+.title-card.locked .title-show { filter: grayscale(.85); opacity: .55; }
+.title-card.open { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.title-card.on { background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+.title-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.title-head b { font-size: 13px; }
+.title-head small { font-size: 11px; color: var(--muted); text-align: right; }
+.title-show { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 6px; border-radius: 8px; background: repeating-linear-gradient(45deg, var(--input), var(--input) 6px, transparent 6px, transparent 12px); }
+.title-show .title-icon { font-size: 16px; }
+.title-prog { position: relative; height: 14px; border-radius: 99px; background: var(--input); border: 1px solid var(--line); overflow: hidden; }
+.title-prog i { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--accent) 55%, transparent); }
+.title-prog span { position: relative; display: block; text-align: center; font-size: 10px; line-height: 13px; color: var(--ink); }
+.title-btns { display: flex; justify-content: flex-end; gap: 4px; }

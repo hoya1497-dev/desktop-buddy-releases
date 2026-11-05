@@ -425,8 +425,31 @@
   }
 
   // ------------------------------------------------------------ 말풍선 / 라벨
+  // 🏅 0.17.2 칭호 이름표 (바탕화면): 상태 위 줄 + [칭호 이모지 + 꾸민 닉네임]
+  const EMOJI_FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+  function drawTitlePill(name, status, cx, bottom, mine, profile) {
+    const im = Titles.image(profile.title, name, 13.5, profile);
+    const icon = profile.titleIcon || '';
+    ctx.font = `13px ${EMOJI_FONT}`;
+    const iw = icon ? ctx.measureText(icon).width + 3 : 0;
+    ctx.font = `10px ${FONT}`;
+    const sw = status ? ctx.measureText(status).width : 0;
+    const w = Math.min(240, Math.max(sw, iw + im.w)) + 14;
+    const top = status ? 14 : 3, h = top + im.h + 3;
+    const x = Math.round(cx - w / 2), y = Math.round(bottom - h);
+    ctx.fillStyle = mine ? 'rgba(30,30,40,0.72)' : 'rgba(40,60,110,0.82)';
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (status) { ctx.font = `10px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillText(status, cx, y + 9, w - 12); }
+    const lx = x + (w - (iw + im.w)) / 2;
+    if (icon) { ctx.font = `13px ${EMOJI_FONT}`; ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.fillText(icon, lx, y + top + im.ay); ctx.textAlign = 'center'; }
+    Titles.draw(ctx, profile.title, name, lx + iw + im.ax, y + top + im.ay, 13.5, performance.now() / 1000, profile);
+    ctx.textBaseline = 'alphabetic';
+    return y;
+  }
   // 이름표: 상태(작게) 위 줄 + 닉네임(굵게) 아래 줄. 이름을 안 보일 땐 상태만 한 줄
   function drawPill(name, status, cx, bottom, mine, profile) {
+    if (name && profile && profile.title && window.Titles && Titles.has(profile.title)) return drawTitlePill(name, status, cx, bottom, mine, profile);
     ctx.font = `600 12px ${FONT}`;
     let w = name ? ctx.measureText(name).width : 0;
     if (status) { ctx.font = `${name ? 10 : 11}px ${FONT}`; w = Math.max(w, ctx.measureText(status).width); }

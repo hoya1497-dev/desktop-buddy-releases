@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
   <title>Desktop Buddy</title>
   <link rel="stylesheet" href="control.css">
   <link rel="stylesheet" href="profilecard.css">
@@ -42,6 +43,11 @@
         </div>
       </label>
       <p id="nameEffectNote" class="note" hidden></p>
+      <div id="nameEffectRow" hidden>
+        <label class="check" style="margin:4px 0 0"><input type="checkbox" id="nameEffectOn"> ✨ 운영자 닉네임 효과 켜기</label>
+        <p class="note" style="margin:2px 0 0 24px">켜면 칭호를 달아도 글자 색은 효과로 보여요. 끄면 칭호 색 그대로예요.</p>
+        <p class="note" id="nameEffectLockNote" style="margin:2px 0 0 24px" hidden>🌈 무지개는 가장 높은 효과라 항상 켜져 있어요.</p>
+      </div>
       <div class="note" style="margin-top:8px">캐릭터</div>
       <div class="species-row" id="speciesRow"></div>
       <label>바탕화면 크기 <span id="scaleVal" class="note-inline"></span><input id="petScale" type="range" min="2" max="8" step="1"></label>
@@ -133,23 +139,6 @@
     </div>
   </section>
 
-  <!-- ✂️ 사진 맞추기 (프로필 사진 · 배경): 끌어서 자리, 크기 조절 -->
-  <div id="cropPad" class="draw-pad" hidden>
-    <div class="draw-box">
-      <div class="row between"><b id="cropTitle">사진 맞추기</b><button class="ghost small" id="cropClose">취소</button></div>
-      <p class="note" style="margin:0">사진을 끌어서 자리를 옮기고, 아래 막대(또는 마우스 휠)로 크기를 맞춰요.</p>
-      <div class="crop-stage"><canvas id="cropCanvas"></canvas></div>
-      <div class="row"><span class="note-inline">작게</span><input type="range" id="cropZoom" min="0" max="1000" value="0" style="flex:1"><span class="note-inline">크게</span></div>
-      <div class="draw-tools">
-        <button class="ghost small" id="cropCover">⬛ 꽉 채우기</button>
-        <button class="ghost small" id="cropContain">🖼️ 사진 전체 보이기</button>
-        <button class="ghost small" id="cropCenter">⊕ 가운데로</button>
-        <label class="check" style="margin:0">빈 곳 색 <input type="color" id="cropFill" value="#ffffff"></label>
-      </div>
-      <div class="row between"><button class="ghost small" id="cropDraw">🖌️ 이 사진 위에 그리기</button><button class="primary small" id="cropDone">이대로 쓰기</button></div>
-    </div>
-  </div>
-
   <!-- 🖌️ 그림 그리기 (프로필 사진 · 배경) -->
   <div id="drawPad" class="draw-pad" hidden>
     <div class="draw-box">
@@ -227,11 +216,13 @@
 
   <script src="theme.js"></script>
   <script src="nickfx.js"></script>
+  <script src="titles.js"></script>
   <script src="sprites.js"></script>
   <script src="skins.js"></script>
   <script src="fishart.js"></script>
   <script src="petart.js"></script>
   <script src="profilecard.js"></script>
+  <script src="cropper.js"></script>
   <script src="control.js"></script>
   <script src="control-extra.js"></script>
 </body>

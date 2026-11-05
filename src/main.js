@@ -392,11 +392,17 @@ function effectiveStatus() {
   if (config.status === 'custom') return String(config.customStatus || '').slice(0, 24);
   return config.status;
 }
+// 🏅 0.17.2 내가 단 칭호 (이름표 · 채팅에 같이)
+function myTitle() {
+  const id = session?.user.titles?.eq || null;
+  return { title: id, titleIcon: id ? session?.catalog?.titles?.[id]?.icon || null : null };
+}
 function selfProfile() {
   const pet = session?.user.pet;
   return {
     nickname: config.nickname, color: config.color, nameColor: config.nameColor || null,
-    nameEffect: session?.user.nameEffect || null, status: effectiveStatus(), species: config.species,
+    nameEffect: session?.user.nameEffect || null, nameEffectOwned: session?.user.nameEffectOwned || null, nameEffectOn: session?.user.nameEffectOn !== false, nameEffectLocked: !!session?.user.nameEffectLocked,
+    ...myTitle(), status: effectiveStatus(), species: config.species,
     pose: POSES.includes(config.pose) ? config.pose : 'auto',
     username: session?.user.username || '', hungry: !!pet && pet.full < 30, sad: !!pet && pet.mood < 25,
     skin: session?.user.skin?.v ? session.user.skin : null,
@@ -635,7 +641,7 @@ function handleServer(m, sock) {
     case 'chat': {
       const p = peers.get(m.id);
       overlay?.webContents.send('chat', { id: m.id, text: m.text });
-      addChat({ pid: m.id, from: p ? p.nickname : '?', username: p?.username, color: p?.color, nameColor: p?.nameColor, nameEffect: p?.nameEffect, text: m.text, ts: typeof m.ts === 'number' ? m.ts : serverTime() });
+      addChat({ pid: m.id, from: p ? p.nickname : '?', username: p?.username, color: p?.color, nameColor: p?.nameColor, nameEffect: p?.nameEffect, title: p?.title, titleIcon: p?.titleIcon, text: m.text, ts: typeof m.ts === 'number' ? m.ts : serverTime() });
       break;
     }
     case 'emote':
@@ -646,7 +652,7 @@ function handleServer(m, sock) {
       for (const w of homes()) w.webContents.send('emote', { from: m.id, kind: m.kind, target: m.target ? (m.target === myPeerId ? 'me' : m.target) : null });
       if (!m.target && EMOTE_LABEL[m.kind]) {   // 💬 이모티콘도 채팅 로그에 남김
         const p = peers.get(m.id);
-        addChat({ pid: m.id, from: p ? p.nickname : '?', username: p?.username, color: p?.color, nameColor: p?.nameColor, nameEffect: p?.nameEffect, text: '', emote: m.kind });   // 그림만 (글자 · 말풍선 없음)
+        addChat({ pid: m.id, from: p ? p.nickname : '?', username: p?.username, color: p?.color, nameColor: p?.nameColor, nameEffect: p?.nameEffect, title: p?.title, titleIcon: p?.titleIcon, text: '', emote: m.kind });   // 그림만 (글자 · 말풍선 없음)
       }
       break;
     case 'peer-pos':   // 🧍 친구가 보낸 집 안 위치 → 내 화면의 그 친구 캐릭터도 같은 자리로
@@ -736,6 +742,7 @@ function handleServer(m, sock) {
     }
     case 'slots':          // 0.17 💾 저장 슬롯
     case 'slot-done':
+    case 'slot-detail':    // 0.17.2 펼쳐보기
     case 'profile-card':   // 0.17 🪪 프로필
     case 'profile-saved':
       for (const w of [home, control]) if (w && !w.isDestroyed()) w.webContents.send('srv', m);
@@ -866,14 +873,14 @@ function sendChat(text) {
     return;
   }
   overlay?.webContents.send('chat', { id: 'me', text: t });
-  addChat({ pid: 'me', from: config.nickname, username: session?.user.username, color: config.color, nameColor: config.nameColor, nameEffect: session?.user.nameEffect, text: t, mine: true });
+  addChat({ pid: 'me', from: config.nickname, username: session?.user.username, color: config.color, nameColor: config.nameColor, nameEffect: session?.user.nameEffect, ...myTitle(), text: t, mine: true });
   if (room) wsSend({ type: 'chat', text: t });
 }
 function sendEmote(kind, target = null) {
   overlay?.webContents.send('emote', { from: 'me', kind, target, fromName: config.nickname });
   for (const w of homes()) w.webContents.send('emote', { from: 'me', kind, target });
   if (!target && EMOTE_LABEL[kind]) {   // 💬 내가 보낸 이모티콘도 채팅 로그에 남김 — 그림만 (0.15.1: 예전엔 '👋 안녕!' 글자가 같이 가고 말풍선도 떴음)
-    addChat({ pid: 'me', from: config.nickname, username: session?.user.username, color: config.color, nameColor: config.nameColor, nameEffect: session?.user.nameEffect, text: '', emote: kind, mine: true });
+    addChat({ pid: 'me', from: config.nickname, username: session?.user.username, color: config.color, nameColor: config.nameColor, nameEffect: session?.user.nameEffect, ...myTitle(), text: '', emote: kind, mine: true });
   }
   if (room && !room.meeting) wsSend({ type: 'emote', kind, target: target || undefined });   // 회의장에서는 이모트를 안 보냄
 }
@@ -1275,10 +1282,11 @@ function registerIpc() {
     'home-expand', 'music-get', 'music-add', 'music-request', 'music-answer', 'music-skip', 'music-remove', 'music-move', 'music-duration', 'music-error',
     'music-play', 'music-fav', 'music-bgm', 'music-repeat',
     'photo',   // 0.15.1: 📷 방 안 사진
-    'slots-get', 'slot-buy', 'slot-save', 'slot-load', 'slot-del', 'slot-rename', 'furn-sell', 'profile-set', 'profile-get']);   // 0.17: 💾 슬롯 · 🛋️ 되팔기 · 🪪 프로필
+    'slots-get', 'slot-buy', 'slot-save', 'slot-load', 'slot-del', 'slot-rename', 'furn-sell', 'profile-set', 'profile-get',
+    'slot-thumb', 'slot-detail', 'title-buy', 'title-equip', 'name-effect-toggle']);   // 0.17: 💾 슬롯 · 🛋️ 되팔기 · 🪪 프로필 · 0.17.2: 🖼️ 슬롯 대표 이미지 · 펼쳐보기
     // 0.15: ⭐ 즐겨찾기 · 🏠 배경음 · 🔁 반복
   // 0.17: 📷 사진이 여기서 4000자에 걸려 조용히 버려지던 버그 → 그림이 들어가는 메시지는 크기를 따로 정함
-  const SRV_BIG = { 'board-add': 90_000, 'board-edit': 90_000, 'notice-post': 16_000, 'notice-edit': 16_000, photo: 400_000, 'profile-set': 320_000 };
+  const SRV_BIG = { 'board-add': 90_000, 'board-edit': 90_000, 'notice-post': 16_000, 'notice-edit': 16_000, photo: 400_000, 'profile-set': 320_000, 'slot-save': 80_000, 'slot-thumb': 80_000 };
   ipcMain.on('srv', (_e, m) => {
     if (!m || typeof m !== 'object' || !SRV_TYPES.has(m.type)) return;
     const json = JSON.stringify(m);

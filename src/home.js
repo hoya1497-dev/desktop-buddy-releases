@@ -286,6 +286,7 @@
   }
   // 이름표: (상태 — 작게) 위 줄 + 닉네임 아래 줄 (0.17: 예전엔 '닉네임 · 상태' 한 줄 + @아이디)
   function pill(name, status, cx, bottom, mine, profile) {
+    if (profile && profile.title && window.Titles && Titles.has(profile.title)) return titlePill(name, status, cx, bottom, mine, profile);
     ctx.font = `600 11px ${FONT}`;
     let w = ctx.measureText(name).width;
     if (status) { ctx.font = `10px ${FONT}`; w = Math.max(w, ctx.measureText(status).width); }
@@ -298,6 +299,29 @@
     if (status) { ctx.font = `10px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.78)'; ctx.fillText(status, x + w / 2, y + 9, w - 10); }
     ctx.font = `600 11px ${FONT}`;
     NickFX.drawNameLine(ctx, name, '', x + w / 2, y + (status ? 20 : h / 2 + 0.5), w - 10, profile, performance.now() / 1000);
+    ctx.textBaseline = 'alphabetic';
+    return y;
+  }
+  // 🏅 0.17.2 칭호 이름표: (상태) 위 줄 + [칭호 이모지 + 꾸민 닉네임] 아래 줄. 꾸밈은 움직여요
+  function titlePill(name, status, cx, bottom, mine, profile) {
+    const crown = name.startsWith('👑 ') ? '👑' : '';
+    const nick = crown ? name.slice(3) : name;
+    const im = Titles.image(profile.title, nick, 12.5, profile);
+    const icon = (crown ? '👑' : '') + (profile.titleIcon || '');
+    ctx.font = `12px ${EMOJI_FONT}`;
+    const iw = icon ? ctx.measureText(icon).width + 3 : 0;
+    ctx.font = `10px ${FONT}`;
+    const sw = status ? ctx.measureText(status).width : 0;
+    const w = Math.min(220, Math.max(sw, iw + im.w)) + 12;
+    const top = status ? 13 : 3, h = top + im.h + 3;
+    const x = Math.round(clamp(cx - w / 2, 2, RW - w - 2)), y = Math.round(bottom - h);
+    ctx.fillStyle = mine ? 'rgba(30,30,40,0.72)' : 'rgba(40,60,110,0.82)';
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 9); ctx.fill();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (status) { ctx.font = `10px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.78)'; ctx.fillText(status, x + w / 2, y + 8, w - 10); }
+    const lx = x + (w - (iw + im.w)) / 2;
+    if (icon) { ctx.font = `12px ${EMOJI_FONT}`; ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.fillText(icon, lx, y + top + im.ay); ctx.textAlign = 'center'; }
+    Titles.draw(ctx, profile.title, nick, lx + iw + im.ax, y + top + im.ay, 12.5, performance.now() / 1000, profile);
     ctx.textBaseline = 'alphabetic';
     return y;
   }
@@ -537,8 +561,9 @@
   const EVENT_GLOW = { halloween: 'rgba(255,150,60,0.22)', christmas: 'rgba(255,214,130,0.2)', newyear: 'rgba(255,205,90,0.22)', other: 'rgba(255,220,150,0.2)' };
 
   // 꾸미기 격자: 화면에서 너무 촘촘하면 몇 칸마다 한 줄씩, 8칸마다 진한 줄
+  let noGrid = false;   // 0.17.2 슬롯 사진 찍을 땐 격자 · 고른 표시 없이
   function drawGrid() {
-    if (!decorating || !gridStep) return;
+    if (noGrid || !decorating || !gridStep) return;
     const every = Math.max(1, Math.ceil(6 / (gridStep * K)));   // 화면에서 6px 보다 촘촘하면 건너뜀
     const d = gridStep * every, major = d * Math.max(1, Math.round(32 / d));
     ctx.save();
@@ -663,7 +688,7 @@
   let lastPosSend = 0, lastPosSent = null;
   function sendMyPos(t) {
     const me = pets.get('me');
-    if (!me || !S || !S.room || meetingMode()) return;
+    if (MINI || !me || !S || !S.room || meetingMode()) return;   // 0.17.2: 미니맵은 위치를 안 보냄 (집 창과 둘이 따로 보내서 서버 한도를 다 썼음)
     if (t - lastPosSend < 180) return;
     const snap = { x: Math.round(me.x), y: Math.round(me.y), state: me.state, dir: me.dir, inBed: !!me.inBed };
     const same = lastPosSent && snap.x === lastPosSent.x && snap.y === lastPosSent.y && snap.state === lastPosSent.state && snap.dir === lastPosSent.dir;
@@ -1309,8 +1334,14 @@
   }
   // 0.17 🪪 채팅 이름: 아이디는 안 보이고, 이름을 누르면 프로필 카드(아이디 포함)가 떠요
   function nameTag(m) {
-    const b = document.createElement('b'); b.textContent = m.from || '?'; b.style.marginRight = '3px';
-    b.className = 'chat-name ' + NickFX.domClass(m); b.style.cssText += ';' + NickFX.domStyle(m, m.color);
+    const b = document.createElement('b'); b.style.marginRight = '3px';
+    if (m.title && window.Titles && Titles.has(m.title)) {   // 🏅 칭호: 이모지 + 꾸민 닉네임 그림
+      b.className = 'chat-name titled';
+      b.append(Titles.element(m.title, m.from || '?', 12, m, m.titleIcon || ''));
+    } else {
+      b.textContent = m.from || '?';
+      b.className = 'chat-name ' + NickFX.domClass(m); b.style.cssText += ';' + NickFX.domStyle(m, m.color);
+    }
     if (m.username) { b.dataset.user = m.username; b.title = '눌러서 프로필 보기'; }
     if (m.pid) b.dataset.pid = m.pid;
     return b;
@@ -1468,7 +1499,7 @@
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('photoView').hidden) $('photoView').click(); });
   function profileOf(id) {
     const p = pets.get(id)?.profile || (S?.peers || []).find((x) => x.id === id) || {};
-    return { from: p.nickname, username: p.username, color: p.color, nameColor: p.nameColor, nameEffect: p.nameEffect };
+    return { from: p.nickname, username: p.username, color: p.color, nameColor: p.nameColor, nameEffect: p.nameEffect, title: p.title, titleIcon: p.titleIcon };
   }
   // 0.17: 사진은 고르거나 붙여넣으면 바로 가지 않고, 입력칸 위에 올려 두었다가 [보내기]를 누르면 가요
   let pendingPhoto = null;
@@ -1490,7 +1521,7 @@
     if (S.net !== 'online') { toast('서버와 연결돼 있을 때만 보낼 수 있어요.'); return false; }
     buddy.send('srv', { type: 'photo', data: r.data, w: r.w, h: r.h });
     const me = S.self || {};
-    photoMsg({ from: me.nickname, username: S.session?.user?.username, color: me.color, nameColor: me.nameColor, nameEffect: S.session?.user?.nameEffect, data: r.data, ts: Date.now() }, true);
+    photoMsg({ from: me.nickname, username: S.session?.user?.username, color: me.color, nameColor: me.nameColor, nameEffect: S.session?.user?.nameEffect, title: me.title, titleIcon: me.titleIcon, data: r.data, ts: Date.now() }, true);
     pets.get('me')?.say('📷 사진');
     clearPending();
     return true;
@@ -1587,6 +1618,7 @@
     else if (r.reason === 'gift' || r.reason === 'admin') { me?.emote('🎁'); }
     else if (r.reason === 'skin') toast('캐릭터 그림을 바꿨어요!');
     else if (r.reason === 'expand') toast(`🏗️ ${r.name} 완료! 집이 넓어졌어요`, true);
+    else if (r.reason === 'title-buy') toast(`🏅 ${catalog?.titles?.[r.id]?.icon || ''} ${catalog?.titles?.[r.id]?.name || ''} 칭호를 샀어요! 가방 → 🏅 칭호에서 바꿀 수 있어요`, true);
     else if (r.reason === 'furn-sell') toast(`🛋️ ${catalog?.items?.[r.item]?.name || '가구'}을(를) 팔아서 ${r.event ? catalog?.events?.[r.event]?.coin?.icon || '🎫' : '🪙'}${r.amount.toLocaleString()}을 받았어요`, true);   // 0.17
     else if (r.reason === 'slot') toast(`💾 저장 슬롯을 한 칸 늘렸어요 (🪙${(-r.amount).toLocaleString()})`);
     else if (r.reason === 'pet-sell') toast(`🐾 '${r.name}'을(를) 되팔아서 🪙${r.amount}을 돌려받았어요`, true);
@@ -1805,12 +1837,25 @@
   window.HomeCore = {
     get S() { return S; }, get catalog() { return catalog; }, get K() { return K; },
     get FLOORS() { return FLOORS; }, get RW() { return RW; }, get LADDER_X() { return LADDER_X; },
-    viewing, toast, band, rand, clamp, shopRow, wallThumb, placeNew, findItem, geom, itemScale,
+    viewing, toast, band, rand, clamp, shopRow, wallThumb, placeNew, findItem, geom, itemScale, openPhoto,
     me: () => pets.get('me'),
     charOf: (id) => pets.get(id),
     isMini: MINI,
     layout: () => layout,
     isDecorating: () => decorating,
+    // 📸 0.17.2 지금 방 사진 (인테리어 슬롯 대표 이미지): 격자 없이 한 번 그려서 방 전체를 w×h 안에
+    snapshot(w = 240, h = 180) {
+      if (fishingMode() || meetingMode()) return null;
+      noGrid = true;
+      try { render(); } catch {} finally { noGrid = false; }
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g2 = c.getContext('2d');
+      g2.fillStyle = '#efe7da'; g2.fillRect(0, 0, w, h);   // 방 전체가 다 보이게 (남는 곳은 옅은 색)
+      const k = Math.min(w / canvas.width, h / canvas.height);
+      g2.imageSmoothingQuality = 'high';
+      g2.drawImage(canvas, (w - canvas.width * k) / 2, (h - canvas.height * k) / 2, canvas.width * k, canvas.height * k);
+      return c;
+    },
   };
 
   buddy.invoke('get-chat').then((list) => { (list || []).forEach(addMsg); log.scrollTop = log.scrollHeight; });

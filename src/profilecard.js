@@ -51,8 +51,13 @@ window.ProfileCard = (() => {
     else av.append(el('span', { text: SPECIES[p.species] || '🐾' }));
     card.append(av);
     const body = el('div', { class: 'pcard-body' });
-    const nick = el('b', { class: 'pcard-nick ' + (window.NickFX ? NickFX.domClass(p) : ''), text: p.nickname || p.username });
-    if (window.NickFX) nick.style.cssText += ';' + NickFX.domStyle(p, th.ink);
+    let nick;
+    if (p.title && window.Titles && Titles.has(p.title)) {   // 🏅 칭호
+      nick = el('b', { class: 'pcard-nick titled' }, Titles.element(p.title, p.nickname || p.username, 17, p, p.titleIcon || ''));
+    } else {
+      nick = el('b', { class: 'pcard-nick ' + (window.NickFX ? NickFX.domClass(p) : ''), text: p.nickname || p.username });
+      if (window.NickFX) nick.style.cssText += ';' + NickFX.domStyle(p, th.ink);
+    }
     body.append(el('div', { class: 'pcard-name' }, nick, el('span', { class: 'pcard-lv', text: `Lv.${p.level || 1}` })));
     body.append(el('div', { class: 'pcard-id', text: '@' + p.username + (p.friend ? ' · 친구' : '') }));
     if (p.joined) {

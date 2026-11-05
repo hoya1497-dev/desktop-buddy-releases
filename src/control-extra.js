@@ -24,8 +24,9 @@
     if (!account) { box.append(el('p', { class: 'note', text: '로그인하면 쓸 수 있어요.' })); $('charSlotBuy').hidden = true; $('charSlotInfo').textContent = ''; return; }
     if (!slots) { box.append(el('p', { class: 'note', text: '불러오는 중…' })); return; }
     slots.chars.forEach((c, i) => {
-      const pic = el('div', { class: 'slot-pic' });
-      if (c && c.stand) { const img = el('img', { src: c.stand, alt: '' }); if (c.faces === 'left') img.style.transform = 'scaleX(-1)'; pic.append(img); }
+      const pic = el('div', { class: 'slot-pic' + (c?.custom ? ' photo' : '') });
+      const src = c && (c.thumb || c.stand);
+      if (src) { const img = el('img', { src, alt: '' }); if (!c.custom && c.faces === 'left') img.style.transform = 'scaleX(-1)'; pic.append(img); }
       else if (c && c.basic) pic.append(el('span', { text: '🐱', title: '기본 캐릭터' }));
       else pic.append(el('span', { class: 'slot-empty', text: '비어 있음' }));
       // 이름: 그 자리에서 고쳐요 (Electron 에선 prompt() 가 안 돼요)
@@ -39,14 +40,63 @@
           if (c && !confirm(`'${c.name}' 슬롯에 지금 캐릭터 그림을 덮어쓸까요?`)) return;
           waitMsg = 'char'; srv({ type: 'slot-save', kind: 'char', i, name: name.value.trim() || `캐릭터 ${i + 1}` });
         } }),
-        c ? el('button', { class: 'link', text: '비우기', onclick: () => { if (confirm(`'${c.name}' 슬롯을 비울까요? (지금 입은 캐릭터는 그대로예요)`)) srv({ type: 'slot-del', kind: 'char', i }); } }) : null);
+        c ? el('button', { class: 'link', text: '비우기', onclick: () => { if (confirm(`'${c.name}' 슬롯을 비울까요? (지금 입은 캐릭터는 그대로예요)`)) srv({ type: 'slot-del', kind: 'char', i }); } }) : null,
+        c ? el('button', { class: 'link slot-more', text: openSlot === i ? '▴ 접기' : '▾ 펼쳐보기', onclick: () => toggleSlot(i) }) : null);
+      // 🔽 펼쳐보기: 저장한 그림 전부 + 대표 이미지 정하기
+      let more = null;
+      if (c && openSlot === i) {
+        more = el('div', { class: 'slot-detail' });
+        const d = details.get(i);
+        if (c.basic) more.append(el('p', { class: 'note', text: '기본 캐릭터(그림 없이 고양이 · 강아지 · 토끼)로 저장된 슬롯이에요.' }));
+        else if (!d || d.at !== c.at) more.append(el('p', { class: 'note', text: '그림 불러오는 중…' }));
+        else {
+          const grid = el('div', { class: 'pose-grid' });
+          for (const p of ['stand', 'sit', 'walk', 'lie', 'fall']) {
+            const img = d.poses[p];
+            const on = !c.custom && c.thumbPose === p;
+            const cell = el('div', { class: 'pose-cell' + (on ? ' on' : '') + (img ? '' : ' none') },
+              el('div', { class: 'pose-img' }, img ? el('img', { src: img, alt: '', style: d.faces === 'left' ? 'transform:scaleX(-1)' : '' }) : el('span', { text: '없음' })),
+              el('small', { text: POSE_NAME[p] }),
+              img ? el('button', { class: on ? 'primary small' : 'ghost small', text: on ? '✓ 대표' : '대표로', disabled: on, onclick: () => srv({ type: 'slot-thumb', kind: 'char', i, pose: p }) }) : null);
+            grid.append(cell);
+          }
+          more.append(grid);
+        }
+        more.append(el('div', { class: 'slot-btns' },
+          el('button', { class: 'ghost small', text: '📁 사진으로 대표 이미지 정하기', onclick: () => pickThumb(i) }),
+          c.custom ? el('span', { class: 'note-inline', text: '✓ 지금은 직접 고른 사진이 대표예요' }) : null,
+          c.custom ? el('button', { class: 'link', text: '기본으로', onclick: () => srv({ type: 'slot-thumb', kind: 'char', i, reset: true }) }) : null));
+      }
       box.append(el('div', { class: 'slot-card' + (c ? '' : ' empty') }, pic, el('div', { class: 'slot-info' }, name, sub, btns)));
+      if (more) box.append(more);
     });
     const next = slots.charNext;
     $('charSlotBuy').hidden = false;
     $('charSlotBuy').textContent = next == null ? '슬롯이 가득 찼어요' : `＋ 슬롯 늘리기 🪙${next.toLocaleString()}`;
     $('charSlotBuy').disabled = next == null || slots.coins < next;
     $('charSlotInfo').textContent = `${slots.charN}/${slots.charMax}칸 · 내 코인 🪙${(slots.coins || 0).toLocaleString()}`;
+  }
+  const POSE_NAME = { stand: '서 있기', sit: '앉기', walk: '걷기', lie: '눕기', fall: '떨어지기' };
+  let openSlot = -1;
+  const details = new Map();   // 슬롯 번호 → { at, faces, poses }
+  function toggleSlot(i) {
+    openSlot = openSlot === i ? -1 : i;
+    const c = slots?.chars[i];
+    if (openSlot === i && c && !c.basic && details.get(i)?.at !== c.at) srv({ type: 'slot-detail', kind: 'char', i });
+    renderSlots();
+  }
+  function pickThumb(i) {   // 📁 사진 고르기 → ✂️ 맞추기(정사각형) → 대표 이미지
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp,image/gif,image/bmp';
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      try {
+        const r = await Cropper.open({ source: f, w: 160, h: 160, title: '✂️ 캐릭터 슬롯 대표 이미지 맞추기' });
+        if (!r) return;
+        waitMsg = 'char';
+        srv({ type: 'slot-thumb', kind: 'char', i, img: Cropper.toData(r.canvas, 60_000, true) });
+      } catch (e) { $('charSlotMsg').textContent = e.message; }
+    };
+    inp.click();
   }
   $('charSlotBuy').onclick = () => {
     if (!slots || slots.charNext == null) return;
@@ -108,95 +158,23 @@
   let pickFor = null;
   $('pfAvatarPick').onclick = () => { pickFor = 'avatar'; $('pfFile').value = ''; $('pfFile').click(); };
   $('pfBgPick').onclick = () => { pickFor = 'bg'; $('pfFile').value = ''; $('pfFile').click(); };
-  let cropBack = null;   // 그리기 판에서 '사진 넣기'로 왔으면 끝나고 그리기 판으로
-  $('pfFile').onchange = async () => {
-    const f = $('pfFile').files[0]; if (!f) return;
-    try { await openCrop(pickFor, f); }
-    catch (e) { $('pfMsg').textContent = e.message || '그림을 열지 못했어요.'; }
-  };
-
-  // ---------------------------------------------------- ✂️ 사진 맞추기
-  const cc = $('cropCanvas'), cg = cc.getContext('2d');
-  let crop = null;   // { target, img, k, kMin, kMax, ox, oy } — ox/oy: 사진 가운데가 틀 가운데에서 얼마나 (틀 기준 px)
-  async function openCrop(target, file) {
-    if (!/^image\//.test(file.type)) throw new Error('그림 파일만 넣을 수 있어요.');
-    const img = await createImageBitmap(file);
-    const S = target === 'bg' ? ProfileCard.BG : ProfileCard.AVATAR;
-    const DW = target === 'bg' ? 380 : 240, DH = Math.round(DW * S.h / S.w);
-    cc.width = DW * 2; cc.height = DH * 2; cc.style.width = DW + 'px'; cc.style.height = DH + 'px';
-    const cover = Math.max(DW / img.width, DH / img.height), contain = Math.min(DW / img.width, DH / img.height);
-    crop = { target, img, S, DW, DH, cover, contain, kMin: contain * 0.6, kMax: cover * 5, k: cover, ox: 0, oy: 0 };
-    $('cropTitle').textContent = target === 'bg' ? '✂️ 배경 사진 맞추기' : '✂️ 프로필 사진 맞추기';
-    cc.classList.toggle('round', target !== 'bg');
-    syncZoom(); drawCrop();
-    $('cropPad').hidden = false;
-  }
-  const zoomToSlider = (k) => Math.round(1000 * Math.log(k / crop.kMin) / Math.log(crop.kMax / crop.kMin));
-  const sliderToZoom = (v) => crop.kMin * Math.pow(crop.kMax / crop.kMin, v / 1000);
-  function syncZoom() { $('cropZoom').value = zoomToSlider(crop.k); }
-  function paint(g, scale) {   // scale: 틀(화면) → 결과 그림 배율
-    const { img, k, ox, oy, DW, DH } = crop;
-    g.save(); g.scale(scale, scale);
-    g.fillStyle = $('cropFill').value; g.fillRect(0, 0, DW, DH);
-    g.imageSmoothingQuality = 'high';
-    const w = img.width * k, h = img.height * k;
-    g.drawImage(img, DW / 2 + ox - w / 2, DH / 2 + oy - h / 2, w, h);
-    g.restore();
-  }
-  function drawCrop() {
-    cg.setTransform(1, 0, 0, 1, 0, 0); cg.clearRect(0, 0, cc.width, cc.height);
-    paint(cg, 2);
-    if (crop.target !== 'bg') {   // 프로필 사진은 동그랗게 보이니 바깥은 어둡게
-      cg.save(); cg.fillStyle = 'rgba(0,0,0,.45)'; cg.beginPath(); cg.rect(0, 0, cc.width, cc.height);
-      cg.arc(cc.width / 2, cc.height / 2, cc.width / 2 - 2, 0, Math.PI * 2, true); cg.fill('evenodd'); cg.restore();
-    }
-  }
-  function zoomAt(nk, px = crop.DW / 2, py = crop.DH / 2) {   // (px,py) 를 기준으로 크게 · 작게
-    nk = Math.max(crop.kMin, Math.min(crop.kMax, nk));
-    const r = nk / crop.k;
-    crop.ox = (crop.ox - (px - crop.DW / 2)) * r + (px - crop.DW / 2);
-    crop.oy = (crop.oy - (py - crop.DH / 2)) * r + (py - crop.DH / 2);
-    crop.k = nk; syncZoom(); drawCrop();
-  }
-  $('cropZoom').oninput = (e) => zoomAt(sliderToZoom(Number(e.target.value)));
-  cc.addEventListener('wheel', (e) => { e.preventDefault(); const r = cc.getBoundingClientRect(); zoomAt(crop.k * (e.deltaY < 0 ? 1.08 : 1 / 1.08), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
-  let dragC = null;
-  cc.addEventListener('pointerdown', (e) => { cc.setPointerCapture(e.pointerId); dragC = { x: e.clientX, y: e.clientY, ox: crop.ox, oy: crop.oy }; });
-  cc.addEventListener('pointermove', (e) => { if (!dragC) return; crop.ox = dragC.ox + e.clientX - dragC.x; crop.oy = dragC.oy + e.clientY - dragC.y; drawCrop(); });
-  for (const ev of ['pointerup', 'pointercancel']) cc.addEventListener(ev, () => { dragC = null; });
-  $('cropCover').onclick = () => { crop.k = crop.cover; crop.ox = crop.oy = 0; syncZoom(); drawCrop(); };
-  $('cropContain').onclick = () => { crop.k = crop.contain; crop.ox = crop.oy = 0; syncZoom(); drawCrop(); };
-  $('cropCenter').onclick = () => { crop.ox = crop.oy = 0; drawCrop(); };
-  $('cropFill').oninput = drawCrop;
-  const closeCrop = () => { $('cropPad').hidden = true; crop?.img.close?.(); crop = null; };
-  $('cropClose').onclick = () => { const back = cropBack; cropBack = null; closeCrop(); if (back) $('drawPad').hidden = false; };
-  function cropResult() {
-    const { S, DW } = crop;
-    const c = document.createElement('canvas'); c.width = S.w; c.height = S.h;
-    paint(c.getContext('2d'), S.w / DW);
-    return c;
-  }
-  $('cropDone').onclick = async () => {
-    const target = crop.target, c = cropResult();
-    if (cropBack) {   // 그리기 판으로 돌아가서 그 위에 계속 그리기
-      cropBack = null; closeCrop();
-      snap(); g.drawImage(c, 0, 0, cv.width, cv.height); $('drawPad').hidden = false; return;
-    }
-    try { draft[target] = await ProfileCard.shrink(c.toDataURL('image/png'), crop.S.w, crop.S.h, crop.S.max); closeCrop(); dirty(); }
-    catch (e) { $('pfMsg').textContent = e.message; }
-  };
-  $('cropDraw').onclick = () => {   // 맞춘 사진을 그리기 판에 올려서 그 위에 그리기
-    const target = crop.target, c = cropResult();
-    closeCrop();
-    openPad(target).then(() => { g.drawImage(c, 0, 0, cv.width, cv.height); });
-  };
   $('pfSave').onclick = () => {
     if (!Object.keys(draft).length) return;
     waitMsg = 'profile';
     srv({ type: 'profile-set', ...draft });
     $('pfSave').disabled = true; $('pfMsg').textContent = '저장하는 중…';
   };
-
+  const SPEC = (t) => (t === 'bg' ? { ...ProfileCard.BG, title: '✂️ 배경 사진 맞추기' } : { ...ProfileCard.AVATAR, round: true, title: '✂️ 프로필 사진 맞추기' });
+  $('pfFile').onchange = async () => {
+    const f = $('pfFile').files[0]; if (!f) return;
+    const target = pickFor, S = SPEC(target);
+    try {
+      const r = await Cropper.open({ source: f, w: S.w, h: S.h, round: S.round, title: S.title, extra: '🖌️ 이 사진 위에 그리기' });
+      if (!r) return;
+      if (r.extra) { await openPad(target); g.drawImage(r.canvas, 0, 0, cv.width, cv.height); return; }   // 맞춘 사진을 그리기 판에 올려서 그 위에 그리기
+      draft[target] = await ProfileCard.shrink(r.canvas.toDataURL('image/png'), S.w, S.h, S.max); dirty();
+    } catch (e) { $('pfMsg').textContent = e.message || '그림을 열지 못했어요.'; }
+  };
   // ---------------------------------------------------- 🖌️ 그림 그리기
   const PALETTE = ['#222222', '#ffffff', '#e84a4a', '#f79a3e', '#f5d142', '#5cc95c', '#3fb8d9', '#4a6fe8', '#9a5ce0', '#f28fc4', '#8b5a2b', '#9aa0a6'];
   const cv = $('drawCanvas'), g = cv.getContext('2d', { willReadFrequently: true });
@@ -231,8 +209,13 @@
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp,image/gif,image/bmp';
     inp.onchange = async () => {
       const f = inp.files[0]; if (!f) return;
-      try { cropBack = true; $('drawPad').hidden = true; await openCrop(drawFor, f); }
-      catch (e) { cropBack = null; $('drawPad').hidden = false; $('pfMsg').textContent = e.message; }
+      const S = SPEC(drawFor);
+      $('drawPad').hidden = true;
+      try {
+        const r = await Cropper.open({ source: f, w: S.w, h: S.h, round: S.round, title: S.title });
+        if (r) { snap(); g.drawImage(r.canvas, 0, 0, cv.width, cv.height); }
+      } catch (e) { $('pfMsg').textContent = e.message; }
+      $('drawPad').hidden = false;
     };
     inp.click();
   };
@@ -270,6 +253,7 @@
   // ---------------------------------------------------- 서버 소식
   buddy.on('srv', (m) => {
     if (m.type === 'slots') { slots = m; renderSlots(); }
+    if (m.type === 'slot-detail' && m.kind === 'char') { details.set(m.i, { at: slots?.chars[m.i]?.at, faces: m.faces, poses: m.poses }); renderSlots(); }
     if (m.type === 'slot-done' && m.kind === 'char') $('charSlotMsg').textContent = m.what === 'save' ? `✅ '${m.name}'에 저장했어요.` : `✅ '${m.name}' 캐릭터로 바꿨어요!`;
     if (m.type === 'profile-card' && m.self) { prof = m; renderProfile(); }
     if (m.type === 'profile-saved') { draft = {}; $('pfMsg').textContent = '✅ 저장했어요!'; $('pfSave').disabled = true; }
