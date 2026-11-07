@@ -949,6 +949,11 @@
     nm.className = NickFX.domClass(p); nm.style.cssText = NickFX.domStyle(p);
     const id = document.createElement('small'); id.textContent = '@' + p.username;
     who.append(nm, id);
+    const seeable = p.username && ((S?.friends?.friends || []).some((f) => f.username === p.username) || (S?.peers || []).some((x) => x.username === p.username));
+    if (seeable && p.username !== S?.session?.user?.username) {   // 0.17.3 친구 · 같은 방 사람 이름 누르면 프로필 (서버도 그때만 보여 줘요)
+      who.classList.add('clickable'); who.title = '눌러서 프로필 보기';
+      who.onclick = () => openProfile(p.username, p.id && pets.has(p.id) ? p.id : null);
+    }
     li.append(dot, who);
     if (extra) extra(li);
     return li;
@@ -1057,6 +1062,7 @@
           if (!inHere) acts.append(btn('📨 이 집으로', 'ghost small', () => buddy.send('srv', { type: 'invite-fof', username: f.username }), false, `${S.room.owner.nickname}님 집으로 초대하기 (${S.room.owner.nickname}님이 허락하면 들어와요)`));
         }
         const li2 = { append: (...x) => acts.append(...x) };
+        li2.append(btn('🪪', 'ghost small', () => openProfile(f.username), false, '프로필 보기'));   // 0.17.3
         li2.append(btn(f.unread ? `✉️ ${f.unread}` : '✉️', f.unread ? 'primary small' : 'ghost small', () => window.DM && DM.open(f.username, f.nickname), false, '개인 채팅'));
         li2.append(btn('🎁', 'ghost small', () => { giftOpen = giftOpen === f.username ? null : f.username; renderFriends(); }, false, '코인 선물'));
         li2.append(btn('🐋', 'ghost small', () => window.HomeGame && HomeGame.openAquarium(f.username), false, '아쿠아리움 구경'));
@@ -1737,8 +1743,38 @@
     if (u.state === 'ready') { $('updateText').textContent = `🔄 새 버전(v${u.version})이 준비됐어요. 다음에 껐다 켜면 바뀌어요.`; $('updateBtn').hidden = false; $('updateBtn').textContent = '지금 다시 시작'; $('updateBtn').onclick = () => buddy.send('update-install'); }
     if (u.state === 'manual') { $('updateText').textContent = `⬇️ 새 버전(v${u.version})이 나왔어요.`; $('updateBtn').hidden = false; $('updateBtn').textContent = '받으러 가기'; $('updateBtn').onclick = () => buddy.send('update-open'); }
   }
-  buddy.on('update', renderUpdate);
-  buddy.invoke('get-update').then(renderUpdate).catch(() => {});
+  // 0.17.3 ℹ️ 게임 안에서 지금 버전 보기 + 업데이트 확인
+  let upd = null;
+  const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : `${Math.round(m / 60)}시간 전`; };
+  function renderVersion(u) {
+    if (u) upd = { ...(upd || {}), ...u };
+    const v = upd || {};
+    const cur = v.current ? 'v' + v.current : 'v?';
+    const fresh = ['ready', 'manual', 'downloading'].includes(v.state);
+    $('verChip').textContent = cur + (fresh ? ' 🔄' : '');
+    $('verChip').classList.toggle('new', fresh);
+    if ($('verModal').hidden) return;
+    $('verNow').textContent = cur;
+    const st = $('verState'), act = $('verAct');
+    act.hidden = true; st.className = 'ver-state';
+    if (!v.packaged) { st.textContent = '🛠️ 개발용으로 켠 앱이라 업데이트는 확인하지 않아요.'; st.classList.add('muted'); }
+    else if (v.state === 'checking') st.textContent = '🔍 새 버전이 있는지 확인하는 중…';
+    else if (v.state === 'downloading') { st.textContent = `🔄 새 버전${v.version ? `(v${v.version})` : ''}을 받는 중이에요… ${v.percent || 0}%`; st.classList.add('new'); }
+    else if (v.state === 'ready') { st.textContent = `🔄 새 버전(v${v.version})을 다 받았어요! 다시 시작하면 바뀌어요.`; st.classList.add('new'); act.hidden = false; act.textContent = '지금 다시 시작'; act.onclick = () => buddy.send('update-install'); }
+    else if (v.state === 'manual') { st.textContent = `⬇️ 새 버전(v${v.version})이 나왔어요. 받아서 설치해 주세요.`; st.classList.add('new'); act.hidden = false; act.textContent = '받으러 가기'; act.onclick = () => buddy.send('update-open'); }
+    else if (v.state === 'latest') { st.textContent = '✅ 최신 버전이에요!'; st.classList.add('ok'); }
+    else if (v.state === 'error') { st.textContent = '⚠️ 업데이트를 확인하지 못했어요. 인터넷을 확인하고 다시 눌러 보세요.'; st.classList.add('bad'); }
+    else st.textContent = '아직 확인 전이에요. 켜고 10초 뒤, 그 뒤로 6시간마다 저절로 확인해요.';
+    $('verCheck').disabled = !v.packaged || v.state === 'checking' || v.state === 'downloading';
+    $('verNote').textContent = v.checkedAt ? `마지막 확인: ${ago(v.checkedAt)}` : '';
+  }
+  $('verChip').onclick = () => { $('verModal').hidden = false; renderVersion(); };
+  $('verClose').onclick = () => { $('verModal').hidden = true; };
+  $('verModal').addEventListener('click', (e) => { if (e.target === $('verModal')) $('verModal').hidden = true; });
+  $('verCheck').onclick = () => buddy.send('update-check');
+  setInterval(() => { if (!$('verModal').hidden) renderVersion(); }, 30_000);
+  buddy.on('update', (u) => { renderUpdate(u); renderVersion(u); });
+  buddy.invoke('get-update').then((u) => { renderUpdate(u); renderVersion(u); }).catch(() => {});
 
   // ------------------------------------------------------------ 타이머 탭
   let timers = { timers: [], pin: false, miniPin: false, now: Date.now() };

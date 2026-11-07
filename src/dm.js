@@ -36,11 +36,24 @@
       const day = KD.format(new Date(m.at));
       if (day !== lastDay) { const d = document.createElement('div'); d.className = 'dm-day'; d.textContent = day; log.append(d); lastDay = day; }
       const box = document.createElement('div'); box.className = 'dm-msg' + (m.from === me() ? ' mine' : '');
-      const t = document.createElement('div'); t.className = 'txt'; t.textContent = m.text;
+      let t;
+      if (m.emote && window.EmoteArt && EmoteArt.has(m.emote)) {   // 0.17.3 이모티콘은 말풍선 없이 그림만
+        t = document.createElement('img'); t.className = 'dm-emote'; t.src = `assets/emotes/${m.emote}.png`; t.alt = m.text || ''; t.title = m.text || '';
+      } else { t = document.createElement('div'); t.className = 'txt'; t.textContent = m.text; }
       const tm = document.createElement('time'); tm.textContent = KT.format(new Date(m.at));
       box.append(t, tm); log.append(box);
     }
     log.scrollTop = log.scrollHeight;
+  }
+
+  // 0.17.3 😊 개인 채팅 이모티콘 (채팅 창과 같은 그림)
+  const DM_EMOTES = [['wave', '안녕'], ['bye', '잘가'], ['zzz', '잘자'], ['good', '굿'], ['dislike', '싫어'], ['heart', '좋아'], ['cheer', '응원'], ['poke', '콕 찌르기']];
+  for (const [kind, label] of DM_EMOTES) {
+    const b = document.createElement('button'); b.type = 'button'; b.title = label; b.dataset.dmEmote = kind;
+    const img = document.createElement('img'); img.src = `assets/emotes/${kind}.png`; img.alt = label;
+    b.append(img);
+    b.onclick = () => { if (peer) srv({ type: 'dm-send', to: peer, emote: kind }); };
+    $('dmEmotes').append(b);
   }
 
   $('dmClose').onclick = close;

@@ -639,9 +639,9 @@
     const doneInCycle = u.attend.today ? ((u.attend.count - 1) % 7) + 1 : u.attend.count % 7;
     const grid = $('attendGrid'); grid.textContent = '';
     for (let d = 1; d <= 7; d++) {
-      const reward = d < 7 ? `🪙${c.attendance.coins[d - 1]}` : '🎁';
+      const reward = `🪙${d < 7 ? c.attendance.coins[d - 1] : (c.attendance.day7Fallback ?? 300)}`;   // 0.17.3: 7일째도 코인 (예전엔 🎁 액세서리)
       const cls = d <= doneInCycle ? 'done' : (!u.attend.today && d === doneInCycle + 1 ? 'today' : '');
-      grid.append(el('div', { class: cls }, `${d}일`, el('b', { text: d <= doneInCycle ? '✅' : reward }), d < 7 ? '코인' : '액세서리'));
+      grid.append(el('div', { class: cls + (d === 7 ? ' bonus' : '') }, `${d}일`, el('b', { text: d <= doneInCycle ? '✅' : reward }), d < 7 ? '코인' : '보너스!'));
     }
     $('checkinBtn').disabled = !!u.attend.today;
     $('checkinBtn').textContent = u.attend.today ? '오늘은 출석했어요 ✅' : `오늘 출석하기 (${doneInCycle + 1}일째)`;
@@ -1093,6 +1093,50 @@
 
   // ------------------------------------------------------------ 펫 (관리 탭)
   const petRename = { id: null, draft: null }; // 이름 고치는 중인 펫 (화면이 새로 그려져도 유지)
+  const petEnding = { id: null, draft: null };   // 0.17.3 말끝 단어 고치는 중인 펫
+  const ENDING_PICKS = ['냥', '멍', '뿌', '삐약', '쀼', '용', '츄', '다옹'];
+  function petVoiceRow(p, c) {
+    const t = p.level >= 5 && p.trait && c.petTraits?.[p.trait];
+    const owner = U()?.nickname || '주인님';
+    const rare = t ? (t.weight <= 3 ? ' 🌈 아주 희귀' : t.weight <= 6 ? ' ✨ 희귀' : '') : '';
+    const trait = t
+      ? el('span', { class: 'pv-trait' }, '성격 ', el('b', { text: `${t.icon} ${t.name}` }), rare ? el('span', { class: 'pv-rare', text: rare }) : '')
+      : el('span', { class: 'pv-trait unknown' }, '성격 ', el('b', { text: '❓ ???' }), el('span', { class: 'note-inline', text: ' 5레벨이 되면 정해져요' }));
+    const box = el('div', { class: 'pet-voice' }, trait);
+    if (petEnding.id === p.id) {
+      const max = c.petEndingMax || 5;
+      const inp = el('input', { type: 'text', maxLength: max * 2, value: petEnding.draft ?? (p.ending || ''), class: 'pet-ending-input', placeholder: '예: 냥' });
+      const prev = el('div', { class: 'pv-preview' });
+      const show = () => {
+        const e = inp.value.replace(/\s+/g, '');
+        const over = [...e].length > max;
+        prev.textContent = over ? `${max}글자까지만 돼요` : '💬 ' + (window.PetVoice ? PetVoice.samples(t ? p.trait : null, e, owner, 2).join('  ·  ') : '');
+        prev.classList.toggle('bad', over);
+        save.disabled = over;
+      };
+      const done = (val) => {
+        if (val != null) srv({ type: 'pet-ending', id: p.id, ending: val });
+        petEnding.id = null; petEnding.draft = null; renderPets();
+      };
+      const save = btn('저장', 'primary small', () => done(inp.value.replace(/\s+/g, '')));
+      inp.addEventListener('input', () => { petEnding.draft = inp.value; show(); });
+      inp.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter' && !e.isComposing && !save.disabled) save.click();
+        else if (e.key === 'Escape') done(null);
+      });
+      const chips = el('div', { class: 'pv-chips' }, ...ENDING_PICKS.map((w) => btn(w, 'ghost small', () => { inp.value = w; petEnding.draft = w; show(); inp.focus(); })));
+      box.append(el('div', { class: 'pv-edit' },
+        el('span', {}, '💬 말끝에 붙일 말 '), inp, save,
+        p.ending ? btn('없애기', 'ghost small', () => done('')) : '', btn('취소', 'ghost small', () => done(null))), chips, prev);
+      setTimeout(() => { show(); inp.focus(); }, 0);
+    } else {
+      box.append(el('span', { class: 'pv-ending' }, '💬 말끝 ', el('b', { text: p.ending ? `'${p.ending}'` : '없음' })),
+        btn(p.ending ? '바꾸기' : '정하기', 'ghost small', () => { petEnding.id = p.id; petEnding.draft = null; renderPets(); }, false, '펫이 말할 때 문장 끝에 붙는 말 (예: 냥 → 안녕냥!)'));
+      if (t && window.PetVoice) box.append(el('div', { class: 'pv-preview' }, '💬 ' + PetVoice.samples(p.trait, p.ending, owner, 2).join('  ·  ')));
+    }
+    return box;
+  }
   // 펫마다 마지막으로 고른 밥 (이 컴퓨터에 기억)
   const feedPick = new Map((() => { try { return Object.entries(JSON.parse(localStorage.getItem('feedPick') || '{}')); } catch { return []; } })());
   const saveFeedPick = () => { try { localStorage.setItem('feedPick', JSON.stringify(Object.fromEntries(feedPick))); } catch {} };
@@ -1155,12 +1199,14 @@
         nameEl = el('b', { text: `${p.name} ` });
         acts.append(btn('✏️ 이름', 'ghost small', () => { petRename.id = p.id; petRename.draft = null; renderPets(); }, false, '이름 바꾸기 (10자까지)'));
       }
+      // 0.17.3 🐾 성격 · 💬 말끝 단어
+      const voice = petVoiceRow(p, c);
       ul.append(el('li', {},
         el('div', { class: 'top' }, PetArt.thumb(p.kind, 40),
           el('div', { class: 'who' }, nameEl, el('span', { class: 'note-inline', text: `Lv.${p.level}/5${p.level >= 5 ? ' ⭐' : ''}` }),
             el('small', { text: `${kind.code} ${kind.name}${p.out ? ` · ${p.floor}층에 나와 있어요` : ' · 쉬는 중'}${p.private ? ' · 🔒 나만 보기' : ''} · 좋아하는 것: ${kind.likes.map((x) => c.petFoods[x]?.name).join(', ')}` }))),
-        el('div', { class: 'bars' }, el('span', {}, '🍖 ', bar('full', p.full)), el('span', {}, '💗 ', bar('love', p.love)), el('span', { class: 'note-inline', text: p.level >= 5 ? '최고 레벨! 주인 이름을 부르며 인사해요' : `경험치 ${p.exp}/${p.next} · 밥 주기나 쓰다듬기(30초마다)로 올라요` })),
-        acts));
+        el('div', { class: 'bars' }, el('span', {}, '🍖 ', bar('full', p.full)), el('span', {}, '💗 ', bar('love', p.love)), el('span', { class: 'note-inline', text: p.level >= 5 ? '최고 레벨! 성격대로 말을 해요' : `경험치 ${p.exp}/${p.next} · 밥 주기나 쓰다듬기(30초마다)로 올라요` })),
+        voice, acts));
     }
   }
 
@@ -1230,13 +1276,15 @@
     const S = H.S;
     return S.room && !S.room.isOwner ? S.room.owner.nickname : (U()?.nickname || '');
   }
-  const GREET = (n) => [`${n} 안녕!`, `${n}, 안녕~ 💕`, `${n} 좋아!`, `${n} 보고 싶었어!`];
-  function petLine(r) {
-    const p = r.p || {};
-    const hungry = p.hungry ?? (p.full != null && p.full < 30);
-    if (hungry) return Math.random() < 0.5 ? '배고파…' : '배고파… 밥 줘 🍖';
-    if ((p.level || 1) >= 5) { const n = ownerNick(r); const g = GREET(n || '주인님'); return g[Math.floor(Math.random() * g.length)]; }
-    return null;
+  // 0.17.3 5레벨이 되면 성격 발표
+  function petLevelToast(r) {
+    const t = r.levelUp >= 5 && r.trait && C()?.petTraits?.[r.trait];
+    if (t) H.toast(`⭐ ${r.name || '펫'}이(가) Lv.5! 성격이 정해졌어요: ${t.icon} ${t.name} — 이제 말을 해요!`, true);
+    else H.toast(`⭐ ${r.name || '펫'}이(가) Lv.${r.levelUp}이 됐어요!${r.levelUp >= 5 ? ' 이제 말을 해요!' : ''}`);
+  }
+  // 0.17.3 🐾 대사는 petvoice.js (성격 · 말끝 단어). kind: 'idle' | 'pat' | 'fed'
+  function petLine(r, kind = 'idle') {
+    return window.PetVoice ? PetVoice.line(r.p || {}, kind, ownerNick(r) || '주인님') : null;
   }
   function petTalk(r, dt) {
     if (r.say && (r.say.t -= dt) <= 0) r.say = null;
@@ -1305,7 +1353,7 @@
     for (const [id, r] of roomPets) {
       if (Math.abs(p.x - r.x) < 22 && p.y < r.y + 4 && p.y > r.y - 46) {
         r.heart = 1.2; r.hop = 8;
-        const line = petLine(r);   // 5레벨이면 주인 이름 부르며 인사, 배고프면 배고파
+        const line = petLine(r, 'pat');   // 5레벨이면 성격대로 한마디, 배고프면 배고파
         if (line) { r.say = { text: line, t: 3.5 }; r.sayT = rand(35, 75); }
         if ((U()?.pets || []).some((x) => x.id === id)) srv({ type: 'pet-pat', id });
         return true;
@@ -1544,8 +1592,13 @@
     } else if (r.reason === 'fish-gift-sent') H.toast(`🎁 ${r.to}님에게 ${eul(F[r.code]?.name || '물고기')} 선물했어요`);
     else if (r.reason === 'trade-done') H.toast(`🔄 교환 완료! #${r.got} ${iga(F[r.got]?.name || '물고기')} 들어왔어요`, true);
     else if (r.reason === 'trade-sent') H.toast('🔄 교환을 신청했어요');
-    else if (r.reason === 'pet-feed') { H.toast(r.levelUp ? `⭐ ${r.name || '펫'}이(가) Lv.${r.levelUp}이 됐어요!${r.levelUp >= 5 ? ' 이제 말을 해요!' : ''}` : r.liked ? '💗 좋아하는 먹이라 엄청 기뻐해요!' : '냠냠 😋'); const rp = roomPets.get(r.pet); if (rp) { rp.heart = 1.2; rp.say = null; rp.sayT = 0.5; } }
-    else if (r.reason === 'pet-pat') { const rp = roomPets.get(r.pet); if (rp) rp.exp = { n: r.exp, t: 1.2 }; if (r.levelUp) H.toast(`⭐ ${r.name || '펫'}이(가) Lv.${r.levelUp}이 됐어요!${r.levelUp >= 5 ? ' 이제 말을 해요!' : ''}`); }
+    else if (r.reason === 'pet-feed') {
+      if (r.levelUp) petLevelToast(r); else H.toast(r.liked ? '💗 좋아하는 먹이라 엄청 기뻐해요!' : '냠냠 😋');
+      const rp = roomPets.get(r.pet);
+      if (rp) { rp.heart = 1.2; const l = !r.levelUp && petLine({ ...rp, p: { ...rp.p, hungry: false } }, 'fed'); rp.say = l ? { text: l, t: 3.5 } : null; rp.sayT = l ? rand(35, 75) : 0.5; }
+    }
+    else if (r.reason === 'pet-pat') { const rp = roomPets.get(r.pet); if (rp) rp.exp = { n: r.exp, t: 1.2 }; if (r.levelUp) petLevelToast(r); }
+    else if (r.reason === 'pet-ending') H.toast(r.ending ? `💬 ${r.name}의 말끝을 '${r.ending}'(으)로 바꿨어요` : `💬 ${r.name}의 말끝 단어를 없앴어요`);
     else if (r.reason === 'tank-feed') { H.toast('🫙 물고기들이 밥을 먹어요'); viewer.fed = Date.now(); }
     else if (r.reason === 'online-max') H.toast(`오늘 접속 코인 🪙${c.limits.onlinePerDay}을 다 받았어요. 내일 또 쌓여요!`);
     else if (r.reason === 'fish-gift' || r.reason === 'admin') { /* 알림은 따로 떠요 */ }

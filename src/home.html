@@ -20,6 +20,7 @@
     <div class="where">
       <span id="homeTitle">🏠 내 집</span>
       <span id="roomBadge" class="badge off">혼자</span>
+      <button id="verChip" class="ver-chip" title="앱 버전 · 업데이트 확인">v…</button>
     </div>
     <!-- 🏢 운영자 회의장에 있을 때만 보여요 -->
     <div class="meet-bar">
@@ -99,6 +100,16 @@
   </div>
   <!-- 🎵 레코드 플레이어: 닫아도 노래가 계속 나오게 화면 밖으로만 옮겨요 -->
   <div id="profileModal" class="profile-modal" hidden><div id="profileBox"></div></div>
+  <!-- 0.17.3 ℹ️ 앱 버전 -->
+  <div id="verModal" class="profile-modal" hidden>
+    <div class="modal-card ver-card">
+      <div class="row between"><h2>ℹ️ 앱 버전</h2><button id="verClose" class="link">닫기</button></div>
+      <div class="ver-now">지금 쓰는 버전 <b id="verNow">v…</b></div>
+      <div id="verState" class="ver-state"></div>
+      <div class="row ver-acts"><button id="verCheck" class="ghost small">🔍 지금 업데이트 확인</button><button id="verAct" class="primary small" hidden></button></div>
+      <p class="note" id="verNote"></p>
+    </div>
+  </div>
   <div id="photoView" class="photo-view" hidden><img id="photoBig" alt="사진"><p id="photoCap"></p></div>
   <div id="musicModal" class="music-modal closed">
     <div class="music-card">
@@ -253,7 +264,7 @@
           <div id="attendModal" class="modal" hidden>
             <div class="modal-card">
               <div class="row between"><h2>📅 출석 체크</h2><button id="closeAttend" class="link">닫기</button></div>
-              <p class="note">매일 한 번! 1~6일째는 코인, 7일째는 액세서리를 받아요. 하루 빠져도 이어서 세요.</p>
+              <p class="note">매일 한 번! 코인을 받고, 7일째엔 보너스 코인을 더 많이 받아요. 하루 빠져도 이어서 세요.</p>
               <div id="attendGrid" class="attend-grid"></div>
               <button id="checkinBtn" class="primary wide">오늘 출석하기</button>
               <p class="note" id="attendNote"></p>
@@ -399,6 +410,7 @@
               <div class="row between"><h2 id="dmTitle">✉️ 개인 채팅</h2><button id="dmClose" class="link">닫기</button></div>
               <p class="note">친구와 둘만 보는 대화예요. 최근 100개까지 남아요.</p>
               <div id="dmLog" class="dm-log"></div>
+              <div id="dmEmotes" class="dm-emotes"></div>
               <form id="dmForm" class="row">
                 <input id="dmInput" maxlength="300" placeholder="메시지 보내기 (Enter)" autocomplete="off">
                 <button class="primary small">보내기</button>
@@ -711,6 +723,7 @@
   <script src="fishart.js"></script>
   <script src="rodart.js"></script>
   <script src="petart.js"></script>
+  <script src="petvoice.js"></script>
   <script src="emoteart.js"></script>
   <script src="meetscene.js"></script>
   <script src="profilecard.js"></script>

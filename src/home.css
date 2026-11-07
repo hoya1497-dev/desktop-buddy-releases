@@ -154,6 +154,7 @@ h3 { font-size: 13px; margin: 12px 0 6px; }
 .attend-grid div b { display: block; font-size: 16px; margin: 2px 0; }
 .attend-grid div.done { background: color-mix(in srgb, var(--ok) 20%, var(--card)); border-color: var(--ok); }
 .attend-grid div.today { border: 2px solid var(--accent); }
+.attend-grid div.bonus b { font-size: 13px; white-space: nowrap; letter-spacing: -0.3px; }   /* 0.17.3 7일째 🪙300 이 두 줄로 안 갈라지게 */
 .petlist { list-style: none; padding: 0; margin: 0; }
 .petlist li { border: 1px solid var(--line); border-radius: 10px; padding: 8px; margin-bottom: 8px; }
 .petlist .top { display: flex; align-items: center; gap: 8px; }
@@ -162,6 +163,17 @@ h3 { font-size: 13px; margin: 12px 0 6px; }
 .petlist .who small { display: block; color: var(--muted); font-size: 11px; }
 .petlist .bars { display: flex; gap: 10px; font-size: 11px; margin: 6px 0; }
 .petlist .bars .bar { width: 60px; }
+.pet-voice { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; margin: 0 0 6px; padding: 6px 8px; border-radius: 8px; background: var(--input); }
+.pet-voice .pv-trait b { font-size: 13px; }
+.pet-voice .pv-trait.unknown b { color: var(--muted); }
+.pet-voice .pv-rare { font-size: 11px; color: #c07a10; margin-left: 4px; font-weight: 600; }
+.pet-voice button { font-size: 11px; padding: 2px 8px; width: auto; }
+.pet-voice .pv-edit { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; width: 100%; }
+.pet-voice .pet-ending-input { width: 80px; padding: 3px 6px; font-size: 12px; }
+.pet-voice .pv-chips { display: flex; gap: 3px; flex-wrap: wrap; width: 100%; }
+.pet-voice .pv-chips button { padding: 1px 7px; }
+.pet-voice .pv-preview { width: 100%; color: var(--muted); font-size: 11px; }
+.pet-voice .pv-preview.bad { color: #d04040; }
 .petlist .acts { display: flex; flex-wrap: wrap; gap: 4px; }
 .petlist .acts button, .petlist .acts select { font-size: 11px; padding: 3px 8px; width: auto; }
 .love i { background: #ec6f9a !important; }
@@ -333,6 +345,11 @@ body.fishing-mode #deskBtn, body.fishing-mode #decoBtn, body.fishing-mode #light
 .dm-msg.mine { align-self: flex-end; align-items: flex-end; }
 .dm-msg .txt { padding: 6px 10px; border-radius: 12px; background: var(--card, #fff); box-shadow: 0 1px 2px rgba(0,0,0,.08); white-space: pre-wrap; word-break: break-word; }
 .dm-msg.mine .txt { background: var(--accent, #f08a3a); color: #fff; }
+.dm-msg .dm-emote { height: 64px; width: auto; display: block; }
+.dm-emotes { display: flex; gap: 4px; flex-wrap: wrap; margin: 0 0 8px; }
+.dm-emotes button { background: var(--input); border: 1px solid var(--line); border-radius: 8px; padding: 2px 6px; cursor: pointer; line-height: 0; }
+.dm-emotes button:hover { border-color: var(--accent); }
+.dm-emotes img { height: 26px; width: auto; }
 .dm-msg time { font-size: 10px; color: var(--muted, #999); margin: 2px 4px 0; }
 .dm-day { align-self: center; font-size: 11px; color: var(--muted, #999); margin: 4px 0; }
 .dm-card form input { flex: 1; }
@@ -581,6 +598,8 @@ body.meeting-mode #room { cursor: default !important; }
 #profileBox { width: min(92vw, 360px); max-height: 92vh; overflow-y: auto; border-radius: 16px; }
 .pcard-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }
 .chat-name[data-user] { cursor: pointer; }
+.people .who.clickable { cursor: pointer; }
+.people .who.clickable:hover b { text-decoration: underline; }
 .chat-name[data-user]:hover { text-decoration: underline; }
 
 /* 0.17 💬 말풍선 채팅 (내 것 오른쪽 · 남의 것 왼쪽) */
@@ -641,3 +660,18 @@ body.meeting-mode #room { cursor: default !important; }
 .title-prog i { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--accent) 55%, transparent); }
 .title-prog span { position: relative; display: block; text-align: center; font-size: 10px; line-height: 13px; color: var(--ink); }
 .title-btns { display: flex; justify-content: flex-end; gap: 4px; }
+
+/* 0.17.3 ℹ️ 앱 버전 */
+.ver-chip { border: 1px solid var(--line); background: var(--input); color: var(--muted); border-radius: 999px; padding: 1px 8px; font-size: 11px; cursor: pointer; margin-left: 4px; font-family: inherit; }
+.ver-chip:hover { border-color: var(--accent); color: var(--ink); }
+.ver-chip.new { background: var(--accent); color: #fff; border-color: var(--accent); }
+.ver-card { width: min(340px, 92vw); }
+.ver-now { font-size: 13px; margin: 8px 0; }
+.ver-now b { font-size: 18px; margin-left: 4px; }
+.ver-state { font-size: 13px; padding: 8px 10px; border-radius: 10px; background: var(--input); margin-bottom: 10px; }
+.ver-state.ok { background: color-mix(in srgb, var(--ok) 18%, var(--card)); }
+.ver-state.new { background: color-mix(in srgb, var(--accent) 18%, var(--card)); }
+.ver-state.bad { background: color-mix(in srgb, #e05050 15%, var(--card)); }
+.ver-state.muted { color: var(--muted); }
+.ver-acts { gap: 6px; }
+.ver-acts button { width: auto; }

@@ -407,7 +407,7 @@ function selfProfile() {
     username: session?.user.username || '', hungry: !!pet && pet.full < 30, sad: !!pet && pet.mood < 25,
     skin: session?.user.skin?.v ? session.user.skin : null,
     acc: session?.user.acc?.eq || {},
-    pets: (session?.user.pets || []).filter((x) => x.out).map((x) => ({ id: x.id, kind: x.kind, name: x.name, level: x.level, hungry: x.full < 30 })),
+    pets: (session?.user.pets || []).filter((x) => x.out).map((x) => ({ id: x.id, kind: x.kind, name: x.name, level: x.level, hungry: x.full < 30, trait: x.trait, ending: x.ending })),   // 0.17.3 성격 · 말투
   };
 }
 function publicConfig() {
@@ -760,8 +760,9 @@ function handleServer(m, sock) {
 // ---------------------------------------------------------------- 자동 업데이트
 let updateState = { state: 'idle' };
 let updater = { check() {}, install() {}, openDownload() {} };
+const updateView = () => ({ ...updateState, current: app.getVersion(), packaged: app.isPackaged });   // 0.17.3 게임 안에서 지금 버전 보기
 function pushUpdate() {
-  for (const w of [home, login, control]) if (w && !w.isDestroyed()) w.webContents.send('update', updateState);
+  for (const w of [home, login, control]) if (w && !w.isDestroyed()) w.webContents.send('update', updateView());
   updateTray();
 }
 function installUpdate() {
@@ -774,7 +775,7 @@ function startUpdater() {
     releasesUrl: DEFAULTS.releasesUrl,
     onStatus: (st) => {
       const prev = updateState.state;
-      updateState = { ...updateState, ...st };
+      updateState = { ...updateState, ...st, ...(['latest', 'error', 'manual', 'downloading', 'ready'].includes(st.state) ? { checkedAt: Date.now() } : {}) };
       if (st.state === 'ready' && prev !== 'ready') {
         notify('업데이트 준비 완료 🔄', `새 버전(v${st.version})을 받았어요. 다음에 껐다 켜면 바뀌어요.`);
         // 업데이트가 꼭 필요한 상황이면 바로 설치
@@ -1283,7 +1284,8 @@ function registerIpc() {
     'music-play', 'music-fav', 'music-bgm', 'music-repeat',
     'photo',   // 0.15.1: 📷 방 안 사진
     'slots-get', 'slot-buy', 'slot-save', 'slot-load', 'slot-del', 'slot-rename', 'furn-sell', 'profile-set', 'profile-get',
-    'slot-thumb', 'slot-detail', 'title-buy', 'title-equip', 'name-effect-toggle']);   // 0.17: 💾 슬롯 · 🛋️ 되팔기 · 🪪 프로필 · 0.17.2: 🖼️ 슬롯 대표 이미지 · 펼쳐보기
+    'slot-thumb', 'slot-detail', 'title-buy', 'title-equip', 'name-effect-toggle',   // 0.17: 💾 슬롯 · 🛋️ 되팔기 · 🪪 프로필 · 0.17.2: 🖼️ 슬롯 대표 이미지 · 펼쳐보기
+    'pet-ending']);   // 0.17.3 🐾 펫 말투
     // 0.15: ⭐ 즐겨찾기 · 🏠 배경음 · 🔁 반복
   // 0.17: 📷 사진이 여기서 4000자에 걸려 조용히 버려지던 버그 → 그림이 들어가는 메시지는 크기를 따로 정함
   const SRV_BIG = { 'board-add': 90_000, 'board-edit': 90_000, 'notice-post': 16_000, 'notice-edit': 16_000, photo: 400_000, 'profile-set': 320_000, 'slot-save': 80_000, 'slot-thumb': 80_000 };
@@ -1293,10 +1295,13 @@ function registerIpc() {
     if (json.length > (SRV_BIG[m.type] || 4000)) return;   // 그림이 들어가는 것만 크게 허용
     wsSend(JSON.parse(json));
   });
-  ipcMain.handle('get-update', () => ({ ...updateState, current: app.getVersion() }));
+  ipcMain.handle('get-update', () => updateView());
   ipcMain.on('update-install', () => { if (updateState.state === 'ready') installUpdate(); });
   ipcMain.on('update-open', () => updater.openDownload());
-  ipcMain.on('update-check', () => updater.check());
+  ipcMain.on('update-check', () => {   // 0.17.3 '지금 확인' 버튼: 받는 중 · 준비됨이면 그대로 두고, 아니면 확인 중으로 보여 줌
+    if (app.isPackaged && !['downloading', 'ready'].includes(updateState.state)) { updateState = { ...updateState, state: 'checking' }; pushUpdate(); }
+    updater.check();
+  });
   ipcMain.on('set-bubble', (_e, b) => {   // 0.17 💬 말풍선 색 (내 화면에만)
     const hex = (v, d) => (/^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : d);
     const d = DEFAULT_CONFIG.bubble;

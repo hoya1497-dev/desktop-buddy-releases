@@ -383,8 +383,8 @@
           if (f.sayT <= 0) {
             f.sayT = rand(45, 90);
             const nick = owner.profile.nickname || '주인님';
-            if (p.hungry) f.say = { text: '배고파…', t: 3.5 };
-            else if ((p.level || 1) >= 5) f.say = { text: [`${nick} 안녕!`, `${nick}, 안녕~ 💕`, `${nick} 좋아!`][Math.floor(Math.random() * 3)], t: 3.5 };
+            const line = window.PetVoice && PetVoice.line(p, 'idle', nick);   // 0.17.3 성격 · 말끝 단어
+            if (line) f.say = { text: line, t: 3.5 };
           }
           // 주인 뒤쪽에 줄 서서 따라감
           const gap = owner.w * 0.55 + (i + 1) * Math.max(18, cfg.petScale * 9);
