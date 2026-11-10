@@ -38,6 +38,8 @@ const DEFAULT_CONFIG = {
   targets: [],
   occlusion: true,
   hideOthers: false,
+  othersPose: 'own',   // 0.17.4 다른 사람 캐릭터 자세 (내 화면에서만): 'own'(그 사람이 정한 대로) | 'sit' | 'stand' | 'lie'
+  peerPose: {},        // 0.17.4 한 사람씩 정한 자세 { 아이디: 'own'|'auto'|'sit'|'stand'|'lie' } — 위 설정보다 먼저
   petScale: 3,
   species: 'cat',
   theme: 'system',   // 'system' | 'light' | 'dark' | 'aurora' | 'custom'
@@ -411,7 +413,8 @@ function selfProfile() {
   };
 }
 function publicConfig() {
-  return { petScale: config.petScale, occlusion: config.occlusion, hideOthers: config.hideOthers, showPetsDesktop: config.showPetsDesktop !== false, showAllPets: !!config.showAllPets };
+  return { petScale: config.petScale, occlusion: config.occlusion, hideOthers: config.hideOthers, showPetsDesktop: config.showPetsDesktop !== false, showAllPets: !!config.showAllPets,
+    othersPose: OTHERS_POSES.includes(config.othersPose) ? config.othersPose : 'own', peerPose: config.peerPose || {} };
 }
 let lastSentProfile = '';
 function onSelfChanged() {
@@ -892,6 +895,16 @@ const EMOTES = [['wave', '👋 안녕'], ['bye', '🚶 잘가'], ['zzz', '💤 �
 const POSES = ['auto', 'stand', 'sit', 'lie'];
 const THEME_MODES = ['system', 'light', 'dark', 'aurora', 'custom'];
 const themePayload = () => ({ mode: THEME_MODES.includes(config.theme) ? config.theme : 'system', custom: { ...DEFAULT_CONFIG.themeCustom, ...(config.themeCustom || {}) }, bubble: { ...DEFAULT_CONFIG.bubble, ...(config.bubble || {}) } });
+// 0.17.4 🪑 다른 사람 캐릭터 자세 (내 화면에서만, 서버에 안 보냄)
+const OTHERS_POSES = ['own', 'sit', 'stand', 'lie'];
+const PEER_POSES = ['own', 'auto', 'sit', 'stand', 'lie'];
+function setPeerPose(username, v) {
+  if (!username || !PEER_POSES.includes(v)) return;
+  config.peerPose = { ...(config.peerPose || {}) };
+  if (v === 'own') delete config.peerPose[username]; else config.peerPose[username] = v;
+  saveConfig();
+  overlay?.webContents.send('config', publicConfig());
+}
 function setPose(v) {
   if (!POSES.includes(v)) return;
   config.pose = v; saveConfig();
@@ -941,6 +954,11 @@ function petMenu({ id }, win = overlay) {
     template = [
       { label: p ? `${p.nickname} (@${p.username})${p.status ? ' · ' + p.status : ''}` : '친구', enabled: false },
       { type: 'separator' },
+      ...(p ? [{
+        label: '🪑 내 화면에서 자세',   // 0.17.4 그 사람 화면에는 영향 없음
+        submenu: [['own', '설정 따라가기'], ['auto', '🐾 자유롭게 움직이기'], ['sit', '🪑 앉혀 두기'], ['stand', '🧍 세워 두기'], ['lie', '🛏️ 눕혀 두기']]
+          .map(([k, l]) => ({ label: l, type: 'radio', checked: ((config.peerPose || {})[p.username] || 'own') === k, click: () => setPeerPose(p.username, k) })),
+      }] : []),
       { label: '🍪 간식 나눠먹기', enabled: !!(room && p), submenu: snackMenu(id) },
       ...EMOTES.slice(0, 3).map(([k, l]) => ({ label: l + ' 보내기', click: () => sendEmote(k, id) })),
       { label: '💬 채팅하기', click: () => showHome(true) },
@@ -1229,12 +1247,13 @@ function registerIpc() {
   });
   ipcMain.on('save-config', (_e, partial) => {
     const allowed = ['nickname', 'color', 'nameColor', 'serverUrl', 'status', 'customStatus', 'targets',
-      'occlusion', 'hideOthers', 'petScale', 'statusRules', 'autoStart', 'species', 'showPetsDesktop', 'showAllPets'];
+      'occlusion', 'hideOthers', 'petScale', 'statusRules', 'autoStart', 'species', 'showPetsDesktop', 'showAllPets', 'othersPose'];
     for (const k of allowed) if (partial && k in partial) config[k] = partial[k];
     config.nickname = String(config.nickname || '나').slice(0, 16);
     if (config.nameColor && !/^#[0-9a-f]{6}$/i.test(config.nameColor)) config.nameColor = null;
     config.petScale = Math.min(8, Math.max(2, Number(config.petScale) || 3));
     if (!['cat', 'dog', 'rabbit'].includes(config.species)) config.species = 'cat';
+    if (!OTHERS_POSES.includes(config.othersPose)) config.othersPose = 'own';
     saveConfig();
     if (partial && 'autoStart' in partial) applyAutoStart();
     overlay?.webContents.send('config', publicConfig());

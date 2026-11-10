@@ -219,6 +219,8 @@
 
   $('hideOthers').checked = config.hideOthers;
   $('hideOthers').onchange = (e) => save({ hideOthers: e.target.checked });
+  $('othersPose').value = config.othersPose || 'own';   // 0.17.4
+  $('othersPose').onchange = (e) => save({ othersPose: e.target.value });
   $('showPetsDesktop').checked = config.showPetsDesktop !== false;
   $('showPetsDesktop').onchange = (e) => save({ showPetsDesktop: e.target.checked });
   $('showAllPets').checked = !!config.showAllPets;

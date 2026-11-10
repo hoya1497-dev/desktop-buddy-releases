@@ -90,6 +90,15 @@
     <div class="card">
       <h2>바탕화면</h2>
       <label class="check"><input id="hideOthers" type="checkbox"> 다른 사람 캐릭터를 바탕화면에서 숨기기</label>
+      <label>🪑 다른 사람 캐릭터 자세 <span class="note-inline">(내 화면에서만)</span>
+        <select id="othersPose">
+          <option value="own">그 사람이 정한 대로</option>
+          <option value="sit">🪑 모두 앉혀 두기</option>
+          <option value="stand">🧍 모두 세워 두기</option>
+          <option value="lie">🛏️ 모두 눕혀 두기</option>
+        </select>
+      </label>
+      <p class="note">한 사람만 바꾸려면 바탕화면에서 그 캐릭터를 우클릭 → 🪑 내 화면에서 자세. 끌어다 놓으면 그 자리에서 그 자세로 있어요.</p>
       <label class="check"><input id="showPetsDesktop" type="checkbox"> 🐾 꺼내 둔 펫이 바탕화면에서도 캐릭터를 따라다니기</label>
       <label class="check"><input id="showAllPets" type="checkbox"> 👀 친구들 펫 전부 보기 <span class="note-inline">(친구가 꺼내 두지 않은 펫까지)</span></label>
       <label>화면 모드

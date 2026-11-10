@@ -103,14 +103,22 @@
       this.setProfile(profile);
     }
     setProfile(p) {
-      const before = this.profile.pose;
+      const before = this.profile.pose ? this.effPose() : undefined;
       this.profile = { ...this.profile, ...p };
       this.pal = Sprites.palette(this.profile.color);
       // 자세를 바꾸면 바로 그 자세로 (공중에 있으면 내려온 뒤에)
-      if (this.profile.pose !== before && !this.air && !this.dragging) this.think();
+      if (this.effPose() !== before && !this.air && !this.dragging) this.think();
     }
     // 우클릭 → 자세에서 고른 자세 (없으면 null = 자유롭게)
-    forcedState() { return { stand: 'idle', sit: 'sit', lie: 'sleep' }[this.profile.pose] || null; }
+    // 0.17.4 다른 사람 캐릭터는 내 화면에서 따로 정한 자세가 먼저 (한 사람씩 > 모두 > 그 사람이 정한 것)
+    effPose() {
+      if (this.isMe) return this.profile.pose;
+      const one = (cfg.peerPose || {})[this.profile.username];
+      if (one && one !== 'own') return one;
+      if (cfg.othersPose && cfg.othersPose !== 'own') return cfg.othersPose;
+      return this.profile.pose;
+    }
+    forcedState() { return { stand: 'idle', sit: 'sit', lie: 'sleep' }[this.effPose()] || null; }
     get s() { return cfg.petScale; }
     get w() { return 16 * this.s; }
     get h() { return 16 * this.s; }
@@ -659,7 +667,11 @@
     resize();
     ensureMe(d.self);
   });
-  buddy.on('config', (c) => { cfg = { ...cfg, ...c }; rebuildPlatforms(); });
+  buddy.on('config', (c) => {
+    const before = new Map([...pets].map(([id, p]) => [id, p.effPose()]));
+    cfg = { ...cfg, ...c }; rebuildPlatforms();
+    for (const [id, p] of pets) if (p.effPose() !== before.get(id) && !p.air && !p.dragging) p.think();   // 0.17.4 자세 설정 바꾸면 바로
+  });
   buddy.on('self', (p) => ensureMe(p));
   buddy.on('windows', (wins) => { rawWindows = wins; rebuildPlatforms(); });
   buddy.on('peers', (list) => {
