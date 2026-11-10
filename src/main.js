@@ -288,7 +288,7 @@ function showHome(focusChat = false, dmWith = null) {
     home = makeWindow('home.html', { width: 1220, height: 720, minWidth: 720, minHeight: 560, title: `${BETA_TAG}🏠 Desktop Buddy 집`, webPreferences: webPreferences({ autoplayPolicy: 'no-user-gesture-required', backgroundThrottling: false }) });
     for (const ev of ['show', 'hide', 'minimize', 'restore']) home.on(ev, () => setTimeout(updateWidgets, 50));
     // 0.17: 집 창을 다시 불러온 뒤(화면 멈춤 · 그래픽 오류 복구) 바로 지금 상태를 다시 보내 줌 (예전엔 다음 소식이 올 때까지 빈 화면)
-    home.webContents.on('did-finish-load', () => { pushHome(); pushTimers(); pushSkins(); });
+    home.webContents.on('did-finish-load', () => { pushHome(); pushTimers(); pushSkins(); if (pendingGift) home.webContents.send('limited-gift', pendingGift); });
     // 0.17: 모니터를 옮기거나(배율이 다른 화면) 다시 보일 때 화면이 빈 채로 남지 않게 한 번 더 그리게 함
     for (const ev of ['moved', 'show', 'restore', 'focus']) home.on(ev, () => { if (!home.isDestroyed()) home.webContents.invalidate(); });
   }
@@ -430,6 +430,7 @@ function onSelfChanged() {
 // ---------------------------------------------------------------- 서버 연결
 let ws = null;
 let session = null;    // { user, catalog } — 로그인된 상태
+let pendingGift = null;   // 0.17.5 🍫 아직 집 창에서 못 본 한정 선물 펫
 let pendingAuth = null; // 로그인 창에서 보낸 요청 (비밀번호는 연결 직후 지움)
 let remember = true;
 let wantRoom = null;
@@ -601,6 +602,12 @@ function handleServer(m, sock) {
       friends = { friends: m.friends, incoming: m.incoming, outgoing: m.outgoing, blocked: m.blocked || [] };
       pushHome();
       control?.webContents.send('srv', { type: 'friends', ...friends });
+      break;
+    case 'limited-gift':   // 0.17.5 🍫 한정 선물 펫 축하 창 (집 창이 닫혀 있으면 열릴 때 보여 줌)
+      pendingGift = m;
+      if (home && !home.isDestroyed()) home.webContents.send('limited-gift', m);
+      notify(`${m.icon} ${m.title} 선물!`, `한정 펫 '${m.name}'을(를) 받았어요!`);
+      overlay?.webContents.send('emote', { from: 'me', kind: 'heart' });
       break;
     case 'notice':
       home?.webContents.send('toast', m.message);
@@ -1317,6 +1324,7 @@ function registerIpc() {
   ipcMain.handle('get-update', () => updateView());
   ipcMain.on('update-install', () => { if (updateState.state === 'ready') installUpdate(); });
   ipcMain.on('update-open', () => updater.openDownload());
+  ipcMain.on('gift-seen', () => { pendingGift = null; });   // 0.17.5
   ipcMain.on('update-check', () => {   // 0.17.3 '지금 확인' 버튼: 받는 중 · 준비됨이면 그대로 두고, 아니면 확인 중으로 보여 줌
     if (app.isPackaged && !['downloading', 'ready'].includes(updateState.state)) { updateState = { ...updateState, state: 'checking' }; pushUpdate(); }
     updater.check();

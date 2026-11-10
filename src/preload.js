@@ -18,6 +18,7 @@ const SEND = [
   'char-menu', 'open-home', 'timer-cmd', 'timer-pin', 'mini-pin', 'sticky-pin', 'sticky-save', 'widget-size', 'widget-close', 'timer-sound', 'timer-test', 'fishing-view',
   // 확인창(confirm) 뒤 입력칸이 안 눌리는 Electron 문제 고치기
   'refocus',
+  'gift-seen',   // 0.17.5 🍫
 ];
 const INVOKE = ['get-state', 'list-windows', 'get-chat', 'get-skins', 'get-theme', 'get-update', 'get-timers', 'yt-info', 'sticky-get'];
 const ON = [
@@ -25,6 +26,7 @@ const ON = [
   'login-state', 'login-error', 'account',
   'home-state', 'reward', 'toast', 'focus-chat', 'skins', 'skin-saved', 'theme', 'update', 'srv',
   'timers', 'snack', 'alarm', 'open-dm', 'sticky-data', 'open-tab',
+  'limited-gift',   // 0.17.5 🍫
 ];
 
 contextBridge.exposeInMainWorld('buddy', {

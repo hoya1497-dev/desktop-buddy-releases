@@ -100,6 +100,17 @@
   </div>
   <!-- 🎵 레코드 플레이어: 닫아도 노래가 계속 나오게 화면 밖으로만 옮겨요 -->
   <div id="profileModal" class="profile-modal" hidden><div id="profileBox"></div></div>
+  <!-- 0.17.5 🍫 한정 선물 펫 축하 창 -->
+  <div id="giftModal" class="profile-modal" hidden>
+    <div class="modal-card gift-card">
+      <div class="gift-confetti" aria-hidden="true"></div>
+      <div id="giftTitle" class="gift-title"></div>
+      <canvas id="giftPet" width="168" height="192"></canvas>
+      <div id="giftName" class="gift-name"></div>
+      <p class="note" id="giftNote"></p>
+      <div class="row gift-acts"><button id="giftGo" class="primary small">🐾 펫 탭에서 보기</button><button id="giftClose" class="ghost small">닫기</button></div>
+    </div>
+  </div>
   <!-- 0.17.3 ℹ️ 앱 버전 -->
   <div id="verModal" class="profile-modal" hidden>
     <div class="modal-card ver-card">

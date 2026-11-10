@@ -675,3 +675,18 @@ body.meeting-mode #room { cursor: default !important; }
 .ver-state.muted { color: var(--muted); }
 .ver-acts { gap: 6px; }
 .ver-acts button { width: auto; }
+
+/* 0.17.5 🍫 한정 선물 펫 축하 창 */
+.gift-card { width: min(300px, 92vw); text-align: center; position: relative; overflow: hidden; }
+.gift-title { font-size: 18px; font-weight: 700; margin: 6px 0 4px; }
+.gift-card > * { position: relative; }
+.gift-card .gift-confetti { position: absolute; }
+.gift-card canvas { image-rendering: pixelated; display: block; margin: 6px auto; animation: gift-bob 1.6s ease-in-out infinite; }
+.gift-name { font-size: 15px; font-weight: 600; }
+.gift-acts { justify-content: center; gap: 6px; margin-top: 8px; }
+.gift-acts button { width: auto; }
+.gift-confetti { position: absolute; inset: 0 0 42% 0; pointer-events: none; opacity: .5; -webkit-mask-image: linear-gradient(#000 60%, transparent); mask-image: linear-gradient(#000 60%, transparent);
+  background-image: radial-gradient(circle, #f794b6 2px, transparent 3px), radial-gradient(circle, #ffe066 2px, transparent 3px), radial-gradient(circle, #86b452 2px, transparent 3px), radial-gradient(circle, #a06644 2px, transparent 3px);
+  background-size: 46px 52px, 58px 40px, 38px 60px, 66px 48px; background-position: 4px 6px, 20px 30px, 30px 10px, 12px 40px; }
+@keyframes gift-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.limited-tag { color: #b8541e; font-weight: 600; }

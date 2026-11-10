@@ -162,7 +162,7 @@
     const pf = $('shopPetFoods'); pf.textContent = '';
     for (const [id, f] of Object.entries(c.petFoods)) {
       // 좋아하는 펫: 상점에서 그냥 살 수 있는 펫만 (비밀 펫 · 이벤트 펫 이름은 안 보여 줌)
-      const fans = Object.entries(c.pets).filter(([, p]) => !p.secret && !p.event && p.likes.includes(id)).map(([, p]) => p.name);
+      const fans = Object.entries(c.pets).filter(([, p]) => !p.secret && !p.event && !p.limited && p.likes.includes(id)).map(([, p]) => p.name);
       const who = f.tank ? '어항 · 아쿠아리움 물고기' : fans.length ? fans.join('·') + '가 좋아해요' : '펫 먹이';
       pf.append(row(f.icon, f.name, `🪙 ${f.price} · ${who}${u.food[id] ? ` · ${u.food[id]}개 있음` : ''}`, [
         ['1개', u.coins < f.price, () => srv({ type: 'buy', item: id, n: 1 })],
@@ -182,6 +182,7 @@
     const pets = $('shopPets'); pets.textContent = '';
     const full = u.pets.length >= c.limits.petsMax;
     for (const [id, p] of Object.entries(c.pets)) {
+      if (p.limited) continue;   // 0.17.5 🍫 한정 선물 펫은 상점에 안 보임
       if (p.secret) {   // 운영자 전용 펫
         const own = u.pets.some((x) => x.kind === id);
         pets.append(row(own ? PetArt.thumb(id, 34) : secretThumb(), own ? p.name : '???', `${p.code} · ${own ? '✨ 운영자 보상 · 가지고 있음' : '🔒 비밀 펫 · 살 수 없어요'}`, [[own ? '있음' : '구매 불가', true, () => {}]]));
@@ -1172,7 +1173,8 @@
       if (myPetFoods.length) { acts.append(sel); acts.append(btn('밥 주기', 'primary small', () => { feedPick.set(p.id, sel.value); saveFeedPick(); srv({ type: 'feed', food: sel.value, target: p.id }); }, p.full >= 98)); }
       else acts.append(el('span', { class: 'note-inline', text: '먹이가 없어요 (상점 → 음식)' }));
       // 되팔기: 산 값의 절반 (운영자 펫은 안 됨)
-      if (kind.secret) acts.append(el('span', { class: 'note-inline', text: '✨ 운영자 펫' }));
+      if (kind.limited) { const g = c.limitedGifts?.[kind.limited]; acts.append(el('span', { class: 'note-inline limited-tag', text: `${g?.icon || '🎁'} ${g?.name || ''} 한정` })); }   // 0.17.5 되팔기 없음
+      else if (kind.secret) acts.append(el('span', { class: 'note-inline', text: '✨ 운영자 펫' }));
       else if (kind.price) {
         const back = Math.floor(kind.price / 2);
         acts.append(btn(`되팔기 🪙${back}`, 'ghost small', () => { if (confirm(`'${p.name}'을(를) 되팔까요?\n산 값의 절반인 🪙${back}을 돌려받고, 펫은 사라져요. (되돌릴 수 없어요)`)) srv({ type: 'pet-sell', id: p.id }); }, false, '산 값의 절반을 돌려받아요'));

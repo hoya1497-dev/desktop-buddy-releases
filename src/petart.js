@@ -410,6 +410,110 @@ window.PetArt = (() => {
     ],
   };
 
+  // ---- 🍫 빼빼로 데이 한정 펫 (P24~P28, 0.17.5) — 하루가 고른 시안 그대로
+  ART.ppOriginal = {   // 오리지널 초코
+    pal: { o: '#3a1e10', c: '#6e3e24', h: '#a06644', d: '#4e2a18', s: '#ffe9c8', b: '#f0c486', l: '#fbe0b0', B: '#d09a58', e: '#1a1010', w: '#ffffff', p: '#f6a0b4', m: '#e0566a' },
+    rows: [
+      '....ooooooo...',
+      '...ohhccccco..',
+      '..ohshcccccdo.',
+      '..ohcccccccdo.',
+      '..ohewcccewdo.',
+      '..oheeccceedo.',
+      '..ohpcemecpdo.',
+      '.occcccmcccdco',
+      '..ohcccccccdo.',
+      '..olbcbbbcbBo.',
+      '..olbcbbbbbBo.',
+      '..olbbbbbbbBo.',
+      '..olbbbbbbbBo.',
+      '..ooooooooooo.',
+      '...oo.....oo..',
+    ],
+  };
+  ART.ppMatcha = {   // 녹차
+    pal: { o: '#24401a', g: '#86b452', G: '#b4d97a', d: '#5e8a34', k: '#4a7428', L: '#3a8a2e', v: '#6cc24a', b: '#f0c486', l: '#fbe0b0', B: '#d09a58', e: '#24401a', p: '#f6a0b4', m: '#24401a' },
+    rows: [
+      '........LL....',
+      '.......LvL....',
+      '....oooLooo...',
+      '...oGGgggggo..',
+      '..oGgkggggkdo.',
+      '..oGggggkggdo.',
+      '..oGggggggkdo.',
+      '..oGeegggeedo.',
+      '..oGpggmggpdo.',
+      '.oggggkggggdgo',
+      '..olgbgbbgbBo.',
+      '..olgbgbbbbBo.',
+      '..olbbgbbbbBo.',
+      '..olbbbbbbbBo.',
+      '..ooooooooooo.',
+      '...oo.....oo..',
+    ],
+  };
+  ART.ppNude = {   // 누드
+    pal: { o: '#5a3418', b: '#f2c88a', l: '#fde6bc', B: '#d49a5a', c: '#5a2e18', C: '#8a5030', e: '#1a1010', w: '#ffffff', p: '#f6a0b4', m: '#7a2a20' },
+    rows: [
+      '..ooooooooooo.',
+      '..olbCcccCbBo.',
+      '..olbcCCCcbBo.',
+      '..olbbcccbbBo.',
+      '..olbbbbbbbBo.',
+      '..olewbbbewBo.',
+      '..oleebbbeeBo.',
+      '.oblpbbmbbpBbo',
+      '..olbbbmbbbBo.',
+      '..olbBbbbbbBo.',
+      '..olbbbbBbbBo.',
+      '..olbBbbbbbBo.',
+      '..olbbbbbBbBo.',
+      '..ooooooooooo.',
+      '...oo.....oo..',
+    ],
+  };
+  ART.ppAlmond = {   // 아몬드
+    pal: { o: '#2e180c', c: '#5e3420', h: '#8a5a3c', d: '#3e2214', a: '#ecc690', A: '#b8864e', k: '#141018', w: '#9ad0ff', b: '#f0c486', l: '#fbe0b0', B: '#d09a58', e: '#1a1010' },
+    rows: [
+      '.......oo.....',
+      '....ooaAooo...',
+      '...ohcccaAco..',
+      '..ohcaAccccdo.',
+      '.oahcccccccdo.',
+      '..ohkkkkkkkdo.',
+      '..ohkwkckwkdo.',
+      '.ochccccceedco',
+      '..ohcaAccccdAo',
+      '..olbcbbbbcBo.',
+      '..olbbbbbbcBo.',
+      '..olbbbbbbbBo.',
+      '..olbbbbbbbBo.',
+      '..ooooooooooo.',
+      '...oo.....oo..',
+    ],
+  };
+  ART.ppStrawberry = {   // 딸기
+    pal: { o: '#7a2a40', s: '#f794b6', S: '#ffc4da', d: '#d8648c', R: '#ff5a6e', r: '#c8243e', y: '#ffe066', v: '#a88ae8', t: '#5ac8e0', w: '#ffffff', b: '#f0c486', l: '#fbe0b0', B: '#d09a58', e: '#3a1020', p: '#ff6a8a', m: '#c8243e' },
+    rows: [
+      '...oo.....oo..',
+      '..oRRo...oRRo.',
+      '..oRrRoroRrRo.',
+      '...ooooroooo..',
+      '...oSSyssvso..',
+      '..oSsstssysdo.',
+      '..oSvsssssddo.',
+      '..oSewsssewdo.',
+      '..oSeessseedo.',
+      '.osSpssmsspdso',
+      '..olsbsbbsbBo.',
+      '..olbbsbbbbBo.',
+      '..olbbbbbbbBo.',
+      '..olbbbbbbbBo.',
+      '..ooooooooooo.',
+      '...oo.....oo..',
+    ],
+  };
+
   const cache = new Map();
   function bitmap(kind) {
     if (cache.has(kind)) return cache.get(kind);

@@ -1743,6 +1743,25 @@
     if (u.state === 'ready') { $('updateText').textContent = `🔄 새 버전(v${u.version})이 준비됐어요. 다음에 껐다 켜면 바뀌어요.`; $('updateBtn').hidden = false; $('updateBtn').textContent = '지금 다시 시작'; $('updateBtn').onclick = () => buddy.send('update-install'); }
     if (u.state === 'manual') { $('updateText').textContent = `⬇️ 새 버전(v${u.version})이 나왔어요.`; $('updateBtn').hidden = false; $('updateBtn').textContent = '받으러 가기'; $('updateBtn').onclick = () => buddy.send('update-open'); }
   }
+  // 0.17.5 🍫 한정 선물 펫 축하 창
+  function showGift(g) {
+    if (!g) return;
+    $('giftTitle').textContent = `${g.icon || '🎁'} ${g.title || '선물'} 선물!`;
+    $('giftName').textContent = `'${g.name}' 펫을 받았어요!`;
+    $('giftNote').textContent = '오늘만 받을 수 있는 한정 펫이에요. 상점에서는 살 수 없어요.';
+    const cv = $('giftPet'), gx = cv.getContext('2d');
+    gx.clearRect(0, 0, cv.width, cv.height);
+    if (window.PetArt) {
+      const bm = PetArt.bitmap(g.kind);
+      if (bm) { const k = Math.floor(Math.min((cv.width - 8) / bm.width, (cv.height - 8) / bm.height)); PetArt.draw(gx, g.kind, cv.width / 2, cv.height - 4, k); }
+    }
+    $('giftModal').hidden = false;
+  }
+  const closeGift = () => { $('giftModal').hidden = true; buddy.send('gift-seen'); };
+  $('giftClose').onclick = closeGift;
+  $('giftGo').onclick = () => { closeGift(); document.querySelector('.tabs button[data-tab=pets]')?.click(); };
+  buddy.on('limited-gift', showGift);
+
   // 0.17.3 ℹ️ 게임 안에서 지금 버전 보기 + 업데이트 확인
   let upd = null;
   const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : `${Math.round(m / 60)}시간 전`; };
