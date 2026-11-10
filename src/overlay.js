@@ -421,7 +421,7 @@
       if (f.say) {
         ctx.font = `12px ${FONT}`;
         const tw = Math.min(170, ctx.measureText(f.say.text).width) + 14, th = 20;
-        const bx = Math.round(clamp(f.x - tw / 2, 2, W - tw - 2)), by = Math.round(f.y - 14 * sc - th - 8);
+        const bx = Math.round(clamp(f.x - tw / 2, 2, W - tw - 2)), by = Math.round(f.y - Math.max(14, (PetArt.bitmap(f.kind)?.height || 12) + 2) * sc - th - 8);   // 0.17.5 키 큰 펫은 더 위로
         ctx.globalAlpha = Math.min(1, f.say.t * 2);
         ctx.fillStyle = 'rgba(255,255,255,0.96)'; ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.roundRect(bx, by, tw, th, 8); ctx.fill(); ctx.stroke();

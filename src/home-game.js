@@ -1316,31 +1316,48 @@
       }
     }
   }
+  // 0.17.5 키 큰 펫(빼빼로 15~16칸 등)은 이름표 · 말풍선을 그만큼 위로 (12칸까지는 예전 자리 그대로)
+  // 그림에서 실제로 칠해진 높이(맨 위 빈 줄 빼고)를 보고, 이름표 아랫변이 머리보다 2px 위에 오게
+  const liftCache = new Map();
+  const petLift = (kind, k = 3) => {
+    if (liftCache.has(kind)) return liftCache.get(kind);
+    const bm = PetArt.bitmap(kind);
+    let v = 0;
+    if (bm) {
+      const d = bm.getContext('2d').getImageData(0, 0, bm.width, bm.height).data;
+      let top = 0;
+      while (top < bm.height && ![...Array(bm.width).keys()].some((x) => d[(top * bm.width + x) * 4 + 3])) top++;
+      v = Math.max(0, (bm.height - top) * k + 2 + 14 - 40);   // 예전 이름표 자리(r.y - 40)보다 더 올라가야 할 만큼
+    }
+    if (v > 0 || !PetArt.bitmap(kind)) liftCache.set(kind, v); else liftCache.set(kind, 0);
+    return v;
+  };
   function addThings(ctx, things) {
     for (const r of roomPets.values()) {
+      const up = petLift(r.p.kind);
       things.push({ y: r.y, draw: () => {
         ctx.fillStyle = 'rgba(0,0,0,0.13)'; ctx.fillRect(Math.round(r.x - 12), Math.round(r.y - 2), 24, 3);
         PetArt.draw(ctx, r.p.kind, r.x, r.y, 3, r.dir < 0, r.hop);
         if (r.heart > 0) {
           ctx.globalAlpha = Math.min(1, r.heart * 2);
           ctx.font = `16px "Segoe UI Emoji","Apple Color Emoji",sans-serif`; ctx.textAlign = 'center';
-          ctx.fillText('💗', r.x, r.y - 50 - (1.2 - r.heart) * 18);
+          ctx.fillText('💗', r.x, r.y - 50 - up - (1.2 - r.heart) * 18);
           ctx.globalAlpha = 1;
         }
         // 이름표는 항상 보이게 (레벨도 같이)
         const label = `${r.p.name}${r.p.level ? ' Lv.' + r.p.level : ''}`;
         ctx.font = `bold 10px ${FONT}`; ctx.textAlign = 'center'; ctx.fillStyle = (r.p.level || 1) >= 5 ? 'rgba(160,90,10,0.8)' : 'rgba(0,0,0,0.55)';
         const w = ctx.measureText(label).width + 10;
-        ctx.fillRect(Math.round(r.x - w / 2), Math.round(r.y - 40), w, 14);
-        ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(label, r.x, r.y - 33); ctx.textBaseline = 'alphabetic';
+        ctx.fillRect(Math.round(r.x - w / 2), Math.round(r.y - 40 - up), w, 14);
+        ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(label, r.x, r.y - 33 - up); ctx.textBaseline = 'alphabetic';
         if (r.exp) {   // 쓰다듬기 경험치
           ctx.globalAlpha = Math.min(1, r.exp.t * 2); ctx.font = `bold 11px ${FONT}`; ctx.fillStyle = '#e8894a';
-          ctx.fillText(`+${r.exp.n} EXP`, r.x, r.y - 46 - (1.2 - r.exp.t) * 14); ctx.globalAlpha = 1;
+          ctx.fillText(`+${r.exp.n} EXP`, r.x, r.y - 46 - up - (1.2 - r.exp.t) * 14); ctx.globalAlpha = 1;
         }
         if (r.say) {   // 말풍선
           ctx.font = `12px ${FONT}`;
           const tw = Math.min(170, ctx.measureText(r.say.text).width) + 14, th = 20;
-          const bx = Math.round(clamp(r.x - tw / 2, 2, H.RW - tw - 2)), by = Math.round(r.y - 68);
+          const bx = Math.round(clamp(r.x - tw / 2, 2, H.RW - tw - 2)), by = Math.round(r.y - 68 - up);
           ctx.globalAlpha = Math.min(1, r.say.t * 2);
           ctx.fillStyle = 'rgba(255,255,255,0.96)'; ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
           ctx.beginPath(); ctx.roundRect(bx, by, tw, th, 8); ctx.fill(); ctx.stroke();
@@ -1353,7 +1370,7 @@
   }
   function onClick(p) {
     for (const [id, r] of roomPets) {
-      if (Math.abs(p.x - r.x) < 22 && p.y < r.y + 4 && p.y > r.y - 46) {
+      if (Math.abs(p.x - r.x) < 22 && p.y < r.y + 4 && p.y > r.y - 46 - petLift(r.p.kind)) {
         r.heart = 1.2; r.hop = 8;
         const line = petLine(r, 'pat');   // 5레벨이면 성격대로 한마디, 배고프면 배고파
         if (line) { r.say = { text: line, t: 3.5 }; r.sayT = rand(35, 75); }
