@@ -597,6 +597,8 @@ function handleServer(m, sock) {
       room = null; myPeerId = null; peers.clear(); pushPeers();
       addChat({ system: true, text: m.message }); updateTray();
       home?.webContents.send('toast', m.message);
+      // 0.17.7 친구 집이 닫히거나 나가게 되면 우리 집으로 바로 돌아감 (예전엔 '방 없음'에 남아서 레코드 즐겨찾기 등이 안 바뀌는 것처럼 보였음)
+      setTimeout(() => { if (session && !room) joinRoom(session.user.code); }, 300);
       break;
     case 'friends':
       friends = { friends: m.friends, incoming: m.incoming, outgoing: m.outgoing, blocked: m.blocked || [] };
@@ -1308,6 +1310,7 @@ function registerIpc() {
     'board-get', 'board-add', 'board-del', 'board-clear', 'board-edit', 'board-style', 'dm-send', 'dm-get', 'dm-read', 'mail-get', 'mail-send', 'mail-reply', 'mail-read', 'mail-del', 'fish-sell-many', 'fish-show', 'invite-fof', 'friend-add-peer', 'notices-get', 'notice-post', 'notice-edit', 'notice-del', 'invite',
     'home-expand', 'music-get', 'music-add', 'music-request', 'music-answer', 'music-skip', 'music-remove', 'music-move', 'music-duration', 'music-error',
     'music-play', 'music-fav', 'music-bgm', 'music-repeat',
+    'music-folder', 'music-folder-play',   // 0.17.7 📁 즐겨찾기 폴더
     'photo',   // 0.15.1: 📷 방 안 사진
     'slots-get', 'slot-buy', 'slot-save', 'slot-load', 'slot-del', 'slot-rename', 'furn-sell', 'profile-set', 'profile-get',
     'slot-thumb', 'slot-detail', 'title-buy', 'title-equip', 'name-effect-toggle',   // 0.17: 💾 슬롯 · 🛋️ 되팔기 · 🪪 프로필 · 0.17.2: 🖼️ 슬롯 대표 이미지 · 펼쳐보기

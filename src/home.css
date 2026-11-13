@@ -690,3 +690,23 @@ body.meeting-mode #room { cursor: default !important; }
   background-size: 46px 52px, 58px 40px, 38px 60px, 66px 48px; background-position: 4px 6px, 20px 30px, 30px 10px, 12px 40px; }
 @keyframes gift-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 .limited-tag { color: #b8541e; font-weight: 600; }
+
+/* 0.17.7 📁 즐겨찾기 폴더 */
+.fav-folders { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.fav-folders .fchip { border: 1px solid var(--line); background: var(--input); color: var(--ink); border-radius: 999px; padding: 2px 9px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.fav-folders .fchip small { color: var(--muted); }
+.fav-folders .fchip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fav-folders .fchip.on small { color: rgba(255,255,255,.85); }
+.fav-folders .fchip.add, .fav-folders .fchip.edit { border-style: dashed; color: var(--muted); }
+.fav-folders .fchip.edit.on { border-style: solid; }
+.fav-folder-bar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.fav-folder-bar:empty { display: none; }
+.fav-folder-bar button { width: auto; font-size: 12px; padding: 3px 9px; }
+.folder-form { display: flex; gap: 4px; width: 100%; }
+.folder-form .folder-input { flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px; }
+.folder-form button { width: auto; }
+#musicFavs li .in-folders { display: block; color: var(--muted); font-size: 10.5px; margin-top: 1px; }
+#musicFavs.editing li { flex-wrap: wrap; }
+#musicFavs .fav-put { display: flex; flex-wrap: wrap; gap: 3px; width: 100%; margin-top: 3px; }
+#musicFavs li .fav-put button.put { border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; font-size: 11px; color: var(--muted); }
+#musicFavs li .fav-put button.put.on { background: var(--accent); border-color: var(--accent); color: #fff; }

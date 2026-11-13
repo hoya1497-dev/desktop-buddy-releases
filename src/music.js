@@ -136,26 +136,103 @@
     for (const d of document.querySelectorAll('[data-msec]')) d.hidden = d.dataset.msec !== t;
   }
   for (const b of document.querySelectorAll('#musicTabs button')) b.onclick = () => showTab(b.dataset.mtab);
+  // 📁 0.17.7 즐겨찾기 폴더: 위에 폴더 칩(전체 · 내 폴더들 · ＋ 폴더), 고르면 그 폴더 노래만. ✏️ 편집 → 노래마다 폴더 넣기/빼기
+  let favFolder = load('favFolder', '');     // '' = 전체
+  let favEdit = false;
+  let folderInput = null;                     // { mode: 'add' | 'rename', id, value }
+  const folders = () => mine().folders || [];
+  function folderForm() {
+    const fi = folderInput;
+    const inp = el('input', { type: 'text', maxLength: 20, value: fi.value || '', placeholder: '폴더 이름 (예: 잔잔한 노래)', className: 'folder-input' });
+    const ok = () => {
+      const name = inp.value.trim();
+      if (!name) { inp.focus(); return; }
+      if (fi.mode === 'add') srv({ type: 'music-folder', op: 'add', name });
+      else srv({ type: 'music-folder', op: 'rename', id: fi.id, name });
+      folderInput = null; renderFavs();
+    };
+    inp.addEventListener('input', () => { fi.value = inp.value; });
+    inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter' && !e.isComposing) ok(); else if (e.key === 'Escape') { folderInput = null; renderFavs(); } });
+    setTimeout(() => inp.focus(), 0);
+    return el('div', { class: 'folder-form' }, inp,
+      smallBtn(fi.mode === 'add' ? '만들기' : '바꾸기', 'primary small', ok),
+      smallBtn('취소', 'ghost small', () => { folderInput = null; renderFavs(); }));
+  }
+  function renderFolders() {
+    const my = mine(), fs = folders(), own = !!M?.isOwner;
+    if (favFolder && !fs.some((f) => f.id === favFolder)) favFolder = '';
+    const bar = $('favFolders'); bar.textContent = '';
+    const chip = (id, text, n) => {
+      const b = el('button', { class: 'fchip' + (favFolder === id ? ' on' : ''), title: id ? '이 폴더 노래만 보기' : '즐겨찾기 전부 보기' },
+        text, el('small', { text: ` ${n}` }));
+      b.onclick = () => { favFolder = id; store('favFolder', id); renderFavs(); };
+      return b;
+    };
+    bar.append(chip('', '⭐ 전체', my.favs.length));
+    for (const f of fs) bar.append(chip(f.id, `📁 ${f.name}`, f.vids.length));
+    const add = el('button', { class: 'fchip add', text: '＋ 폴더', title: '새 폴더 만들기 (잔잔한 노래 · 신나는 노래 …)' });
+    add.onclick = () => { folderInput = { mode: 'add', value: '' }; renderFavs(); };
+    if (fs.length < 20) bar.append(add);
+    const edit = el('button', { class: 'fchip edit' + (favEdit ? ' on' : ''), text: favEdit ? '✔ 편집 끝' : '✏️ 편집', title: '노래마다 폴더에 넣고 빼기' });
+    edit.onclick = () => { favEdit = !favEdit; renderFavs(); };
+    if (my.favs.length) bar.append(edit);
+    // 고른 폴더의 할 일
+    const fb = $('favFolderBar'); fb.textContent = '';
+    if (folderInput) { fb.append(folderForm()); return; }
+    const f = fs.find((x) => x.id === favFolder);
+    if (!f) return;
+    if (own) {
+      const play = smallBtn('▶ 다 틀기', 'primary small', () => srv({ type: 'music-folder-play', id: f.id }), '이 폴더 노래를 대기열에 다 넣어요');
+      const shuf = smallBtn('🔀 섞어서', 'ghost small', () => srv({ type: 'music-folder-play', id: f.id, shuffle: true }), '섞어서 대기열에 넣어요');
+      play.disabled = shuf.disabled = !f.vids.length || !M?.hasRecord;
+      fb.append(play, shuf);
+    }
+    const bg = smallBtn('🏠 배경음으로', 'ghost small', () => srv({ type: 'music-folder', op: 'bgm', id: f.id }), '우리 집 배경음을 이 폴더 노래로 바꿔요');
+    bg.disabled = !f.vids.length;
+    fb.append(bg,
+      smallBtn('✏️ 이름', 'ghost small', () => { folderInput = { mode: 'rename', id: f.id, value: f.name }; renderFavs(); }, '폴더 이름 바꾸기'),
+      smallBtn('🗑', 'ghost small', () => { if (confirm(`📁 '${f.name}' 폴더를 지울까요?\n(노래는 즐겨찾기에 그대로 있어요)`)) { srv({ type: 'music-folder', op: 'del', id: f.id }); favFolder = ''; store('favFolder', ''); } }, '폴더 지우기'));
+  }
   function renderFavs() {
-    const my = mine(), own = !!M?.isOwner, rec = !!M?.hasRecord;
+    const my = mine(), own = !!M?.isOwner, rec = !!M?.hasRecord, fs = folders();
+    renderFolders();
+    const f = fs.find((x) => x.id === favFolder);
+    const list = f ? my.favs.filter((x) => f.vids.includes(x.vid)) : my.favs;
     const ul = $('musicFavs'); ul.textContent = '';
-    $('favNote').textContent = my.favs.length
-      ? (own ? `${my.favs.length}곡 · ▶ 지금 틀기 · ＋ 대기열에 넣기 · 🏠 우리 집 배경음으로 고르기` : `${my.favs.length}곡 · 신청을 누르면 링크 없이 바로 집주인에게 신청돼요 · 🏠는 우리 집 배경음`)
-      : '노래 옆 ☆를 누르거나, 링크를 넣고 ⭐ 저장을 누르면 여기에 모여요. 다음엔 링크 없이 바로 틀 수 있어요.';
-    for (const f of my.favs) {
-      const inBgm = my.bgm.list.includes(f.vid);
-      const li = el('li', {}, el('span', { class: 't' }, inBgm ? el('span', { class: 'bgm-tag', text: '🏠' }) : null, f.title));
+    ul.classList.toggle('editing', favEdit);
+    $('favNote').textContent = favEdit
+      ? (fs.length ? '노래 아래 폴더 이름을 눌러 넣고 빼요. 한 곡을 여러 폴더에 넣을 수 있어요.' : '먼저 위의 ＋ 폴더로 폴더를 만들어 주세요 (잔잔한 노래 · 신나는 노래 …).')
+      : f ? (f.vids.length ? `📁 ${f.name} · ${f.vids.length}곡` : `📁 ${f.name} 폴더가 비었어요. ✏️ 편집을 눌러 노래를 넣어 주세요.`)
+      : my.favs.length
+        ? (own ? `${my.favs.length}곡 · ▶ 지금 틀기 · ＋ 대기열에 넣기 · 🏠 우리 집 배경음으로 고르기` : `${my.favs.length}곡 · 신청을 누르면 링크 없이 바로 집주인에게 신청돼요 · 🏠는 우리 집 배경음`)
+        : '노래 옆 ☆를 누르거나, 링크를 넣고 ⭐ 저장을 누르면 여기에 모여요. 다음엔 링크 없이 바로 틀 수 있어요.';
+    for (const fv of list) {
+      const inBgm = my.bgm.list.includes(fv.vid);
+      const where = fs.filter((x) => x.vids.includes(fv.vid));
+      const li = el('li', {}, el('span', { class: 't' }, inBgm ? el('span', { class: 'bgm-tag', text: '🏠' }) : null, fv.title,
+        !favEdit && !f && where.length ? el('small', { class: 'in-folders', text: where.map((x) => '📁' + x.name).join(' ') }) : null));
+      if (favEdit) {   // ✏️ 편집: 폴더 칩으로 넣고 빼기
+        const chips = el('div', { class: 'fav-put' });
+        for (const x of fs) {
+          const on = x.vids.includes(fv.vid);
+          chips.append(smallBtn((on ? '✓ ' : '＋ ') + x.name, 'put' + (on ? ' on' : ''), () => srv({ type: 'music-folder', op: 'put', id: x.id, vid: fv.vid, on: !on }), on ? `📁 ${x.name}에서 빼기` : `📁 ${x.name}에 넣기`));
+        }
+        li.append(chips);
+        ul.append(li);
+        continue;
+      }
       if (own) {
-        li.append(smallBtn('▶', '', () => srv({ type: 'music-play', vid: f.vid, title: f.title }), '지금 바로 틀기'));
-        li.append(smallBtn('＋', '', () => srv({ type: 'music-add', vid: f.vid, title: f.title }), '대기열에 넣기'));
+        li.append(smallBtn('▶', '', () => srv({ type: 'music-play', vid: fv.vid, title: fv.title }), '지금 바로 틀기'));
+        li.append(smallBtn('＋', '', () => srv({ type: 'music-add', vid: fv.vid, title: fv.title }), '대기열에 넣기'));
       } else {
-        const r = smallBtn('신청', '', () => srv({ type: 'music-request', vid: f.vid, title: f.title }), '집주인에게 신청하기');
+        const r = smallBtn('신청', '', () => srv({ type: 'music-request', vid: fv.vid, title: fv.title }), '집주인에게 신청하기');
         r.disabled = !rec; li.append(r);
       }
-      const hb = smallBtn('🏠', inBgm ? 'in' : '', () => srv({ type: 'music-bgm', ...(inBgm ? { del: f.vid } : { add: f.vid }) }),
+      const hb = smallBtn('🏠', inBgm ? 'in' : '', () => srv({ type: 'music-bgm', ...(inBgm ? { del: fv.vid } : { add: fv.vid }) }),
         inBgm ? '우리 집 배경음에서 빼기' : '우리 집 배경음에 넣기');
       li.append(hb);
-      li.append(smallBtn('✕', '', () => { if (confirm(`'${f.title}'을(를) 즐겨찾기에서 뺄까요?${inBgm ? '\n(배경음에서도 빠져요)' : ''}`)) srv({ type: 'music-fav', op: 'del', vid: f.vid }); }, '즐겨찾기에서 빼기'));
+      if (f) li.append(smallBtn('📤', '', () => srv({ type: 'music-folder', op: 'put', id: f.id, vid: fv.vid, on: false }), `📁 ${f.name}에서 빼기 (즐겨찾기엔 그대로)`));
+      li.append(smallBtn('✕', '', () => { if (confirm(`'${fv.title}'을(를) 즐겨찾기에서 뺄까요?${inBgm ? '\n(배경음에서도 빠져요)' : ''}${where.length ? '\n(폴더에서도 빠져요)' : ''}`)) srv({ type: 'music-fav', op: 'del', vid: fv.vid }); }, '즐겨찾기에서 빼기'));
       ul.append(li);
     }
   }
@@ -198,7 +275,7 @@
   $('repAll').onclick = () => srv({ type: 'music-repeat', mode: M?.repeat === 'all' ? 'off' : 'all' });
   function render() {
     renderBtn();
-    if (!M) return;
+    if (!M) { renderFavs(); renderBgm(); return; }   // 0.17.7 방이 없어도 ⭐ 즐겨찾기 · 🏠 배경음은 내 계정 것이라 늘 보여 줌
     const own = M.isOwner;
     const owner = H.S?.room?.owner;
     $('musicWhere').textContent = owner ? (own ? '· 우리 집' : `· ${owner.nickname}님 집`) : '';
@@ -352,7 +429,7 @@
       if (code) srv({ type: 'music-get' });
     }
     renderBtn();
-    if (M && !$('musicModal').classList.contains('closed')) render();   // ⭐ 즐겨찾기 · 🏠 배경음 바뀐 것 보여 주기
+    if (!$('musicModal').classList.contains('closed')) render();   // ⭐ 즐겨찾기 · 🏠 배경음 바뀐 것 보여 주기 (0.17.7 방이 없을 때도)
   });
   showTab(['queue', 'fav', 'bgm'].includes(tab) ? tab : 'queue');
   applyVolume();
