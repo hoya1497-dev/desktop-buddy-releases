@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
+  <title>Desktop Buddy</title>
+  <link rel="stylesheet" href="control.css">
+  <link rel="stylesheet" href="profilecard.css">
+</head>
+<body>
+  <header>
+    <canvas id="preview" width="48" height="48"></canvas>
+    <div>
+      <h1>Desktop Buddy</h1>
+      <p class="sub" id="selfLine">화면 위의 작은 친구</p>
+    </div>
+  </header>
+
+  <nav>
+    <button data-tab="me" class="active">내 캐릭터</button>
+    <button data-tab="profile">🪪 프로필</button>
+    <button data-tab="windows">상태</button>
+    <button data-tab="account">계정</button>
+  </nav>
+
+  <!-- 내 캐릭터 -->
+  <section id="tab-me" class="tab active">
+    <div class="card">
+      <h2>내 캐릭터</h2>
+      <label>닉네임 <input id="nickname" maxlength="16"></label>
+      <label>색깔
+        <div class="row">
+          <input id="color" type="color">
+          <div id="swatches" class="row"></div>
+        </div>
+      </label>
+      <label>닉네임 글자색 <span class="note-inline">(채팅 · 이름표에 보이는 색)</span>
+        <div class="row">
+          <input id="nameColor" type="color">
+          <button id="nameColorReset" class="ghost small" type="button">기본으로</button>
+          <div id="nameSwatches" class="row"></div>
+        </div>
+      </label>
+      <p id="nameEffectNote" class="note" hidden></p>
+      <div id="nameEffectRow" hidden>
+        <label class="check" style="margin:4px 0 0"><input type="checkbox" id="nameEffectOn"> ✨ 운영자 닉네임 효과 켜기</label>
+        <p class="note" style="margin:2px 0 0 24px">켜면 칭호를 달아도 글자 색은 효과로 보여요. 끄면 칭호 색 그대로예요.</p>
+        <p class="note" id="nameEffectLockNote" style="margin:2px 0 0 24px" hidden>🌈 무지개는 가장 높은 효과라 항상 켜져 있어요.</p>
+      </div>
+      <div class="note" style="margin-top:8px">캐릭터</div>
+      <div class="species-row" id="speciesRow"></div>
+      <label>바탕화면 크기 <span id="scaleVal" class="note-inline"></span><input id="petScale" type="range" min="2" max="8" step="1"></label>
+    </div>
+    <div class="card">
+      <h2>캐릭터 그림 바꾸기</h2>
+      <p class="note">서 있는 · 앉은 · 걷는 그림 3장은 꼭 골라 주세요. 누운 그림(잘 때)과 떨어지는 그림(잡아서 들 때)은 넣고 싶을 때만 넣어요. 없으면 앉기 · 서 있기 그림으로 대신해요. 배경이 투명한 PNG가 가장 예뻐요. 그림은 128px로 줄여서 올라가고, 친구 화면에도 보여요.</p>
+      <div class="skin-grid">
+        <label class="skin-slot"><span>서 있기</span><canvas id="pv-stand" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="stand"></label>
+        <label class="skin-slot"><span>앉기</span><canvas id="pv-sit" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="sit"></label>
+        <label class="skin-slot"><span>걷기</span><canvas id="pv-walk" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="walk"></label>
+        <label class="skin-slot optional"><span>눕기 <small>(선택)</small></span><canvas id="pv-lie" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="lie"><button type="button" class="link-btn" data-clear="lie" hidden>빼기</button></label>
+        <label class="skin-slot optional"><span>떨어지기 <small>(선택)</small></span><canvas id="pv-fall" width="96" height="96"></canvas><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-pose="fall"><button type="button" class="link-btn" data-clear="fall" hidden>빼기</button></label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span class="note" style="margin:0">그림 속 캐릭터가 보는 방향</span>
+        <label class="check" style="margin:0"><input type="radio" name="faces" value="right" checked> 오른쪽</label>
+        <label class="check" style="margin:0"><input type="radio" name="faces" value="left"> 왼쪽</label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="skinApply" class="primary small" disabled>적용하기</button>
+        <button id="skinReset" class="ghost small">기본 고양이로</button>
+      </div>
+      <p id="skinMsg" class="note"></p>
+    </div>
+    <!-- 0.17.8 접을 수 있게 (처음엔 접힘, 펼친 상태는 기억) -->
+    <details class="card fold-card" id="charSlotCard">
+      <summary><h2>💾 캐릭터 저장 슬롯 <span id="charSlotSum" class="note-inline"></span></h2><span class="fold-hint"></span></summary>
+      <p class="note" style="margin:0 0 6px">지금 캐릭터 그림을 슬롯에 저장해 두고, 언제든 불러와서 바꿔 입어요. 닉네임 색 · 효과는 저장되지 않아요.</p>
+      <div id="charSlots" class="slot-grid"></div>
+      <div class="row" style="margin-top:8px"><button id="charSlotBuy" class="ghost small"></button><span id="charSlotInfo" class="note-inline"></span></div>
+      <p id="charSlotMsg" class="note"></p>
+    </details>
+
+    <div class="card">
+      <h2>상태 표시</h2>
+      <select id="status"></select>
+      <input id="customStatus" maxlength="24" placeholder="예: 🏃 운동중" hidden>
+      <p class="note">자동 감지는 지금 보고 있는 프로그램을 보고 상태를 정해요. 다른 사람에게는 상태 글자만 전달되고, 창 제목이나 프로그램 이름은 보내지 않아요.</p>
+    </div>
+    <div class="card">
+      <h2>바탕화면</h2>
+      <label class="check"><input id="hideOthers" type="checkbox"> 다른 사람 캐릭터를 바탕화면에서 숨기기</label>
+      <label>🪑 다른 사람 캐릭터 자세 <span class="note-inline">(내 화면에서만)</span>
+        <select id="othersPose">
+          <option value="own">그 사람이 정한 대로</option>
+          <option value="sit">🪑 모두 앉혀 두기</option>
+          <option value="stand">🧍 모두 세워 두기</option>
+          <option value="lie">🛏️ 모두 눕혀 두기</option>
+        </select>
+      </label>
+      <p class="note">한 사람만 바꾸려면 바탕화면에서 그 캐릭터를 우클릭 → 🪑 내 화면에서 자세. 끌어다 놓으면 그 자리에서 그 자세로 있어요.</p>
+      <label class="check"><input id="showPetsDesktop" type="checkbox"> 🐾 꺼내 둔 펫이 바탕화면에서도 캐릭터를 따라다니기</label>
+      <label class="check"><input id="showAllPets" type="checkbox"> 👀 친구들 펫 전부 보기 <span class="note-inline">(친구가 꺼내 두지 않은 펫까지)</span></label>
+      <label>화면 모드
+        <select id="themeSel">
+          <option value="system">컴퓨터 설정 따라가기</option>
+          <option value="light">☀️ 화이트 모드</option>
+          <option value="dark">🌙 다크 모드</option>
+          <option value="aurora">🌈 오로라 모드</option>
+          <option value="custom">🎨 사용자 지정 (집 → 🎨 화면에서 색 고르기)</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <!-- 창 · 상태 -->
+  <section id="tab-profile" class="tab">
+    <div class="card">
+      <h2>🪪 내 프로필 <span class="hint">채팅에서 내 이름을 누르면 이렇게 보여요</span></h2>
+      <div class="pcard-view-toggle" id="pfViewToggle"><button data-v="0" class="on">🙋 내가 보는 모습</button><button data-v="1">👀 친구에게 보이는 모습</button></div>
+      <div id="profilePreview" class="pf-preview"><p class="note">로그인하면 프로필을 꾸밀 수 있어요.</p></div>
+    </div>
+    <div class="card" id="profileEdit">
+      <h2>사진</h2>
+      <div class="pf-row"><span>프로필 사진</span>
+        <button class="ghost small" id="pfAvatarPick">📁 사진 고르기</button>
+        <button class="ghost small" id="pfAvatarDraw">🖌️ 그리기</button>
+        <button class="link" id="pfAvatarDel">지우기</button></div>
+      <div class="pf-row"><span>배경 사진</span>
+        <button class="ghost small" id="pfBgPick">📁 사진 고르기</button>
+        <button class="ghost small" id="pfBgDraw">🖌️ 그리기</button>
+        <button class="link" id="pfBgDel">지우기</button></div>
+      <input type="file" id="pfFile" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden>
+      <h2 style="margin-top:12px">테마</h2>
+      <div id="pfThemes" class="pf-themes"></div>
+      <div id="pfCustom" class="pf-custom" hidden>
+        <label>배경 왼쪽 <input type="color" data-c="bg1"></label>
+        <label>배경 오른쪽 <input type="color" data-c="bg2"></label>
+        <label>포인트 <input type="color" data-c="accent"></label>
+        <label>카드 <input type="color" data-c="card"></label>
+      </div>
+      <h2 style="margin-top:12px">자기소개 <span class="hint" id="pfBioCount">0/100</span></h2>
+      <textarea id="pfBio" rows="3" maxlength="100" placeholder="나를 한 줄로 소개해 보세요 (100자까지)" style="font-family:inherit;font-size:13px"></textarea>
+      <h2 style="margin-top:12px">도감 보여 주기</h2>
+      <label class="check"><input type="checkbox" id="pfShowFish"> 🐟 물고기 도감을 다른 사람도 볼 수 있게</label>
+      <label class="check"><input type="checkbox" id="pfShowPets"> 🐾 펫 도감을 다른 사람도 볼 수 있게</label>
+      <div class="row" style="margin-top:10px"><button id="pfSave" class="primary small" disabled>저장하기</button><span id="pfMsg" class="note-inline"></span></div>
+    </div>
+  </section>
+
+  <!-- 🖌️ 그림 그리기 (프로필 사진 · 배경) -->
+  <div id="drawPad" class="draw-pad" hidden>
+    <div class="draw-box">
+      <div class="row between"><b id="drawTitle">그림 그리기</b><button class="ghost small" id="drawClose">닫기</button></div>
+      <canvas id="drawCanvas"></canvas>
+      <div class="draw-tools">
+        <div id="drawColors" class="row"></div>
+        <input type="color" id="drawColor" value="#333333" title="다른 색">
+        <select id="drawSize" title="굵기"><option value="3">가늘게</option><option value="8" selected>보통</option><option value="18">굵게</option><option value="40">아주 굵게</option></select>
+        <button class="ghost small" id="drawEraser">🧽 지우개</button>
+        <button class="ghost small" id="drawFill" title="배경을 지금 색으로 칠해요">🪣 배경 칠하기</button>
+        <button class="ghost small" id="drawUndo">↩ 되돌리기</button>
+        <button class="ghost small" id="drawClear">🗑️ 처음부터</button>
+        <button class="ghost small" id="drawPhoto">📁 사진 넣기</button>
+      </div>
+      <div class="row between"><label class="check" style="margin:0"><input type="checkbox" id="drawOnPhoto"> 지금 사진 위에 그리기</label><button class="primary small" id="drawDone">이 그림 쓰기</button></div>
+    </div>
+  </div>
+
+  <section id="tab-windows" class="tab">
+    <!-- 0.15.1: '캐릭터가 올라갈 창'(창 위 걷기)은 없앴어요. 버디는 화면 아래에서만 돌아다녀요. -->
+    <div class="card">
+      <h2>자동 상태 규칙</h2>
+      <p id="gwError" class="warn" hidden></p>
+      <p class="note">한 줄에 하나씩 <span class="mono">키워드 = 상태</span>. 프로그램 이름이나 창 제목에 키워드가 들어 있으면 그 상태가 돼요. 위에 있는 줄이 먼저예요.</p>
+      <textarea id="statusRules" rows="9" spellcheck="false"></textarea>
+      <button id="saveRules" class="primary small">규칙 저장</button>
+    </div>
+  </section>
+
+  <!-- 계정 -->
+  <section id="tab-account" class="tab">
+    <div class="card" id="accountCard">
+      <h2>계정</h2>
+      <p id="accountLine" class="note"></p>
+      <div class="code-line">
+        <div class="note">내 데스크톱 코드 (바꿀 수 없어요)</div>
+        <b id="myCode" class="mono" style="font-size:20px"></b>
+      </div>
+      <button id="logoutBtn" class="danger small">로그아웃</button>
+    </div>
+    <div class="card" id="unameCard">
+      <h2>아이디 바꾸기</h2>
+      <p class="note">지금 아이디와 비밀번호만 있으면 바꿀 수 있어요. 코인 · 집 · 친구 · 물고기 · 펫은 그대로예요. 하루에 한 번 바꿀 수 있고, 옛 아이디는 7일 동안 다른 사람이 못 가져가요.</p>
+      <label>지금 아이디 <input id="unCur" maxlength="16" autocomplete="username"></label>
+      <label>비밀번호 <input id="unPw" type="password" maxlength="72" autocomplete="current-password"></label>
+      <label>새 아이디 (한글/영문/숫자/_ 2~16자) <input id="unNew" maxlength="16"></label>
+      <button id="unBtn" class="primary small">아이디 바꾸기</button>
+      <p id="unMsg" class="note"></p>
+    </div>
+    <div class="card" id="pwCard">
+      <h2>비밀번호 바꾸기</h2>
+      <label>지금 비밀번호 <input id="pwCur" type="password" maxlength="72" autocomplete="current-password"></label>
+      <label>새 비밀번호 (8자 이상) <input id="pwNew" type="password" maxlength="72" autocomplete="new-password"></label>
+      <label>새 비밀번호 확인 <input id="pwNew2" type="password" maxlength="72" autocomplete="new-password"></label>
+      <button id="pwBtn" class="primary small">바꾸기</button>
+      <p id="pwMsg" class="note"></p>
+    </div>
+    <div class="card">
+      <h2>차단한 사람</h2>
+      <p class="note">차단하면 그 사람의 채팅이 안 보이고, 내 집에 올 수 없고, 친구 신청·선물·교환도 못 해요. 집의 친구 창이나 캐릭터 우클릭에서 차단할 수 있어요.</p>
+      <ul id="blockedList" class="checklist"></ul>
+    </div>
+    <div class="card">
+      <h2>시작</h2>
+      <label class="check"><input id="autoStart" type="checkbox"> 컴퓨터를 켜면 자동으로 실행</label>
+      <p class="note">자동 로그인은 로그인할 때 고를 수 있어요. 로그인 정보는 운영체제의 암호화 저장소에 보관돼요.</p>
+    </div>
+    <div class="card">
+      <h2>서버</h2>
+      <p class="note">서버 주소는 로그인 화면의 "서버 설정"에서 바꿀 수 있어요.</p>
+      <p class="mono note" id="serverLine"></p>
+    </div>
+  </section>
+
+  <script src="theme.js"></script>
+  <script src="nickfx.js"></script>
+  <script src="titles.js"></script>
+  <script src="sprites.js"></script>
+  <script src="skins.js"></script>
+  <script src="fishart.js"></script>
+  <script src="petart.js"></script>
+  <script src="profilecard.js"></script>
+  <script src="cropper.js"></script>
+  <script src="control.js"></script>
+  <script src="control-extra.js"></script>
+</body>
+</html>

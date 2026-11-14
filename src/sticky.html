@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>Desktop Buddy 메모장</title>
+  <link rel="stylesheet" href="control.css">
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    body { display: flex; flex-direction: column; font-size: 13px; }
+    .head { display: flex; align-items: center; gap: 4px; padding: 6px 6px 4px 10px; -webkit-app-region: drag; cursor: move; font-weight: 700; color: var(--muted); font-size: 12px; }
+    .head .t { flex: 1; }
+    .head button { -webkit-app-region: no-drag; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px 5px; }
+    .head button:hover { color: var(--ink); }
+    nav.stabs { display: flex; gap: 2px; padding: 0 6px; border-bottom: 1px solid var(--line); }
+    nav.stabs button { flex: 1; border: 0; background: none; color: var(--muted); padding: 6px 2px; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+    nav.stabs button.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 700; }
+    main { flex: 1; overflow-y: auto; padding: 8px 10px 12px; }
+    .pane { display: none; } .pane.active { display: block; }
+    .row { display: flex; gap: 6px; align-items: center; }
+    .between { justify-content: space-between; }
+    input[type=text], textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--line); background: var(--input); color: var(--ink); border-radius: 8px; padding: 6px 8px; font: inherit; }
+    textarea { resize: vertical; }
+    button.mini { border: 1px solid var(--line); background: var(--input); color: var(--ink); border-radius: 7px; padding: 3px 8px; font-size: 12px; cursor: pointer; }
+    button.mini:hover { border-color: var(--accent); }
+    button.x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 0 3px; }
+    button.x:hover { color: var(--danger); }
+    .muted { color: var(--muted); font-size: 11px; }
+    /* 캘린더 */
+    .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin: 6px 0 8px; text-align: center; font-size: 11px; }
+    .cal .dow { color: var(--muted); font-size: 10px; }
+    .cal button { border: 0; background: none; color: var(--ink); border-radius: 6px; padding: 3px 0; cursor: pointer; position: relative; font-size: 11px; }
+    .cal button.other { color: var(--muted); opacity: .45; }
+    .cal button.today { font-weight: 800; color: var(--accent); }
+    .cal button.sel { background: var(--accent); color: var(--accent-ink, #fff); }
+    .cal button.has::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--accent); }
+    .cal button.sel.has::after { background: #fff; }
+    /* 체크 목록 */
+    ul.checks { list-style: none; margin: 4px 0; padding: 0; }
+    ul.checks li { display: flex; align-items: center; gap: 6px; padding: 4px 2px; border-bottom: 1px dashed var(--line); }
+    ul.checks li input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); flex: none; }
+    ul.checks li span { flex: 1; min-width: 0; word-break: break-word; cursor: text; }
+    ul.checks li.done span { text-decoration: line-through; color: var(--muted); }
+    .add { margin-top: 6px; }
+    .progress { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin: 4px 0; }
+    .progress i { display: block; height: 100%; background: var(--ok); }
+    /* 메모 카드 */
+    .memos { display: flex; flex-direction: column; gap: 8px; }
+    .memo { border-radius: 8px; padding: 6px 8px; box-shadow: 0 2px 6px rgba(0,0,0,.12); color: #2a2430; }
+    .memo textarea { background: transparent; border: 0; color: #2a2430; padding: 2px; min-height: 54px; font-size: 13px; }
+    .memo .bar { display: flex; align-items: center; gap: 4px; }
+    .memo .bar .sw { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); cursor: pointer; padding: 0; }
+    .memo .bar .muted { flex: 1; color: rgba(40,30,50,.55); }
+    .memo button.x { color: rgba(40,30,50,.5); }
+    /* 체크리스트 묶음 */
+    .list { border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; margin-bottom: 8px; background: var(--card); }
+    .list .ttl { font-weight: 700; border: 0; background: transparent; padding: 2px 0; }
+    .mood { display: flex; gap: 2px; }
+    .mood button { border: 0; background: none; font-size: 18px; cursor: pointer; opacity: .35; padding: 0 2px; }
+    .mood button.on { opacity: 1; transform: scale(1.12); }
+    .datebar { margin-bottom: 6px; }
+    .datebar b { flex: 1; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="head"><span class="t">🗒 메모장</span><button id="openHome" title="집 열기">🏠</button><button id="closeBtn" title="메모장 닫기 (내용은 그대로 남아요)">✕</button></div>
+  <nav class="stabs">
+    <button data-p="today" class="active">📅 오늘</button>
+    <button data-p="memo">📝 메모</button>
+    <button data-p="check">✅ 체크리스트</button>
+    <button data-p="diary">📔 다이어리</button>
+  </nav>
+  <main>
+    <section class="pane active" id="p-today">
+      <div class="row between datebar"><button class="mini" id="calPrev">‹</button><b id="calTitle"></b><button class="mini" id="calNext">›</button></div>
+      <div class="cal" id="cal"></div>
+      <div class="row between"><b id="todayTitle"></b><button class="mini" id="goToday">오늘로</button></div>
+      <div class="progress"><i id="todoBar"></i></div>
+      <ul class="checks" id="todoList"></ul>
+      <form class="row add" id="todoForm"><input type="text" id="todoInput" maxlength="120" placeholder="할 일 적기 (Enter)"></form>
+    </section>
+    <section class="pane" id="p-memo">
+      <div class="row between" style="margin-bottom:6px"><span class="muted">자유롭게 적는 메모예요.</span><button class="mini" id="memoAdd">＋ 새 메모</button></div>
+      <div class="memos" id="memos"></div>
+    </section>
+    <section class="pane" id="p-check">
+      <div class="row between" style="margin-bottom:6px"><span class="muted">장보기 · 준비물 · 공부 목록처럼 묶어서 써요.</span><button class="mini" id="listAdd">＋ 새 목록</button></div>
+      <div id="lists"></div>
+    </section>
+    <section class="pane" id="p-diary">
+      <div class="row between datebar"><button class="mini" id="dPrev">‹</button><b id="dTitle"></b><button class="mini" id="dNext">›</button></div>
+      <div class="row between" style="margin-bottom:6px"><span class="muted">오늘 기분</span><span class="mood" id="mood"></span></div>
+      <textarea id="diaryText" rows="10" maxlength="4000" placeholder="오늘 있었던 일을 적어 보세요."></textarea>
+      <p class="muted" id="diaryNote">이 컴퓨터에만 저장돼요. 친구들은 볼 수 없어요.</p>
+    </section>
+  </main>
+  <script src="theme.js"></script>
+  <script src="sticky.js"></script>
+</body>
+</html>
