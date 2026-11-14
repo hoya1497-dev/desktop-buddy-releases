@@ -1141,76 +1141,96 @@
   // 펫마다 마지막으로 고른 밥 (이 컴퓨터에 기억)
   const feedPick = new Map((() => { try { return Object.entries(JSON.parse(localStorage.getItem('feedPick') || '{}')); } catch { return []; } })());
   const saveFeedPick = () => { try { localStorage.setItem('feedPick', JSON.stringify(Object.fromEntries(feedPick))); } catch {} };
+  // 0.17.8 펫 카드 정리: 자주 쓰는 것(꺼내기 · 밥)만 바로 보이고, 나머지(이름 · 말투 · 숨기기 · 되팔기)는 ⋯ 안에
+  const petMore = new Set();
+  let petFavOnly = (() => { try { return localStorage.getItem('petFavOnly') === '1'; } catch { return false; } })();
+  document.getElementById('petFavOnly').onclick = () => { petFavOnly = !petFavOnly; try { localStorage.setItem('petFavOnly', petFavOnly ? '1' : '0'); } catch {} renderPets(); };
   function renderPets() {
     const u = U(), c = C();
     if (!u || !c) return;
     const outN = u.pets.filter((p) => p.out).length;
     $('petNote').textContent = u.pets.length
-      ? `${u.pets.length}/${c.limits.petsMax}마리 · 집에 꺼내 둔 펫 ${outN}/${c.limits.petsOut} · 👀 공개 펫은 친구들도 보고, 🔒 나만 보기 펫은 나만 봐요`
+      ? `${u.pets.length}/${c.limits.petsMax}마리 · 꺼내 둔 펫 ${outN}/${c.limits.petsOut} · 방에서 펫을 끌어서 옮길 수 있어요`
       : '아직 키우는 펫이 없어요. 🛒 상점 → 펫에서 데려올 수 있어요!';
     const ul = $('petList'); ul.textContent = '';
     const myPetFoods = Object.keys(u.food).filter((k) => c.petFoods[k] && !c.petFoods[k].tank && u.food[k] > 0);
-    for (const p of u.pets) {
+    // 0.17.8 ⭐ 즐겨찾기 펫이 맨 위, '즐겨찾기만' 보기
+    const favN = u.pets.filter((p) => p.fav).length;
+    $('petFilter').hidden = !favN;
+    if (!favN) petFavOnly = false;
+    $('petFavOnly').classList.toggle('on', petFavOnly);
+    $('petFavOnly').textContent = `⭐ 즐겨찾기만 (${favN})`;
+    const shown = u.pets.filter((p) => !petFavOnly || p.fav).sort((a, b) => (!!b.fav - !!a.fav));
+    for (const p of shown) {
       const kind = c.pets[p.kind];
+      const more = petMore.has(p.id) || petRename.id === p.id || petEnding.id === p.id;
       const bar = (cls, v) => el('span', { class: 'bar ' + cls }, el('i', { style: `width:${v}%` }));
-      const sel = el('select', {});
-      for (const id of myPetFoods) {
-        const liked = kind.likes.includes(id);
-        sel.append(el('option', { value: id, text: `${c.petFoods[id].icon} ${c.petFoods[id].name} ×${u.food[id]}${liked ? ' ❤' : ''}` }));
-      }
-      // 고른 밥 기억 (밥을 주고 나서 목록을 다시 그려도 첫 번째 밥으로 안 돌아감, 다 떨어지면 첫 번째)
-      if (feedPick.get(p.id) && myPetFoods.includes(feedPick.get(p.id))) sel.value = feedPick.get(p.id);
-      sel.onchange = () => { feedPick.set(p.id, sel.value); saveFeedPick(); };
-      const acts = el('div', { class: 'acts' });
-      if (p.out) acts.append(btn('🏠 집 안으로 넣기', 'ghost small', () => srv({ type: 'pet-out', id: p.id, out: false })));
-      else {
-        acts.append(btn('2층에 꺼내기', 'ghost small', () => srv({ type: 'pet-out', id: p.id, out: true, floor: 2 }), outN >= c.limits.petsOut));
-        acts.append(btn('1층에 꺼내기', 'ghost small', () => srv({ type: 'pet-out', id: p.id, out: true, floor: 1 }), outN >= c.limits.petsOut));
-      }
-      // 공개 / 나만 보기
-      acts.append(btn(p.private ? '🔒 나만 보기' : '👀 친구들에게 공개', p.private ? 'ghost small private-on' : 'ghost small', () => srv({ type: 'pet-private', id: p.id, private: !p.private }), false,
-        p.private ? '지금은 나만 봐요. 누르면 친구들에게도 보여요' : '지금은 친구들도 봐요. 누르면 나만 보게 바뀌어요'));
-      if (myPetFoods.length) { acts.append(sel); acts.append(btn('밥 주기', 'primary small', () => { feedPick.set(p.id, sel.value); saveFeedPick(); srv({ type: 'feed', food: sel.value, target: p.id }); }, p.full >= 98)); }
-      else acts.append(el('span', { class: 'note-inline', text: '먹이가 없어요 (상점 → 음식)' }));
-      // 되팔기: 산 값의 절반 (운영자 펫은 안 됨)
-      if (kind.limited) { const g = c.limitedGifts?.[kind.limited]; acts.append(el('span', { class: 'note-inline limited-tag', text: `${g?.icon || '🎁'} ${g?.name || ''} 한정` })); }   // 0.17.5 되팔기 없음
-      else if (kind.secret) acts.append(el('span', { class: 'note-inline', text: '✨ 운영자 펫' }));
-      else if (kind.price) {
-        const back = Math.floor(kind.price / 2);
-        acts.append(btn(`되팔기 🪙${back}`, 'ghost small', () => { if (confirm(`'${p.name}'을(를) 되팔까요?\n산 값의 절반인 🪙${back}을 돌려받고, 펫은 사라져요. (되돌릴 수 없어요)`)) srv({ type: 'pet-sell', id: p.id }); }, false, '산 값의 절반을 돌려받아요'));
-      }
-      // 이름 바꾸기: Electron에선 prompt()가 안 돼서 그 자리에서 입력칸으로 바꿔요
+      // ── 머리: 그림 · 이름 · 레벨 · 성격 · 있는 곳 · 배부름/애정
       let nameEl;
-      if (petRename.id === p.id) {
+      if (petRename.id === p.id) {   // Electron 에선 prompt() 가 안 돼서 그 자리에서 입력칸
         const inp = el('input', { type: 'text', maxLength: 10, value: petRename.draft ?? p.name, class: 'pet-name-input', placeholder: kind.name });
         const done = (ok) => {
           if (ok) srv({ type: 'pet-rename', id: p.id, name: inp.value.trim() });
           petRename.id = null; petRename.draft = null; renderPets();
         };
         inp.addEventListener('input', () => { petRename.draft = inp.value; });
-        inp.addEventListener('keydown', (e) => {
-          e.stopPropagation();
-          if (e.key === 'Enter' && !e.isComposing) done(true);
-          else if (e.key === 'Escape') done(false);
-        });
-        nameEl = el('span', { class: 'pet-rename' }, inp,
-          btn('저장', 'primary small', () => done(true)), btn('취소', 'ghost small', () => done(false)));
-        // 처음 열 때만 전체 선택, 화면이 새로 그려질 땐 커서를 끝에 둬요
+        inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter' && !e.isComposing) done(true); else if (e.key === 'Escape') done(false); });
+        nameEl = el('span', { class: 'pet-rename' }, inp, btn('저장', 'primary small', () => done(true)), btn('취소', 'ghost small', () => done(false)));
         setTimeout(() => { inp.focus(); if (petRename.draft == null) inp.select(); else inp.setSelectionRange(inp.value.length, inp.value.length); }, 0);
-      } else {
-        nameEl = el('b', { text: `${p.name} ` });
-        acts.append(btn('✏️ 이름', 'ghost small', () => { petRename.id = p.id; petRename.draft = null; renderPets(); }, false, '이름 바꾸기 (10자까지)'));
+      } else nameEl = el('b', { text: p.name });
+      const t = p.level >= 5 && p.trait && c.petTraits?.[p.trait];
+      const lim = kind.limited && c.limitedGifts?.[kind.limited];
+      const tags = el('span', { class: 'pet-tags' },
+        el('span', { class: 'ptag lv', text: `Lv.${p.level}${p.level >= 5 ? ' ⭐' : ''}` }),
+        el('span', { class: 'ptag' + (t ? ' trait' : ' dim'), text: t ? `${t.icon} ${t.name}` : '❓ 성격', title: t ? '성격' : '5레벨이 되면 성격이 정해져요' }),
+        lim ? el('span', { class: 'ptag lim', text: `${lim.icon} 한정` }) : null,
+        kind.secret ? el('span', { class: 'ptag', text: '✨ 운영자' }) : null,
+        p.private && !p.out ? el('span', { class: 'ptag dim', text: '🙈', title: '쉬는 동안 친구에게 안 보여요' }) : null);
+      const where = el('small', { class: 'pet-where' }, p.out ? `🏠 ${p.floor}층에 나와 있어요` : '💤 쉬는 중',
+        el('span', { class: 'mini-bars' }, ' 🍖', bar('full', p.full), ' 💗', bar('love', p.love)));
+      const moreBtn = btn(more ? '접기 ▴' : '⋯', 'ghost small pet-more-btn', () => { if (petMore.has(p.id)) petMore.delete(p.id); else petMore.add(p.id); renderPets(); }, false, '이름 · 말투 · 숨기기 · 되팔기');
+      const star = btn(p.fav ? '★' : '☆', 'pet-star' + (p.fav ? ' on' : ''), () => srv({ type: 'pet-fav', id: p.id, on: !p.fav }), false, p.fav ? '즐겨찾기 빼기' : '즐겨찾기 (맨 위로)');
+      const top = el('div', { class: 'top' }, star, PetArt.thumb(p.kind, 40), el('div', { class: 'who' }, el('div', { class: 'pet-name-line' }, nameEl, tags), where), moreBtn);
+      // ── 자주 쓰는 것: 꺼내기/넣기 · 밥
+      const acts = el('div', { class: 'acts' });
+      if (p.out) acts.append(btn('🏠 넣기', 'ghost small', () => srv({ type: 'pet-out', id: p.id, out: false }), false, '집 안으로 넣어 쉬게 하기'));
+      else {
+        const full = outN >= c.limits.petsOut;
+        acts.append(el('span', { class: 'pet-out-group' }, el('span', { class: 'note-inline', text: '꺼내기' }),
+          btn('1층', 'ghost small', () => srv({ type: 'pet-out', id: p.id, out: true, floor: 1 }), full, full ? `한 번에 ${c.limits.petsOut}마리까지 꺼낼 수 있어요` : '1층에 꺼내기'),
+          btn('2층', 'ghost small', () => srv({ type: 'pet-out', id: p.id, out: true, floor: 2 }), full, full ? `한 번에 ${c.limits.petsOut}마리까지 꺼낼 수 있어요` : '2층에 꺼내기')));
       }
-      // 0.17.3 🐾 성격 · 💬 말끝 단어
-      const voice = petVoiceRow(p, c);
-      ul.append(el('li', {},
-        el('div', { class: 'top' }, PetArt.thumb(p.kind, 40),
-          el('div', { class: 'who' }, nameEl, el('span', { class: 'note-inline', text: `Lv.${p.level}/5${p.level >= 5 ? ' ⭐' : ''}` }),
-            el('small', { text: `${kind.code} ${kind.name}${p.out ? ` · ${p.floor}층에 나와 있어요` : ' · 쉬는 중'}${p.private ? ' · 🔒 나만 보기' : ''} · 좋아하는 것: ${kind.likes.map((x) => c.petFoods[x]?.name).join(', ')}` }))),
-        el('div', { class: 'bars' }, el('span', {}, '🍖 ', bar('full', p.full)), el('span', {}, '💗 ', bar('love', p.love)), el('span', { class: 'note-inline', text: p.level >= 5 ? '최고 레벨! 성격대로 말을 해요' : `경험치 ${p.exp}/${p.next} · 밥 주기나 쓰다듬기(30초마다)로 올라요` })),
-        voice, acts));
+      if (myPetFoods.length) {
+        const sel = el('select', { title: '먹이 고르기' });
+        for (const id of myPetFoods) sel.append(el('option', { value: id, text: `${c.petFoods[id].icon} ${c.petFoods[id].name} ×${u.food[id]}${kind.likes.includes(id) ? ' ❤' : ''}` }));
+        if (feedPick.get(p.id) && myPetFoods.includes(feedPick.get(p.id))) sel.value = feedPick.get(p.id);
+        sel.onchange = () => { feedPick.set(p.id, sel.value); saveFeedPick(); };
+        acts.append(el('span', { class: 'feed-group' }, sel, btn('🍖 밥 주기', 'primary small', () => { feedPick.set(p.id, sel.value); saveFeedPick(); srv({ type: 'feed', food: sel.value, target: p.id }); }, p.full >= 98, p.full >= 98 ? '배불러요' : '')));
+      } else acts.append(el('span', { class: 'note-inline', text: '먹이가 없어요 (상점 → 음식)' }));
+      const li = el('li', { class: more ? 'open' : '' }, top, acts);
+      // ── ⋯ 더 보기
+      if (more) {
+        const box = el('div', { class: 'pet-more' });
+        box.append(el('div', { class: 'pet-info' },
+          el('span', { text: p.level >= 5 ? '최고 레벨! 성격대로 말해요' : `경험치 ${p.exp}/${p.next} · 밥 주기 · 쓰다듬기(30초마다)로 올라요` }),
+          el('span', { text: `좋아하는 것: ${kind.likes.map((x) => c.petFoods[x]?.name).join(', ')}` }),
+          el('span', { text: `${kind.code} ${kind.name}` })));
+        box.append(petVoiceRow(p, c));
+        const ma = el('div', { class: 'acts' });
+        if (petRename.id !== p.id) ma.append(btn('✏️ 이름 바꾸기', 'ghost small', () => { petRename.id = p.id; petRename.draft = null; renderPets(); }, false, '10자까지'));
+        ma.append(btn(p.private ? '🙈 쉬는 동안 숨김: 켬' : '👀 쉬는 동안 숨김: 끔', p.private ? 'ghost small private-on' : 'ghost small', () => srv({ type: 'pet-private', id: p.id, private: !p.private }), false,
+          '켜면 친구가 "펫 전부 보기"를 켜도 쉬는 중인 이 펫은 안 보여요. 꺼내 두면 언제나 보여요.'));
+        if (!kind.limited && !kind.secret && kind.price) {
+          const back = Math.floor(kind.price / 2);
+          ma.append(btn(`되팔기 🪙${back}`, 'ghost small danger-text', () => { if (confirm(`'${p.name}'을(를) 되팔까요?\n산 값의 절반인 🪙${back}을 돌려받고, 펫은 사라져요. (되돌릴 수 없어요)`)) srv({ type: 'pet-sell', id: p.id }); }, false, '산 값의 절반을 돌려받아요'));
+        } else if (lim) ma.append(el('span', { class: 'note-inline limited-tag', text: `${lim.icon} ${lim.name} 한정 · 되팔기 없음` }));
+        box.append(ma);
+        li.append(box);
+      }
+      ul.append(li);
     }
   }
+
 
   // ------------------------------------------------------------ 방 안에서 돌아다니는 펫
   const roomPets = new Map(); // id -> { x, y, tx, dir, t, hop, heart }
@@ -1302,6 +1322,7 @@
     for (const r of roomPets.values()) {
       r.heart = Math.max(0, r.heart - dt);
       petTalk(r, dt);
+      if (r.dragging) { r.hop = 0; continue; }   // 0.17.8 잡혀 있는 동안은 가만히
       if (r.follow) { followOwner(r, dt); continue; }
       const b = H.band(r.floor || 1);
       if (r.tx != null) {
@@ -1367,6 +1388,37 @@
         }
       } });
     }
+  }
+  // 0.17.8 🐾 펫 잡아끌기: 방 안 펫을 끌어서 옮김 (내 집에서 내 펫을 다른 층에 놓으면 그 층으로 저장)
+  const petHit = (p, r) => Math.abs(p.x - r.x) < 22 && p.y < r.y + 4 && p.y > r.y - 46 - petLift(r.p.kind);
+  function grabPet(p) {
+    // 겹쳐 있으면 앞에 그려진(아래쪽, y 가 큰) 펫을 잡음
+    const hit = [...roomPets].filter(([, r]) => petHit(p, r)).sort((a, b) => b[1].y - a[1].y)[0];
+    if (!hit) return null;
+    const [id, r] = hit;
+    return { id, r, ox: p.x - r.x, oy: p.y - r.y };
+  }
+  function movePet(h, p) {
+    const r = h.r;
+    r.dragging = true; r.tx = null; r.hop = 0; r.say = null;
+    r.x = clamp(p.x - h.ox, 16, H.RW - 16);
+    r.y = clamp(p.y - h.oy, H.band(2).min, H.band(1).max);
+  }
+  function dropPet(h) {
+    const r = h.r;
+    r.dragging = false;
+    r.heart = 0.6; r.t = rand(2, 4);
+    if (r.follow) return;   // 따라다니는 펫은 놓으면 다시 주인한테
+    const b1 = H.band(1), b2 = H.band(2);
+    const f = Math.abs(r.y - (b2.min + b2.max) / 2) < Math.abs(r.y - (b1.min + b1.max) / 2) ? 2 : 1;
+    const mine = (U()?.pets || []).find((x) => x.id === h.id);
+    if (f !== (r.floor || 1) && mine && H.viewing()?.editable) {   // 내 집 · 내 펫: 다른 층에 놓으면 그 층으로
+      r.floor = f; r.p = { ...r.p, floor: f };
+      srv({ type: 'pet-out', id: h.id, out: true, floor: f });
+    }
+    const b = H.band(r.floor || 1);
+    r.x = clamp(r.x, 30, H.LADDER_X - 40);
+    r.y = clamp(r.y, b.min, b.max);
   }
   function onClick(p) {
     for (const [id, r] of roomPets) {
@@ -1645,5 +1697,5 @@
     if (!recent.length) renderRecent();
   }
 
-  window.HomeGame = { afterItem, addThings, update: updateRoomPets, onClick, openTank, openAquarium, renderPanels, onState, drawFishing, fishingActive, fishClick };
+  window.HomeGame = { afterItem, addThings, update: updateRoomPets, onClick, grabPet, movePet, dropPet, openTank, openAquarium, renderPanels, onState, drawFishing, fishingActive, fishClick };
 })();

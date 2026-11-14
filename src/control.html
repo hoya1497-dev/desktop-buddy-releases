@@ -73,13 +73,14 @@
       </div>
       <p id="skinMsg" class="note"></p>
     </div>
-    <div class="card">
-      <h2>💾 캐릭터 저장 슬롯</h2>
+    <!-- 0.17.8 접을 수 있게 (처음엔 접힘, 펼친 상태는 기억) -->
+    <details class="card fold-card" id="charSlotCard">
+      <summary><h2>💾 캐릭터 저장 슬롯 <span id="charSlotSum" class="note-inline"></span></h2><span class="fold-hint"></span></summary>
       <p class="note" style="margin:0 0 6px">지금 캐릭터 그림을 슬롯에 저장해 두고, 언제든 불러와서 바꿔 입어요. 닉네임 색 · 효과는 저장되지 않아요.</p>
       <div id="charSlots" class="slot-grid"></div>
       <div class="row" style="margin-top:8px"><button id="charSlotBuy" class="ghost small"></button><span id="charSlotInfo" class="note-inline"></span></div>
       <p id="charSlotMsg" class="note"></p>
-    </div>
+    </details>
 
     <div class="card">
       <h2>상태 표시</h2>

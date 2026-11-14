@@ -710,3 +710,63 @@ body.meeting-mode #room { cursor: default !important; }
 #musicFavs .fav-put { display: flex; flex-wrap: wrap; gap: 3px; width: 100%; margin-top: 3px; }
 #musicFavs li .fav-put button.put { border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; font-size: 11px; color: var(--muted); }
 #musicFavs li .fav-put button.put.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* 0.17.8 레코드 오른쪽 목록이 아래 빈 곳까지 꽉 차게 (예전엔 260px 에서 잘려 스크롤이 생기는지 몰랐음) */
+.music-right { display: flex; flex-direction: column; min-height: 0; }
+.music-right > [data-msec]:not([hidden]) { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.music-right > [data-msec] > .music-list { flex: 1 1 0; min-height: 90px; max-height: none; margin-bottom: 0; }
+.music-right > [data-msec="queue"] > .music-list { margin-bottom: 8px; }
+.music-right > [data-msec] > .note:last-child { margin-bottom: 0; }
+@media (max-width: 760px) { .music-right > [data-msec]:not([hidden]) { min-height: 300px; } }
+.fav-folders .fchip.none:not(.on) { border-style: dashed; }
+
+/* 0.17.8 🚪 문 열어두기 · 🚫 출입 제한 큰 버튼 */
+.door-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 12px; }
+.door-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 92px; padding: 10px 8px;
+  border: 2px solid var(--line); border-radius: 14px; background: var(--input); color: var(--ink); cursor: pointer; font-family: inherit; text-align: center; transition: transform .08s, border-color .15s; }
+.door-tile:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-1px); }
+.door-tile .dt-icon { font-size: 30px; line-height: 1.1; }
+.door-tile .dt-title { font-size: 15px; }
+.door-tile .dt-sub { font-size: 11px; color: var(--muted); line-height: 1.35; }
+.door-tile.on { border-color: #4caf72; background: color-mix(in srgb, #4caf72 14%, var(--card)); }
+.door-tile.on .dt-title { color: #2e8a52; }
+.door-tile.nv.on { border-color: #e05a5a; background: color-mix(in srgb, #e05a5a 13%, var(--card)); }
+.door-tile.nv.on .dt-title { color: #c43c3c; }
+.door-tile.dim { opacity: .45; cursor: default; }
+
+/* 0.17.8 친구 줄 꺼진 버튼은 흐리게 (출입 제한 등) */
+.people .acts button:disabled { opacity: .38; cursor: default; }
+
+/* 0.17.8 🐾 펫 카드 정리 */
+.petlist li { padding: 8px 10px; }
+.petlist .pet-name-line { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.petlist .pet-name-line > b { font-size: 14px; margin-right: 2px; }
+.petlist .pet-tags { display: inline-flex; flex-wrap: wrap; gap: 3px; }
+.petlist .ptag { font-size: 10.5px; padding: 1px 6px; border-radius: 999px; background: var(--input); border: 1px solid var(--line); color: var(--ink); white-space: nowrap; }
+.petlist .ptag.lv { font-weight: 700; }
+.petlist .ptag.trait { border-color: var(--accent); }
+.petlist .ptag.dim { color: var(--muted); }
+.petlist .ptag.lim { border-color: #d98a3a; color: #b8541e; }
+.petlist .pet-where { display: flex !important; align-items: center; flex-wrap: wrap; gap: 2px 6px; margin-top: 3px; }
+.petlist .mini-bars { display: inline-flex; align-items: center; gap: 3px; }
+.petlist .mini-bars .bar { width: 46px; }
+.petlist .pet-more-btn { flex: none; width: auto; font-size: 12px; padding: 2px 8px; align-self: flex-start; }
+.petlist .acts { margin-top: 6px; align-items: center; }
+.petlist .pet-out-group, .petlist .feed-group { display: inline-flex; align-items: center; gap: 3px; }
+.petlist .pet-out-group .note-inline { margin-right: 1px; }
+.petlist .feed-group { margin-left: auto; }
+.petlist .feed-group select { max-width: 150px; }
+.petlist .pet-more { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.petlist .pet-info { display: flex; flex-direction: column; gap: 1px; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.petlist .pet-more .pet-voice { margin-bottom: 4px; }
+.petlist .danger-text { color: #c43c3c; }
+
+/* 0.17.8 ⭐ 펫 · 친구 즐겨찾기 */
+.pet-star, .friend-star { border: 0; background: none; color: var(--muted); font-size: 17px; line-height: 1; padding: 2px; width: auto; cursor: pointer; flex: none; }
+.pet-star:hover, .friend-star:hover { color: #e8a317; }
+.pet-star.on, .friend-star.on { color: #e8a317; }
+.petlist .top .pet-star { align-self: flex-start; margin-top: 2px; }
+.pet-filter { margin: -2px 0 8px; }
+.pet-filter .fchip { border: 1px solid var(--line); background: var(--input); color: var(--ink); border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; width: auto; font-family: inherit; }
+.pet-filter .fchip.on { background: #e8a317; border-color: #e8a317; color: #fff; }
+.people li.fav { background: color-mix(in srgb, #e8a317 7%, transparent); border-radius: 8px; }

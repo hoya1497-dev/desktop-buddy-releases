@@ -21,6 +21,7 @@
   let waitMsg = null;   // 'char' | 'profile' : 서버 오류를 어디에 보여 줄지
   function renderSlots() {
     const box = $('charSlots'); box.textContent = '';
+    if ($('charSlotSum')) { const n = (slots?.chars || []).filter((c) => c).length; $('charSlotSum').textContent = slots ? `· ${n}/${slots.chars.length}칸 사용` : ''; }   // 0.17.8 접혀 있어도 몇 칸 썼는지
     if (!account) { box.append(el('p', { class: 'note', text: '로그인하면 쓸 수 있어요.' })); $('charSlotBuy').hidden = true; $('charSlotInfo').textContent = ''; return; }
     if (!slots) { box.append(el('p', { class: 'note', text: '불러오는 중…' })); return; }
     slots.chars.forEach((c, i) => {
@@ -277,4 +278,12 @@
   });
   buddy.on('skin-saved', (ok) => { if (ok === true && account) srv({ type: 'slots-get' }); });
   load();
+})();
+
+// 0.17.8 💾 캐릭터 저장 슬롯 카드: 처음엔 접힘, 펼친 상태는 기억
+(() => {
+  const card = document.getElementById('charSlotCard');
+  if (!card) return;
+  try { card.open = localStorage.getItem('charSlotOpen') === '1'; } catch {}
+  card.addEventListener('toggle', () => { try { localStorage.setItem('charSlotOpen', card.open ? '1' : '0'); } catch {} });
 })();

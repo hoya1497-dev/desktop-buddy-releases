@@ -401,11 +401,14 @@
               </nav>
               <div class="cpane active" id="cpane-myroom">
                 <p id="roomNow"></p>
-                <label class="check"><input id="doorBox" type="checkbox"> 🚪 문 열어두기 <span class="note-inline">(닫으면 친구가 두드려야 들어와요)</span></label>
+                <!-- 0.17.8 🚪 문 · 🚫 출입 제한: 큰 버튼 -->
+                <div class="door-tiles">
+                  <button id="doorTile" class="door-tile" type="button"><span class="dt-icon"></span><b class="dt-title"></b><small class="dt-sub"></small></button>
+                  <button id="noVisitTile" class="door-tile nv" type="button"><span class="dt-icon">🚫</span><b class="dt-title">출입 제한</b><small class="dt-sub"></small></button>
+                </div>
                 <h3 id="membersTitle" hidden>지금 우리 집에 있는 사람</h3>
                 <ul id="memberList" class="people"></ul>
                 <button id="goHomeBtn" class="primary wide" hidden>🏠 내 집으로 돌아가기</button>
-                <button id="leaveBtn" class="danger wide" hidden>집 비우고 혼자 놀기</button>
               </div>
               <div class="cpane" id="cpane-code">
                 <label>데스크톱 코드로 놀러 가기
@@ -671,6 +674,7 @@
       <div class="pane" id="pane-pets">
         <label class="check"><input id="allPetsBox" type="checkbox"> 👀 친구들 펫 전부 보기 <span class="note-inline">(친구가 꺼내 두지 않은 펫까지)</span></label>
         <p class="note" id="petNote"></p>
+        <div class="pet-filter" id="petFilter" hidden><button id="petFavOnly" class="fchip" type="button">⭐ 즐겨찾기만</button></div>
         <ul id="petList" class="petlist"></ul>
       </div>
       <div class="pane" id="pane-timer">

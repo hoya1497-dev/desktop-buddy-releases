@@ -221,3 +221,12 @@ input.slot-name:hover, input.slot-name:focus { border-color: var(--line); backgr
 .pose-img span { font-size: 10px; color: var(--muted); }
 .pose-cell small { font-size: 10px; color: var(--muted); }
 .pose-cell button { padding: 2px 6px; font-size: 10px; }
+
+/* 0.17.8 접는 카드 (💾 캐릭터 저장 슬롯) */
+.fold-card > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; user-select: none; }
+.fold-card > summary::-webkit-details-marker { display: none; }
+.fold-card > summary h2 { margin: 0; }
+.fold-card > summary .fold-hint::after { content: '펼치기 ▾'; font-size: 12px; color: var(--muted); border: 1px solid var(--line, rgba(0,0,0,.12)); border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+.fold-card[open] > summary { margin-bottom: 8px; }
+.fold-card[open] > summary .fold-hint::after { content: '접기 ▴'; }
+.fold-card > summary:hover .fold-hint::after { border-color: var(--accent); color: var(--accent); }

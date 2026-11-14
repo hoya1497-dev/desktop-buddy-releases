@@ -137,7 +137,8 @@
   }
   for (const b of document.querySelectorAll('#musicTabs button')) b.onclick = () => showTab(b.dataset.mtab);
   // 📁 0.17.7 즐겨찾기 폴더: 위에 폴더 칩(전체 · 내 폴더들 · ＋ 폴더), 고르면 그 폴더 노래만. ✏️ 편집 → 노래마다 폴더 넣기/빼기
-  let favFolder = load('favFolder', '');     // '' = 전체
+  const NONE = '__none';                       // 📂 미분류
+  let favFolder = load('favFolder', '');     // '' = 전체, NONE = 미분류
   let favEdit = false;
   let folderInput = null;                     // { mode: 'add' | 'rename', id, value }
   const folders = () => mine().folders || [];
@@ -160,7 +161,8 @@
   }
   function renderFolders() {
     const my = mine(), fs = folders(), own = !!M?.isOwner;
-    if (favFolder && !fs.some((f) => f.id === favFolder)) favFolder = '';
+    if (favFolder && favFolder !== NONE && !fs.some((f) => f.id === favFolder)) favFolder = '';
+    if (favFolder === NONE && !fs.length) favFolder = '';
     const bar = $('favFolders'); bar.textContent = '';
     const chip = (id, text, n) => {
       const b = el('button', { class: 'fchip' + (favFolder === id ? ' on' : ''), title: id ? '이 폴더 노래만 보기' : '즐겨찾기 전부 보기' },
@@ -170,6 +172,10 @@
     };
     bar.append(chip('', '⭐ 전체', my.favs.length));
     for (const f of fs) bar.append(chip(f.id, `📁 ${f.name}`, f.vids.length));
+    if (fs.length) {   // 0.17.8 📂 미분류: 어느 폴더에도 안 들어간 노래
+      const c = chip(NONE, '📂 미분류', my.favs.filter((x) => !fs.some((f) => f.vids.includes(x.vid))).length);
+      c.classList.add('none'); c.title = '아직 어느 폴더에도 안 넣은 노래'; bar.append(c);
+    }
     const add = el('button', { class: 'fchip add', text: '＋ 폴더', title: '새 폴더 만들기 (잔잔한 노래 · 신나는 노래 …)' });
     add.onclick = () => { folderInput = { mode: 'add', value: '' }; renderFavs(); };
     if (fs.length < 20) bar.append(add);
@@ -197,14 +203,17 @@
     const my = mine(), own = !!M?.isOwner, rec = !!M?.hasRecord, fs = folders();
     renderFolders();
     const f = fs.find((x) => x.id === favFolder);
-    const list = f ? my.favs.filter((x) => f.vids.includes(x.vid)) : my.favs;
+    const none = favFolder === NONE;
+    const list = f ? my.favs.filter((x) => f.vids.includes(x.vid)) : none ? my.favs.filter((x) => !fs.some((g) => g.vids.includes(x.vid))) : my.favs;
+    const cap = ` (최대 100곡)`;
     const ul = $('musicFavs'); ul.textContent = '';
     ul.classList.toggle('editing', favEdit);
     $('favNote').textContent = favEdit
       ? (fs.length ? '노래 아래 폴더 이름을 눌러 넣고 빼요. 한 곡을 여러 폴더에 넣을 수 있어요.' : '먼저 위의 ＋ 폴더로 폴더를 만들어 주세요 (잔잔한 노래 · 신나는 노래 …).')
       : f ? (f.vids.length ? `📁 ${f.name} · ${f.vids.length}곡` : `📁 ${f.name} 폴더가 비었어요. ✏️ 편집을 눌러 노래를 넣어 주세요.`)
+      : none ? (list.length ? `📂 미분류 · ${list.length}곡 · ✏️ 편집에서 폴더에 넣으면 여기서 빠져요` : '📂 모든 노래가 폴더에 들어가 있어요!')
       : my.favs.length
-        ? (own ? `${my.favs.length}곡 · ▶ 지금 틀기 · ＋ 대기열에 넣기 · 🏠 우리 집 배경음으로 고르기` : `${my.favs.length}곡 · 신청을 누르면 링크 없이 바로 집주인에게 신청돼요 · 🏠는 우리 집 배경음`)
+        ? (own ? `${my.favs.length}곡${cap} · ▶ 지금 틀기 · ＋ 대기열에 넣기 · 🏠 우리 집 배경음으로 고르기` : `${my.favs.length}곡${cap} · 신청을 누르면 링크 없이 바로 집주인에게 신청돼요 · 🏠는 우리 집 배경음`)
         : '노래 옆 ☆를 누르거나, 링크를 넣고 ⭐ 저장을 누르면 여기에 모여요. 다음엔 링크 없이 바로 틀 수 있어요.';
     for (const fv of list) {
       const inBgm = my.bgm.list.includes(fv.vid);

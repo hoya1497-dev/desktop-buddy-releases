@@ -315,7 +315,6 @@ function updateTray() {
   tray.setToolTip(`${BETA_TAG}Desktop Buddy${coins}${room ? ` · ${room.owner.nickname}님의 방` : ''}`);
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '🏠 집 열기', enabled: !!session, click: () => showHome() },
-    { label: '🚪 방 나가기 (혼자 놀기)', enabled: !!room, click: () => leaveRoom() },
     { label: '🏠 내 집으로 돌아가기', enabled: !!session && !(room && room.isOwner), click: () => wsSend({ type: 'join', code: session.user.code }) },
     { label: '캐릭터 불러오기', click: () => overlay?.webContents.send('summon') },
     { label: '⏱️ 타이머 화면에 고정', type: 'checkbox', checked: !!config.timerPin, click: (i) => setPin('timer', i.checked) },
@@ -953,7 +952,7 @@ function petMenu({ id }, win = overlay) {
           .map(([k, l]) => ({ label: l, type: 'radio', checked: (config.pose || 'auto') === k, click: () => setPose(k) })),
       },
       { label: '이모트', submenu: EMOTES.map(([k, l]) => ({ label: l, click: () => sendEmote(k) })) },
-      { label: '🚪 방 나가기 (혼자 놀기)', enabled: !!room, click: () => leaveRoom() },
+      { label: '🏠 내 집으로 돌아가기', enabled: !!session && !(room && room.isOwner), click: () => wsSend({ type: 'join', code: session.user.code }) },   // 0.17.8 혼자 놀기 대신
       { label: '설정', click: () => showControl() },
       { type: 'separator' },
       { label: '종료', click: () => app.quit() },
@@ -1303,7 +1302,8 @@ function registerIpc() {
   ipcMain.handle('get-theme', () => themePayload());
   ipcMain.handle('yt-info', (_e, vid) => ytInfo(vid));
   // 게임 기능 요청은 정해진 종류만 서버로 전달
-  const SRV_TYPES = new Set(['checkin', 'acc-equip', 'buy', 'feed', 'pet-out', 'pet-rename', 'pet-pat',
+  const SRV_TYPES = new Set(['no-visit', 'pet-fav', 'friend-fav',   // 0.17.8 🚫 출입 제한 · ⭐ 펫 · 친구 즐겨찾기
+    'checkin', 'acc-equip', 'buy', 'feed', 'pet-out', 'pet-rename', 'pet-pat',
     'fish-cast', 'fish-reel', 'fish-sell', 'fish-gift', 'fish-view', 'trade-offer', 'trade-answer', 'trade-cancel',
     'tank-put', 'tank-take', 'tank-feed', 'aqua-put', 'aqua-take', 'aqua-view', 'block', 'unblock', 'password-change', 'username-change',
     'fish-here', 'share-snack', 'mg-invite', 'mg-answer', 'mg-move', 'mg-quit', 'rod-equip', 'pet-sell', 'pet-private',

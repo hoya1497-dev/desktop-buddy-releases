@@ -759,6 +759,9 @@
       return;
     }
     const pet = petAt(p);
+    const ap = window.HomeGame && HomeGame.grabPet(p);   // 0.17.8 🐾 동물 펫 잡기
+    // 캐릭터와 펫이 겹치면 앞에 그려진 쪽(아래쪽)을 잡음
+    if (ap && (!pet || ap.r.y >= pet.y)) { mouse = { kind: 'animal', h: ap, moved: false, sx: p.x, sy: p.y }; return; }
     if (pet) { mouse = { kind: 'pet', pet, ox: p.x - pet.x, oy: p.y - pet.y, moved: false, sx: p.x, sy: p.y }; return; }
     mouse = { kind: 'click' };
   });
@@ -768,6 +771,11 @@
       mouse.item.x = clamp(snap(p.x - mouse.ox), 10, RW - 10);
       if (!isStructure(mouse.item.item)) mouse.item.y = clamp(snap(p.y - mouse.oy), 40, RH - 4);   // 🧱 가벽 · 🪩 미러볼은 양옆으로만 (다른 층은 가방에 넣었다 꺼내기)
       mouse.moved = true;
+      return;
+    }
+    if (mouse && mouse.kind === 'animal') {
+      if (!mouse.moved && Math.hypot(p.x - mouse.sx, p.y - mouse.sy) > 4) mouse.moved = true;
+      if (mouse.moved) { HomeGame.movePet(mouse.h, p); canvas.style.cursor = 'grabbing'; }
       return;
     }
     if (mouse && mouse.kind === 'pet') {
@@ -783,7 +791,7 @@
     if (e.target === canvas && meetingMode()) { canvas.style.cursor = 'default'; return; }
     if (e.target === canvas && fishingMode()) { canvas.style.cursor = 'pointer'; return; }
     if (e.target === canvas) {
-      const hov = decorating ? itemAt(p) : (petAt(p) || ['computer', 'record'].includes(itemAt(p)?.item));
+      const hov = decorating ? itemAt(p) : (petAt(p) || (window.HomeGame && HomeGame.grabPet(p)) || ['computer', 'record'].includes(itemAt(p)?.item));
       canvas.style.cursor = hov ? (decorating ? 'move' : 'pointer') : 'default';
     }
   });
@@ -791,6 +799,11 @@
     const m = mouse; mouse = null;
     if (!m) return;
     if (m.kind === 'item') { if (m.moved) saveLayout(true); return; }
+    if (m.kind === 'animal') {   // 0.17.8 끌었으면 내려놓기, 안 끌었으면 예전처럼 쓰다듬기
+      if (m.moved) HomeGame.dropPet(m.h); else HomeGame.onClick(toRoom(e));
+      canvas.style.cursor = 'default';
+      return;
+    }
     if (m.kind === 'pet') {
       const pet = m.pet;
       pet.dragging = false;
@@ -921,8 +934,9 @@
     const me = pets.get('me');
     const comp = findItem('computer');
     if (!me) return;
-    if (!comp) { openComputer(); return; }
-    me.goTo(comp.x + 4, comp.y + 2, () => { me.state = 'desk'; me.dir = -1; openComputer(); });
+    openComputer();   // 0.17.8 누르면 바로 열림 (캐릭터는 그동안 컴퓨터 앞으로 걸어가서 앉음)
+    if (!comp) return;
+    me.goTo(comp.x + 4, comp.y + 2, () => { if (!$('computer').hidden) { me.state = 'desk'; me.dir = -1; } });
   }
   function openComputer() { if (decorating) $('decoBtn').click(); $('friends').hidden = true; $('computer').hidden = false; renderComputer(); }
   function closeComputer() {
@@ -969,11 +983,19 @@
     const u = S.session.user;
     const inMine = S.room && S.room.isOwner;
     $('roomNow').textContent = inMine ? `지금 내 집에 있어요 · ${S.peers.length + 1}명`
-      : S.room ? `지금 ${S.room.owner.nickname}(@${S.room.owner.username})님 집에 놀러 와 있어요` : '지금은 혼자 돌아다니고 있어요 (집 비움)';
-    $('doorBox').checked = !u.locked;
+      : S.room ? `지금 ${S.room.owner.nickname}(@${S.room.owner.username})님 집에 놀러 와 있어요` : '집으로 돌아가는 중이에요…';
+    // 0.17.8 🚪 문 열어두기 · 🚫 출입 제한 큰 버튼 (내 집 설정이라 친구 집에 있어도 바꿀 수 있음)
+    const nv = !!u.noVisit, open = !u.locked;
+    const dt = $('doorTile');
+    dt.classList.toggle('on', open && !nv); dt.classList.toggle('dim', nv); dt.disabled = nv;
+    dt.querySelector('.dt-icon').textContent = open ? '🚪' : '🔒';
+    dt.querySelector('.dt-title').textContent = open ? '문 열려 있음' : '문 닫혀 있음';
+    dt.querySelector('.dt-sub').textContent = nv ? '출입 제한 중엔 못 바꿔요' : open ? '친구가 바로 들어와요 · 누르면 닫기' : '친구가 노크해야 들어와요 · 누르면 열기';
+    const vt = $('noVisitTile');
+    vt.classList.toggle('on', nv);
+    vt.querySelector('.dt-title').textContent = nv ? '출입 제한 중' : '출입 제한';
+    vt.querySelector('.dt-sub').textContent = nv ? '아무도 못 들어오고 노크 · 초대도 막혀요 · 누르면 풀기' : '아무도 못 들어오게 (노크 · 초대 막기)';
     $('goHomeBtn').hidden = !!inMine;
-    $('leaveBtn').hidden = !S.room;
-    $('leaveBtn').textContent = inMine ? '집 비우고 혼자 놀기' : '나가서 혼자 놀기';
     $('membersTitle').hidden = !(inMine && S.peers.length);
     const ml = $('memberList'); ml.textContent = '';
     if (inMine) for (const p of S.peers) ml.append(personRow(p, (li) => {
@@ -981,9 +1003,13 @@
       li.append(btn('🚫', 'x', () => { if (confirm(`${p.nickname}(@${p.username})님을 차단할까요?`)) buddy.send('srv', { type: 'block', username: p.username }); }, false, '차단'));
     }));
   }
-  $('doorBox').onchange = (e) => buddy.send('lock', !e.target.checked);
+  $('doorTile').onclick = () => { const u = S?.session?.user; if (u && !u.noVisit) buddy.send('lock', !u.locked); };
+  $('noVisitTile').onclick = () => {
+    const u = S?.session?.user; if (!u) return;
+    if (!u.noVisit && S.room?.isOwner && S.peers.length && !confirm(`🚫 출입 제한을 켤까요?\n지금 와 있는 ${S.peers.length}명은 그대로 있고, 새로 들어오거나 노크 · 초대는 못 해요.`)) return;
+    buddy.send('srv', { type: 'no-visit', on: !u.noVisit });
+  };
   $('goHomeBtn').onclick = () => buddy.send('open-my-room');
-  $('leaveBtn').onclick = () => buddy.send('leave-room');
   $('joinCode').oninput = (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); };
   $('joinBtn').onclick = () => buddy.send('join-room', $('joinCode').value);
   $('joinCode').onkeydown = (e) => { if (e.key === 'Enter') $('joinBtn').click(); };
@@ -1037,6 +1063,10 @@
     const here = S.room && S.room.owner.username;
     for (const f of F.friends) {
       fl.append(personRow(f, (li) => {
+        // 0.17.8 ⭐ 친구 즐겨찾기 (맨 위로, 나만 보는 표시)
+        const star = btn(f.fav ? '★' : '☆', 'friend-star' + (f.fav ? ' on' : ''), () => buddy.send('srv', { type: 'friend-fav', username: f.username, on: !f.fav }), false, f.fav ? '즐겨찾기 빼기' : '즐겨찾기 (맨 위로 · 나만 보여요)');
+        li.prepend(star);
+        if (f.fav) li.classList.add('fav');
         const st = document.createElement('span'); st.className = 'state';
         const acts = document.createElement('span'); acts.className = 'acts';
         let action;
@@ -1046,6 +1076,7 @@
         if (here === f.username) { st.textContent = `같이 있어요 · 👥 ${cnt}`; st.classList.add('open'); }
         else if (!f.online) st.textContent = '오프라인';
         else if (!f.hosting) st.textContent = '집 비움';
+        else if (f.noVisit) st.textContent = '🚫 출입 제한';   // 0.17.8 노크 · 놀러가기 · 초대 안 됨
         else if (full) st.textContent = `🈵 가득 참 · 👥 ${cnt}`;
         else if (f.open) { st.textContent = `🚪 문 열림 · 👥 ${cnt}`; st.classList.add('open'); action = btn('놀러가기', 'primary small', () => buddy.send('visit', f.username)); }
         else { st.textContent = `🔒 문 닫힘 · 👥 ${cnt}`; action = btn('똑똑', 'ghost small', () => buddy.send('knock', f.username)); }
@@ -1054,12 +1085,13 @@
         // 내 집에 있을 때: 온라인 친구를 바로 초대
         if (S.room?.isOwner && f.online && here !== f.username) {
           const inHere = (S.peers || []).some((p) => p.username === f.username);
-          if (!inHere) acts.append(btn('📨 초대', 'ghost small', () => buddy.send('srv', { type: 'invite', username: f.username }), false, '내 집으로 초대하기 (문이 닫혀 있어도 들어올 수 있어요)'));
+          if (!inHere) acts.append(btn('📨 초대', 'ghost small', () => buddy.send('srv', { type: 'invite', username: f.username }), !!(u.noVisit || f.noVisit),
+            u.noVisit ? '🚫 출입 제한 중엔 초대를 보낼 수 없어요' : f.noVisit ? `${f.nickname}님은 출입 제한 중이에요` : '내 집으로 초대하기 (문이 닫혀 있어도 들어올 수 있어요)'));
         }
         // 친구 집에 놀러 와 있을 때: 내 친구를 이 집으로 초대 (집주인이 허락해야 들어와요)
         if (S.room && !S.room.isOwner && f.online && here !== f.username) {
           const inHere = (S.peers || []).some((p) => p.username === f.username);
-          if (!inHere) acts.append(btn('📨 이 집으로', 'ghost small', () => buddy.send('srv', { type: 'invite-fof', username: f.username }), false, `${S.room.owner.nickname}님 집으로 초대하기 (${S.room.owner.nickname}님이 허락하면 들어와요)`));
+          if (!inHere && !f.noVisit) acts.append(btn('📨 이 집으로', 'ghost small', () => buddy.send('srv', { type: 'invite-fof', username: f.username }), false, `${S.room.owner.nickname}님 집으로 초대하기 (${S.room.owner.nickname}님이 허락하면 들어와요)`));
         }
         const li2 = { append: (...x) => acts.append(...x) };
         li2.append(btn('🪪', 'ghost small', () => openProfile(f.username), false, '프로필 보기'));   // 0.17.3
@@ -1281,8 +1313,8 @@
       $('friendAquaBtn').onclick = () => window.HomeGame && HomeGame.openAquarium(S.room.owner.username);
     }
     const badge = $('roomBadge');
-    if (S.room) { badge.className = 'badge on'; const max = S.room.max || catalog.roomMax; badge.textContent = `👥 ${S.peers.length + 1}${max ? '/' + max : '명'}${S.room.locked ? ' · 🔒' : ' · 🚪 열림'}`; badge.title = max ? `이 방에 ${S.peers.length + 1}명이 있어요 (최대 ${max}명)` : ''; }
-    else { badge.className = 'badge off'; badge.textContent = '혼자 놀기'; }
+    if (S.room) { badge.className = 'badge on'; const max = S.room.max || catalog.roomMax; badge.textContent = `👥 ${S.peers.length + 1}${max ? '/' + max : '명'}${S.room.isOwner && S.session?.user?.noVisit ? ' · 🚫 출입 제한' : S.room.locked ? ' · 🔒' : ' · 🚪 열림'}`; badge.title = max ? `이 방에 ${S.peers.length + 1}명이 있어요 (최대 ${max}명)` : ''; }
+    else { badge.className = 'badge off'; badge.textContent = '…'; }
     for (const b of $('lightBtn').querySelectorAll('button')) {
       const f = Number(b.dataset.floor), on = lightOn(v.home, f);
       b.textContent = `${on ? '💡' : '🌙'} ${f}층`;
