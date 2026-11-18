@@ -22,7 +22,7 @@ const SEND = [
 ];
 const INVOKE = ['get-state', 'list-windows', 'get-chat', 'get-skins', 'get-theme', 'get-update', 'get-timers', 'yt-info', 'sticky-get'];
 const ON = [
-  'init', 'config', 'self', 'windows', 'peers', 'chat', 'emote', 'summon', 'peer-pos',
+  'init', 'config', 'self', 'windows', 'peers', 'chat', 'emote', 'summon', 'peer-pos', 'cursor',
   'login-state', 'login-error', 'account',
   'home-state', 'reward', 'toast', 'focus-chat', 'skins', 'skin-saved', 'theme', 'update', 'srv',
   'timers', 'snack', 'alarm', 'open-dm', 'sticky-data', 'open-tab',

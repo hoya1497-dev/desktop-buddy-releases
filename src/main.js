@@ -199,6 +199,24 @@ function createOverlay() {
   overlay.setIgnoreMouseEvents(true, { forward: true });
   overlay.loadFile(path.join(__dirname, 'overlay.html'));
   overlay.webContents.on('did-finish-load', sendInit);
+  startCursorWatch();
+}
+// 🖱️ 바탕화면 캐릭터 클릭이 가끔 안 되던 문제 — 클릭이 통과하는 창은 Windows 가 마우스 움직임을
+// 가끔 안 넘겨줘서(다른 창이 맨 위로 왔다 가거나 절전 뒤 등) 캐릭터 위에 마우스가 있어도 모름 → 메인이 직접 커서 자리를 알려 줌
+let cursorTimer = null, lastCursor = '';
+function startCursorWatch() {
+  if (cursorTimer) return;
+  cursorTimer = setInterval(() => {
+    try {
+      if (!overlay || overlay.isDestroyed() || !overlay.isVisible()) return;
+      const p = screen.getCursorScreenPoint(), b = overlay.getBounds();
+      const x = p.x - b.x, y = p.y - b.y;
+      const key = x + ',' + y;
+      if (key === lastCursor) return;
+      lastCursor = key;
+      overlay.webContents.send('cursor', { x, y });
+    } catch {}
+  }, 60);
 }
 function sendInit() {
   overlay?.webContents.send('init', { floorY: displayInfo().floorY, config: publicConfig(), self: selfProfile() });
@@ -436,6 +454,7 @@ let wantRoom = null;
 let room = null;       // { code, owner, isOwner, locked, home }
 let myPeerId = null;
 let peers = new Map();
+let peerPos = new Map();   // 🧍 친구들 집 안 자리 (집 창을 나중에 열어도 같은 자리에서 시작)
 let retry = 0, retryTimer = null;
 let netState = 'offline';
 let fishingView = false;   // 집 창에서 낚시터에 있는지 (미니맵에 낚시터를 보여 줌)
@@ -558,6 +577,7 @@ function handleServer(m, sock) {
       // 🏢 운영자 회의장: 집 대신 회의실 (집 그림은 내 집 걸로 채워 두고, 화면은 회의장만 그림)
       room = { code: m.room, owner: m.owner, isOwner: m.isOwner, locked: m.locked, max: m.max, home: m.home || session?.user.home || null, meeting: m.meeting || null };
       peers = new Map(m.peers.map((p) => [p.id, p.profile]));
+      peerPos = new Map();
       // 이미 방에 있던 사람들 그림도 받아 오기 (예전엔 빠져서 집주인이 기본 고양이로 보였음)
       for (const p of peers.values()) requestSkin(p.username, p.skin?.v);
       pushPeers();
@@ -581,7 +601,7 @@ function handleServer(m, sock) {
       break;
     case 'peer-leave': {
       const p = peers.get(m.id);
-      peers.delete(m.id); pushPeers();
+      peers.delete(m.id); peerPos.delete(m.id); pushPeers();
       if (p) addChat({ system: true, text: `${p.nickname}님이 나갔어요.` });
       break;
     }
@@ -667,6 +687,7 @@ function handleServer(m, sock) {
       }
       break;
     case 'peer-pos':   // 🧍 친구가 보낸 집 안 위치 → 내 화면의 그 친구 캐릭터도 같은 자리로
+      peerPos.set(m.id, { x: m.x, y: m.y, state: m.state, dir: m.dir, inBed: m.inBed });
       for (const w of homes()) w.webContents.send('peer-pos', { id: m.id, x: m.x, y: m.y, state: m.state, dir: m.dir, inBed: m.inBed });
       break;
     case 'photo':   // 📷 방 안 사진: 채팅 기록(chatLog)에는 안 남기고 집 창에만 바로 보여 줌
@@ -839,6 +860,7 @@ function homeState() {
   return {
     net: netState, session, room, myPeerId, peers: peerList(), self: selfProfile(), friends, knocks, invites: invites.filter((k) => Date.now() - k.at < 5 * 60_000), fishing: fishingView,
     view: { showAllPets: !!config.showAllPets },
+    peerPos: Object.fromEntries(peerPos),
   };
 }
 // 집 창 + 미니맵 (미니맵은 같은 집 화면을 작게 보여 줌)

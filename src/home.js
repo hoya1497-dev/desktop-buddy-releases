@@ -264,6 +264,7 @@
     }
   }
 
+  let lastPosSend = 0, lastPosSent = null;   // 내 집 안 자리 보내기 (syncPets 에서도 씀)
   function syncPets() {
     if (!S) return;
     const want = new Map();
@@ -271,8 +272,13 @@
     if (S.room) for (const p of S.peers) want.set(p.id, p);
     for (const id of [...pets.keys()]) if (!want.has(id)) pets.delete(id);
     for (const [id, prof] of want) {
-      if (!pets.has(id)) pets.set(id, new HomePet(id, prof));
-      else pets.get(id).setProfile(prof);
+      if (!pets.has(id)) {
+        const p = new HomePet(id, prof);
+        const at = id !== 'me' && S.peerPos && S.peerPos[id];   // 처음부터 그 사람의 진짜 자리에
+        if (at && Number.isFinite(at.x) && Number.isFinite(at.y)) { p.x = at.x; p.y = at.y; p.target = { ...at }; }
+        pets.set(id, p);
+        if (id !== 'me') lastPosSent = null;   // 새로 온 사람에게 내 자리를 바로 보냄
+      } else pets.get(id).setProfile(prof);
     }
   }
 
@@ -685,14 +691,13 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden && window.Furniture?.verifyCache && Furniture.verifyCache()) resetArtCaches(); });
   setInterval(() => { try { if (window.Furniture?.verifyCache && Furniture.verifyCache()) resetArtCaches(); } catch {} }, 4000);
   let last = performance.now();
-  let lastPosSend = 0, lastPosSent = null;
   function sendMyPos(t) {
     const me = pets.get('me');
     if (MINI || !me || !S || !S.room || meetingMode()) return;   // 0.17.2: 미니맵은 위치를 안 보냄 (집 창과 둘이 따로 보내서 서버 한도를 다 썼음)
     if (t - lastPosSend < 180) return;
     const snap = { x: Math.round(me.x), y: Math.round(me.y), state: me.state, dir: me.dir, inBed: !!me.inBed };
     const same = lastPosSent && snap.x === lastPosSent.x && snap.y === lastPosSent.y && snap.state === lastPosSent.state && snap.dir === lastPosSent.dir;
-    if (same) return;
+    if (same && t - lastPosSend < 3000) return;   // 가만히 있어도 3초마다 한 번 (놓친 사람도 맞춰지게)
     lastPosSend = t; lastPosSent = snap;
     buddy.send('home-pos', snap);
   }

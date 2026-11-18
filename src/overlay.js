@@ -544,6 +544,12 @@
     document.body.style.cursor = hovered ? 'grab' : 'default';
   }
 
+  // 메인이 알려 주는 커서 자리 (마우스 움직임이 안 넘어와도 캐릭터 위인지 알 수 있게, 끄는 중엔 진짜 이벤트만)
+  buddy.on('cursor', ({ x, y }) => {
+    if (drag || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    mouse = { x, y };
+    refreshHover();
+  });
   addEventListener('mousemove', (e) => {
     mouse = { x: e.clientX, y: e.clientY };
     if (drag) {
